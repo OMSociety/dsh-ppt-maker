@@ -33,6 +33,11 @@
 |---|---|---|
 | task-8 PR1-C（AI 质检层 + 语料对拍 + SKILL.md/README/CHANGELOG + 打包验证） | 未开工 | 施工图读 PR1 计划 §6（AI 层）/§8/§9；AI 通路：`inject` 加 `llm`+`attachments`，`ctx.llm.stream` + `ctx.llm.resolveModelInfo(...).inputModalities` 门控 + `ctx.attachments.saveImages` 入库；截图源 = ppt_render 产物页 PNG；语料对拍：tests/corpus/ 20 份 PPTD→pptx→loadPresentation 断言关键字段；打包验证：check-mounts 清零、lib/ 已提交、peerDeps 两闸、`dsh plugin add` 装载实测 |
 
+## 会话接力记录
+
+- 本会话（lead）：D0 六轮字体嵌入攻坚（见下表字体嵌入行）；任务板 task-1~8 建立与派发；HANDOFF 初版。
+- 会话 1（手动开）：完成 PR1-B（task-7），提交 `5d4f93d`；顺手把 PR1-A/B 交付明细补进本表。
+
 ## 已完成
 
 | 任务 | 交付 | 验收 |
