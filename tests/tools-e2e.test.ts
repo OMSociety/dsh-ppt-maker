@@ -79,12 +79,12 @@ afterEach(async () => {
 })
 
 describe('宿主入口', () => {
-  it('inject 声明 tools/sessions/skills + llm/attachments（PR1-C AI 质检），无 webServer（PR2）', () => {
-    expect(inject).toEqual(['tools', 'sessions', 'skills', 'llm', 'attachments'])
+  it('inject 声明 tools/sessions/skills + llm/attachments + webServer（PR2）', () => {
+    expect(inject).toEqual(['tools', 'sessions', 'skills', 'llm', 'attachments', 'webServer'])
     expect(pluginName).toBe('dsh-ppt-maker')
   })
 
-  it('apply 注册 1 个技能 + 8 个工具', () => {
+  it('apply 注册 1 个技能 + 11 个工具', () => {
     const { ctx, skillDefs } = makeCtx(cwd)
     apply(ctx)
     expect(skillDefs).toHaveLength(1)
@@ -94,6 +94,9 @@ describe('宿主入口', () => {
       'ppt_create',
       'ppt_edit',
       'ppt_export',
+      'ppt_import',
+      'ppt_open',
+      'ppt_patch',
       'ppt_redo',
       'ppt_render',
       'ppt_themes',

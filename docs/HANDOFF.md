@@ -27,17 +27,29 @@
 | `WorkBench/spike-pptx-editor/REPORT.md` | pptx-editor 可嵌入+中文劫持方案（后备） |
 | `WorkBench/corpus/` | 原始语料 7 份（含现实元素，**绝不进仓库**） |
 
+## 硬纪律（任何会话都必须遵守）
+
+1. **开工先 `git status`**：看清工作区有没有上个会话的半成品，别在脏树上盲改。
+2. **不推远端**：多 PR 全部完成、文档重写后才推；本地提交随便做。
+3. **工具注册用 raw JSON-Schema**，禁 `import defineTool`。
+4. **cwd 获取**：`exec.agent.session.id` → `ctx.sessions.get(id).header.cwd`，缺 cwd 报错不回落 process.cwd()。
+5. **pin 版本**：@office-kit/pptx@0.24.0、@deepseek-ai/libreoffice-kit@0.1.2。
+6. **两个合法 import 点**（PR2 起）：`src/core/engine/officekit.ts` 与 `src/core/reverse/`（读后映射盘）。其余源码不直接 import @office-kit/pptx。
+7. **语料红线**：WorkBench/corpus/ 原始文件绝不提交进 git；tests/corpus/ 只收脱敏变体。
+8. **文档纪律**：不写被否方案、不写日期戳战记、No Negative Echo。
+
 ## 当前进行
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| PR2（逆向 + 外科手术模式 + 自研编辑器 + webServer 路由） | 未开工 | 施工图读 docs/PR2-逆向与工作台-开发计划.md；PR1 三件套已全部收口（下方已完成表），引擎 pin 与质检分层契约冻结 |
+| PR3（字体嵌入 EOT / 转场动画 / 桌面轨道删除） | 待开工 | 施工图读 docs/PR3-去Kimi化-开发计划.md；PR1 与 PR2 已收口（见下行） |
 
 ## 会话接力记录
 
 - 本会话（lead）：D0 六轮字体嵌入攻坚（见下表字体嵌入行）；任务板建立与派发（任务板跨会话换代，旧 task-1~8 编号作废，PR2 现为新 task-1）；HANDOFF 初版；PR1-C 验收（81/81 复跑通过）；`~/.dsh/AGENTS.md` 路由表 kimi-ppt → ppt-maker 已改。
 - 会话 1（手动开）：完成 PR1-B（task-7），提交 `5d4f93d`；顺手把 PR1-A/B 交付明细补进本表。
 - 会话 2（task-8）：完成 PR1-C，提交 `f2c819b`（未推送）。
+- 本会话（lead，接 PR2）：任务板换代重建（task-1~6），task-1 逆向引擎、task-3 三工具、task-6 整合接线由 lead 做；task-2 宿主路由与 task-4/5 客户端骨架/组件由队友 host-routes 与 client-skeleton 并行完成。vitest 全量 131/131 绿、tsc 全绿、tsup + build-client 串行构建通过。
 
 ## 已完成
 
@@ -49,13 +61,9 @@
 | PR1-A（task-6） | 改名 dsh-ppt-maker + 五工具 + 解析层 + 历史层 | vitest 35/35、tsup 构建通过、提交 5452f00（**本地未推送**） |
 | PR1-B（task-7） | 引擎接口层（engine/types.ts + officekit.ts，唯一 import @office-kit/pptx 的文件）+ 富文本编译器（richtext.ts）+ 规则质检层（core/review/：auditTextLayout 溢出 / 出界 / 重叠 / 对比度 / validatePresentation / missingFonts）+ 共享管线（core/export-pipeline.ts：load→build→save/render/check 一条链）+ 三工具（ppt_render / ppt_export / ppt_check，raw JSON-Schema） | vitest 40/40（引擎 5 + e2e 全链含 export/render/check）、tsup 构建通过（lib/index.js 403.94KB）、e2e 实测：导出 pptx 落盘 + libreoffice-kit 渲染 PNG 成功 + 质检 pass |
 | PR1-C（task-8） | AI 质检层（core/review/ai.ts：零宿主 import 结构型接口、BlockAssembler 协议手卷消费、窄校验 + 坏条目丢弃、五段降级链——缺 llm/无路由/无视觉模态/saveImages 失败/解析失败全降级 performed:false + PNG 路径 + 版式摘要；路由取 requestHeader().config，resolveModelInfo 门控，attachments.saveImages 入库）+ inject 加 llm/attachments + 语料对拍 tests/corpus-roundtrip.test.ts（20 份脱敏 pptx：页数台账/画布比例/图表表格计数/隐藏页/备注/脱敏红线）+ 文档收尾（SKILL.md 工具优先重写、README、CHANGELOG [1.0.0]、locale、cordis.patch.yml） | vitest 81/81（7 文件：corpus 26 + review-ai 15 + 既有 40）、tsc 全绿、tsup lib/index.js 416.12KB、check-mounts 0 error/0 warn；提交 `f2c819b`（本地未推送）。实测 API 形态修正：`getPresentation*CountsBySlide` 返 readonly number[]、`getSlideNotes` 返 string\|null、fumunc 两份画布 18288000×10287000 EMU |
-
-## 硬纪律（任何会话都必须遵守）
-
-1. **开工先 `git status`**：看清工作区有没有上个会话的半成品，别在脏树上盲改。
-2. **不推远端**：多 PR 全部完成、文档重写后才推；本地提交随便做。
-3. **工具注册用 raw JSON-Schema**，禁 `import defineTool`。
-4. ** cwd 获取**：`exec.agent.session.id` → `ctx.sessions.get(id).header.cwd`，缺 cwd 报错不回落 process.cwd()。
-5. **pin 版本**：@office-kit/pptx@0.24.0、@deepseek-ai/libreoffice-kit@0.1.2。
-6. **语料红线**：WorkBench/corpus/ 原始文件绝不提交进 git；tests/corpus/ 只收脱敏变体。
-7. **文档纪律**：不写被否方案、不写日期戳战记、No Negative Echo。
+| PR2 task-1（逆向引擎） | src/core/reverse/{types,read,map,writeProject,apply,index}.ts（新增「第二合法 import @office-kit/pptx」点）+ tests/reverse-import.test.ts + tests/__fixtures__/pptx-fixtures.ts | vitest 3/3：fixture round-trip 字段完整、chart/smartart 走 dropped + 占位、media sha1 去重 |
+| PR2 task-2（宿主路由） | plugin/host/{store,routes}.mjs：per-session store（Map<sessionId,{projects,activeKey,lastSeenRevision,openRequests}>，TTL 60s）+ /ppt-maker/api 前缀路由（state/project/page/thumb/media/edit/media.upload/undo/redo/export/active/tab-opened），防护逐字照 fishpai；deps.core 注入（不 import lib/），thumbnail 走 libreoffice-kit `(abs,revision,page)` 磁盘缓存 | tests/host.test.ts 16/16：sameOrigin 各分支、413/409/415、/edit op 应用与 revision 推进、undo/redo 游标、/media/upload 白名单+5MB、openRequest TTL |
+| PR2 task-3（三工具） | src/tools/{import,open,patch}.ts（raw JSON-Schema；ppt_import full/surgical 双模式、ppt_open 仅回写 openRequest、ppt_patch 三类 op 走 L1 passthrough）+ tests/tools-pr2.test.ts + 共享 fixture | tests/tools-pr2.test.ts 8/8：surgical 早退、full 导入计数、SourceNotFound 404、registerProject + requestOpen 调桥、ppt_patch 改字 + lostParts 为空 + 不原地写源文件 |
+| PR2 task-4（客户端骨架） | client/{index,store,api,styles,icons,skeleton}.tsx/ts + scripts/build-client.mjs（esbuild → lib/client.js 81.5KB）+ tests/{client-bundle.guard,client-store}.test.ts | 守卫测试 9/9 + store 纪律测试 14/14；产物 `__ModuleLoader__` 形态、9 项平台种子逐字核对、metafile 输入守卫、tsc 全绿 |
+| PR2 task-5（工作台组件） | client/{panel.tsx,components/{ProjectList,ThumbStrip,Stage,TextEditor,Inspector,Toolbar}.tsx} + client/store.ts 扩展（deck/deckPages/currentPageData/currentPageRevision + updateElement/movePage/duplicatePage/removePage/addPage/uploadMedia/exportDeck） | tests/client-store.test.ts 14/14、client-bundle.guard.test.ts 9/9；check-mounts 0 error |
+| PR2 task-6（整合接线） | package.json（`dsh.client.platform='web'`、exports["./client"]、files 含 lib、peerDependencies 加六个 dsh 包、build 接 `tsup && node scripts/build-client.mjs`）+ src/index.ts（inject 加 webServer、新增三工具注册、plugin/host/ 按需动态 import 起 webServer 前缀路由 + 工具 backchannel 桥）+ tsconfig.json（noImplicitAny=false 给 plain-JS plugin/host/ 让路）+ tests/tools-e2e.test.ts 同步（inject 列表 + 11 个工具） | vitest 全量 131/131、tsc 全绿、tsup build 457.18KB + build-client 81.5KB 串行通过 |

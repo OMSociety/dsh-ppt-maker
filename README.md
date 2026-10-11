@@ -23,12 +23,14 @@
 
 | 特性 | 说明 |
 |---|---|
-| **工具层直出** | 八个 `ppt_*` 工具（raw JSON-Schema 注册）：创建/编辑/撤销/重做/渲染/质检/导出，引擎 `@office-kit/pptx@0.24.0` 本地纯 TS 构建最终 .pptx，不依赖 Python 主链 |
+| **工具层直出** | 11 个 `ppt_*` 工具（raw JSON-Schema 注册）：创建/编辑/撤销/重做/渲染/质检/导出/导入/打开/外科手术，引擎 `@office-kit/pptx@0.24.0` 本地纯 TS 构建最终 .pptx，不依赖 Python 主链 |
+| **双向性** | 读取并改写既有 .pptx：`ppt_import` 全量逆向进 PPTD 工程（图表/SmartArt/OLE 自动落灰底占位），`ppt_patch` 外科手术（改字/换图/调页序）不走 PPTD 往返，库级 L1 passthrough 保住未建模部件 |
 | **PPTD v3** | 自主契约的 YAML DSL（`deck.pptd` + `pages/*.page`），单页自包含、可视即所得；双方言（generate 生成 / reverse 逆向超集） |
+| **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板），所见即所得：双击文字就地改、拖拽调页序、图片一键替换、撤销/重做、409 冲突提示与「外部已修改」banner |
 | **质检分层** | 规则层（文字溢出/出界/重叠/对比度/结构/缺字体）阻断式，blocker 拦导出；AI 层按需（`ppt_check ai:true`）把最终渲染页 PNG 送多模态模型看配色/层级/平衡，只出建议不阻断 |
 | **修订与快照** | manifest.json 单一写者 + append-only 快照（游标模型，undo/redo 天然成立）+ baseRevision 乐观锁（409） |
 | **设计系统** | 内置学术 / 咨询 / 金融 / 促销 / 工作五族预设主题，选题后整套版式配色层级一致 |
-| **本地渲染预览** | `ppt_render` 用 `@deepseek-ai/libreoffice-kit` 把最终 pptx 光栅化成每页 PNG，所见即所得 |
+| **本地渲染预览** | 面板缩略图与「精确预览」都用 `@deepseek-ai/libreoffice-kit` 光栅化最终 pptx；每页（page, revision）磁盘缓存 |
 
 ## 工具清单
 
@@ -41,6 +43,18 @@
 | `ppt_render` | 渲染每页 PNG 预览（最终 pptx 光栅化，96dpi 默认） |
 | `ppt_check` | 规则质检（默认）+ AI 视觉质检（`ai:true`，路由不支持图像时降级为 PNG 路径清单） |
 | `ppt_export` | 导出 .pptx（规则 blocker 拦截，`skipCheck:true` 绕过；摘要落账 manifest.exportReport） |
+| `ppt_import` | .pptx → PPTD v3 全量逆向（dropped/degraded 两级报告 + 占位形状回插） |
+| `ppt_open` | 把右侧栏工作台打开到指定工程（per-session openRequest，TTL 60s） |
+| `ppt_patch` | 对 .pptx 外科手术：set_text / replace_image / move_page |
+| | （不走 PPTD 往返，库 L1 passthrough 保住 chart/SmartArt/OLE） |
+
+## 工作台
+
+右侧栏「PPT 创客」是三栏编辑器：缩略图条 + 画布（GET /thumb 渲 PNG）+ 属性面板。
+
+- **编辑动作**：双击文字就地改 / 拖拽调页序 / 复制删除新增页 / 替换图片 / 「精确预览」整页重渲。
+- **冲突保护**：所有写入都带 `baseRevision`，模型在另一个会话里改了同一工程会回 409——面板只亮冲突条，不覆盖人的手改；「外部已修改」提示同理。
+- **轮询**：每 3s 拉 `/ppt-maker/api/state` 看 manifest.revision；模型 ppt_open / ppt_import 完成后面板自动聚焦到对应工程。
 
 ## 安装方式
 
@@ -70,7 +84,7 @@
 
 - **导出被拦**：规则质检有 blocker（文字溢出/出界/结构坏）→ 按 `ppt_check` 返回的 `issues` 逐条修，或 `skipCheck:true` 强行导出（不推荐）。
 - **AI 质检降级**：返回 `ai.performed:false` + PNG 路径清单时，说明当前路由模型不支持图像输入——主模型自行 `read_image` 那些 PNG 复核即可。
-- **逆向现有 pptx**：PR2 才给 `ppt_import`；本版请对既有 PPTD 工程操作。
+- **逆向现有 pptx**：`ppt_import` 全量逆向进 PPTD 工程；轻改（改字/换图/调页序）走 `ppt_patch` 不经 PPTD 往返，保留 SmartArt/OLE/图表等未建模部件。
 
 ## 更新日志
 

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "PPT Maker",
-    "description": "Create, edit and export presentations with create/theme/edit/undo/redo/render/check/export tools; rule-layer checks block bad exports, AI review is opt-in."
+    "description": "Create, edit and export presentations; reverse-engineer existing .pptx into a PPTD v3 project or patch them surgically, and use the right-hand workbench for visual editing."
   }
 }

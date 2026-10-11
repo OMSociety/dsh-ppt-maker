@@ -17,8 +17,11 @@ dsh-ppt-maker 重写首发（原 dsh-kimi-ppt 改头换面，版本重启 1.0.0�
 ### 新增
 
 - **工具层（PR1）**：八个 `ppt_*` 工具（raw JSON-Schema 注册）——`ppt_create` / `ppt_themes` / `ppt_edit` / `ppt_undo` / `ppt_redo` / `ppt_render` / `ppt_export` / `ppt_check`。引擎 `@office-kit/pptx@0.24.0` pin，本地纯 TS 直出最终 .pptx；预览 `@office-kit/pptx-preview`，渲染 `@deepseek-ai/libreoffice-kit@0.1.2`。
+- **逆向与外科手术（PR2）**：新增 `ppt_import`（PPTX → PPTD v3 全量逆向，`src/core/reverse/`，dropped/degraded 两级报告 + 占位形状落回原位）、`ppt_open`（请求右侧栏打开工程，per-session openRequest，TTL 60s）、`ppt_patch`（对 .pptx 轻改——set_text / replace_image / move_page，不经 PPTD 往返，库 L1 passthrough 保住 SmartArt/OLE/图表）。
+- **右侧栏工作台（PR2）**：自研三栏编辑器（缩略图条 + 画布 + 属性面板）：双击就地改字、HTML5 拖拽调页序、复制/删除/新增页、替换图片、撤销/重做、「精确预览」整页重渲；样式只走 `--dsw-alias-*`；产物经 `esbuild` 打成 `lib/client.js`（DSH `__ModuleLoader__` 形态）随包提交。
+- **宿主 webServer 路由（PR2）**：`/ppt-maker/api` 前缀（`/state` / `/project` / `/page` / `/thumb` / `/media` / `/edit` / `/media/upload` / `/undo` / `/redo` / `/export` / `/active` / `/tab-opened`），防护口径对齐 fishpai：同源校验（拒 cross-site / 环路字面量 Host / Origin 不匹配/为 null）、8MB 流式 413、写方法 415、ProjectError.status 归一 409/404。
 - **PPTD v3 自主契约**：`deck.pptd` + `pages/*.page` 单页自包含；双方言（generate 生成 / reverse 逆向超集）；动画词表 95 / 转场 42 与引擎 d.ts 逐字对拍。
-- **引擎接口层**：`engine/types.ts` 定义 DeckEngine 接口，`engine/officekit.ts` 是唯一 import `@office-kit/pptx` 的文件；富文本编译器 `richtext.ts` 覆盖 p/li/span/strong/em/u/s/sup/sub/a。
+- **引擎接口层**：`engine/types.ts` 定义 DeckEngine 接口，`engine/officekit.ts` 是唯一写入侧 import `@office-kit/pptx` 的文件，`core/reverse/` 是逆向读取侧第二个（且唯一另一个）合法 import 点；富文本编译器 `richtext.ts` 覆盖 p/li/span/strong/em/u/s/sup/sub/a。
 - **修订与快照**：manifest.json 单一写者；append-only 快照 + 游标模型（undo/redo 天然成立）；baseRevision 乐观锁 409；合并窗内连续编辑合并一条快照；第 0 号创建快照不驱逐；恢复时 media 哈希校验。
 - **规则质检层**：文字溢出（auditTextLayout）、出界、重叠、对比度（WCAG ≥3）、结构健全（validatePresentation）、缺字体（missingFonts 诊断）；blocker 阻断 `ppt_export`（`skipCheck:true` 可绕过）。
 - **AI 质检层（PR1-C）**：`ppt_check ai:true` 把 libreoffice-kit 渲染的最终成品页 PNG 经 `ctx.attachments.saveImages` 入库后送当前路由多模态模型（`ctx.llm.stream`），审配色/层级/平衡/图版搭配；只出建议不阻断。路由不支持图像输入（`resolveModelInfo().inputModalities` 不含 image）时降级为 PNG 路径清单 + 版式指标摘要，由主模型自行 `read_image` 复核。
