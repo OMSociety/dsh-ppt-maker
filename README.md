@@ -2,7 +2,7 @@
 
 <img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="160" alt="dsh-ppt-maker logo"/>
 
-# DSH PPT Maker
+# DSH PPT Maker（PPT 创客）
 
 **DeepSeek Harness 插件 —— 内含 ppt-maker 技能与八个 ppt_* 工具：创建 / 编辑 / 质检 / 导出 PPT，本地纯 TS 引擎直出最终 .pptx**
 
