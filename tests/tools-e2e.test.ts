@@ -79,8 +79,8 @@ afterEach(async () => {
 })
 
 describe('宿主入口', () => {
-  it('inject 声明 tools/sessions/skills，无 webServer（PR2）', () => {
-    expect(inject).toEqual(['tools', 'sessions', 'skills'])
+  it('inject 声明 tools/sessions/skills + llm/attachments（PR1-C AI 质检），无 webServer（PR2）', () => {
+    expect(inject).toEqual(['tools', 'sessions', 'skills', 'llm', 'attachments'])
     expect(pluginName).toBe('dsh-ppt-maker')
   })
 

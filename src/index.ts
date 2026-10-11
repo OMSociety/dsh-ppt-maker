@@ -9,10 +9,11 @@
  *     ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check (raw
  *     JSON-Schema via ctx.tools.register, per the PR 1 plan).
  *
- * `inject = ['tools', 'sessions', 'skills']`: the tools need `sessions` to
- * resolve the session cwd (`exec.agent.session.id` → `sessions.get(id).header
- * .cwd`); there is deliberately no process.cwd() fallback. `webServer` joins
- * the inject list in PR 2.
+ * `inject = ['tools', 'sessions', 'skills', 'llm', 'attachments']`: the tools
+ * need `sessions` to resolve the session cwd (`exec.agent.session.id` →
+ * `sessions.get(id).header.cwd`); there is deliberately no process.cwd()
+ * fallback. `llm` + `attachments` power the opt-in AI review pass of
+ * ppt_check (PR 1 plan §6, added in PR1-C). `webServer` joins in PR 2.
  *
  * Note: Cordis refuses bare service access without declaring it in `inject`,
  * and refuses to run apply() at all when an injected service is missing.
@@ -30,7 +31,7 @@ import { registerThemesTool } from './tools/themes.js'
 import { registerUndoTool } from './tools/undo.js'
 
 export const name = 'dsh-ppt-maker'
-export const inject = ['tools', 'sessions', 'skills']
+export const inject = ['tools', 'sessions', 'skills', 'llm', 'attachments']
 export { PACKAGE_ROOT }
 
 const SKILL_DIR = path.join(PACKAGE_ROOT, 'skills', 'ppt-maker')
@@ -63,6 +64,8 @@ interface ApplyCtx {
   skills?: SkillsLike
   tools?: Parameters<typeof registerCreateTool>[0]['tools']
   sessions?: Parameters<typeof registerCreateTool>[0]['sessions']
+  llm?: Parameters<typeof registerCheckTool>[0]['llm']
+  attachments?: Parameters<typeof registerCheckTool>[0]['attachments']
   logger?: { warn?: (message: string) => void }
   effect?: (fn: () => void | (() => void)) => void
 }
@@ -106,7 +109,7 @@ export function apply(ctx: ApplyCtx): void {
       registerCheckTool
     ]) {
       try {
-        const off = register({ tools: ctx.tools, sessions: ctx.sessions })
+        const off = register({ tools: ctx.tools, sessions: ctx.sessions, llm: ctx.llm, attachments: ctx.attachments })
         if (typeof off === 'function') offs.push(off)
       } catch (err) {
         ctx.logger?.warn?.(`[dsh-ppt-maker] tool registration failed: ${(err as Error).message}`)

@@ -30,7 +30,12 @@ export function toolError(err: unknown): ToolErrorResult {
 }
 
 export interface SessionsLike {
-  get(id: string): { header?: { cwd?: unknown } } | undefined
+  get(id: string):
+    | {
+        header?: { cwd?: unknown }
+        requestHeader?: () => { config?: { provider?: string; model?: string } } | undefined
+      }
+    | undefined
 }
 
 export interface ToolDef {
@@ -44,6 +49,10 @@ export interface ToolDef {
 export interface PluginToolCtx {
   tools: { register(def: ToolDef): unknown }
   sessions?: SessionsLike
+  /** AI 质检通路（PR1-C）：宿主 llm 服务，缺席时 ppt_check ai:true 显式降级。 */
+  llm?: import('../core/review/ai.js').LlmLike
+  /** AI 质检通路（PR1-C）：图片入库服务。 */
+  attachments?: import('../core/review/ai.js').AttachmentsLike
 }
 
 /** exec.agent.session.id — the only session key the tool layer trusts. */

@@ -31,7 +31,7 @@ import { auditTextLayout, type TextAuditIssue } from '@office-kit/pptx-preview'
 export interface ReviewIssue {
   page: number
   severity: 'blocker' | 'warning'
-  category: 'text-overflow' | 'out-of-canvas' | 'overlap' | 'contrast' | 'structure'
+  category: 'text-overflow' | 'out-of-canvas' | 'overlap' | 'contrast' | 'structure' | 'ai-visual'
   elementId?: string
   description: string
   suggestion?: string

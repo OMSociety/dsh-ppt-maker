@@ -1,28 +1,32 @@
 ---
 name: ppt-maker
-description: 生成/编辑/复刻/导出 PPT 与演示文稿。默认产出「可编辑 PPTD 项目 + 本地生成的 .pptx」（用 python-pptx 纯本地导出；字体嵌入/淡入淡出走桌面增强轨道，需桌面环境与网络）。内置学术/咨询/金融/促销/工作等设计系统与本地导出字体映射。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
+description: 生成/编辑/导出 PPT 与演示文稿。工具优先：用插件注册的八个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx）；Python 脚本（pptd_to_pptx.py 等）是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作等设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
 ---
 
 # ppt-maker：PPT 生成与本地导出
 
-用 PPTD（YAML 中间格式，单页自包含）写 deck，再**纯本地**导出可编辑 `.pptx`。
+用 PPTD v3（YAML 中间格式，单页自包含）写 deck，**工具层直接产出最终 .pptx**。
+
+## 工具优先
+
+做 PPT 一律先走工具，不要手写脚本调库。八个工具（全部 raw JSON-Schema 注册，参数里有 `dir` 的都是工程目录，相对会话 cwd）：
+
+| 工具 | 干什么 | 关键返回 |
+|---|---|---|
+| `ppt_create` | 新建工程 | `{ok, manifest:{revision:0,...}}` |
+| `ppt_themes` | 列设计系统/主题 | `{ok, themes:[...]}` |
+| `ppt_edit` | 原子编辑（ops 数组批量） | `{ok, revision, appliedOps, warnings}` |
+| `ppt_undo` / `ppt_redo` | 撤销/重做（游标移动，append-only 快照） | `{ok, revision}` |
+| `ppt_render` | 渲染每页 PNG 预览（libreoffice-kit 光栅化最终 pptx） | `{ok, images:[{page,path}]}` |
+| `ppt_check` | 质检（规则层默认跑；`ai:true` 追加 AI 视觉质检） | `{ok, pass, issues:[...]}` |
+| `ppt_export` | 导出 .pptx（规则质检 blocker 会拦住，`skipCheck:true` 绕过） | `{ok, path, revision, check}` |
+
+**质检分两层**：规则层（文字溢出/出界/重叠/对比度/结构/缺字体）是阻断式，blocker 不修掉就不给导出；AI 层（`ppt_check` 传 `ai: true`）只出建议不阻断——把最终渲染页 PNG 送当前路由的多模态模型看配色/层级/平衡。路由不支持图像输入时，AI 层降级为返回 PNG 路径清单 + 版式指标摘要，由你（主模型）自行 `read_image` 复核。
 
 ## 交付产物（默认必须齐备）
 
-除非用户明确只要 PPTD，默认同时交付：
-
-1. **可编辑 PPTD 工程目录**：`deck.pptd`（主题/大纲）+ `pages/*.page`（单页）+ `media/`（素材）；
-2. **本地生成的 `.pptx`**。
-
-工程目录布局（已有等价结构则沿用）：
-
-```text
-deck/
-  deck.pptd          # 主题与大纲
-  pages/*.page       # 每页自包含
-  media/             # 本地素材
-  deck.pptx          # 默认产出
-```
+1. **可编辑 PPTD 工程目录**：`deck.pptd` + `pages/*.page` + `media/` + `manifest.json`（账本）+ `.history/`（快照）；
+2. **本地生成的 `.pptx`**（`ppt_export` 产物）。
 
 ## 工作流
 
@@ -35,101 +39,49 @@ deck/
 | 输入 | 仅主题 / 完整文档 / 逐页大纲 |
 | 页数 | 用户指定优先；只给文档时先给页数估算并确认 |
 
-- 先读完用户上传的全部文件与 URL，再读 `reference/pptd.md` 掌握格式约束。
+- 先读完用户上传的全部文件与 URL。PPTD v3 的格式约束读 `docs/pptd-v3-spec.md`（仓库内）；v2 继承字段的细则读 `reference/pptd.md`。
 - 内容不足以撑满演示时，先用检索补充材料（除非用户明确说不扩展）。
-- 需求冲突或无法判定时**先问用户**：调用 `ask_user_question` 工具把冲突项摆成选项（推荐项放首位并加 `(Recommended)`，每项附一句取舍说明），一次一问；工具不可用或没有界面时退回对话里直接问。不要自行脑补。
+- 需求冲突或无法判定时**先问用户**：调用 `ask_user_question` 把冲突项摆成选项（推荐项放首位并加 `(Recommended)`），一次一问；不要自行脑补。
 
-### 二、前置检查
+### 二、用工具建工程
 
-**本地轨道（默认）**
+1. `ppt_themes` 看有哪些设计系统（学术/咨询/金融/促销/工作），用户指定了就用指定族，没指定就按场景挑一个；自定风格不要硬套预设。
+2. `ppt_create` 建工程（给 `dir`/`title`/`designSystem`/`theme`），拿回 `manifest.revision`（乐观锁的基准）。
+3. `ppt_edit` 批量加页加元素：一次调用发一串 ops（`add_page` / `add_element` / `update_element` / …），原子生效。**每次都要带上一次的 `baseRevision`**，返回 409 就是游标过期，重新读再改。
+4. 改错了用 `ppt_undo` / `ppt_redo`（合并窗内的连续编辑算一步）。
 
-- Python：`python-pptx` + `Pillow` + `PyYAML`。本地轨道脚本不会自动安装，缺哪个先补：
+### 三、生成内容的纪律
 
-  ```bash
-  python -m pip install python-pptx Pillow PyYAML
-  ```
-
-- 字体目录：自动扫描 Windows 与 macOS/Linux 的常见系统与用户字体目录；找不到就回退系统兜底字体（预览图不因此报错）。
-
-**桌面增强轨道（可选）**
-
-- 另需 Node.js 18+（含 npm）、Chrome 或 Edge，以及可连 `www.kimi.com` 与 `statics.moonshot.cn`（宿主页脚本 CDN，不可达时 deckStatus 报错）；`agent-browser` 由脚本经 npm 自动安装或升级（≥0.33.2），Windows 下脚本会另起一个调试用浏览器实例（端口 9337）。
-- 缺 `PyYAML` / `Pillow` / `websocket-client` 时脚本会自行 `pip install --user`。
-- 以上任一缺失就**直接退回本地轨道**，不硬等、不反复重试。
-
-### 三、字体核对（防豆腐块）
-
-```bash
-python scripts/check_fonts.py <deck.pptd>
-```
-
-- 规范名→实装名映射与免费商用状态见 `reference/local-fonts.md`；该表只是常见实装名的参考，一律以 `check_fonts.py` 在本机的输出为准（Windows 读注册表，Linux/macOS 扫系统与用户字体目录）。
-- `.pptd` 里一律写**目标机的实装名**，保证本地导出命中真实字体。
-- 报缺失时：给出缺失清单 + 本地替代（如 `SortsMillGoudy`→`Georgia`、`MiSans`→`更纱黑体 SC`），确认后改写 `.pptd` 再生成。
-
-### 四、生成
-
-- **新建**：按场景读 `reference/slides_categories.md` 里对应场景的规范。指定设计系统时只读该主题（`reference/design_system/`），**严禁混搭**；自定风格时不要自动挑预设。
-- **复刻**（图片/PDF → PPTD）：尽量 1:1。看不清的位置用网格线、放大观察；图标用 Font Awesome 近似；照片/头像这类无法用图形近似的，用脚本裁剪原图后作为图片元素插入。
-- **编辑**：先把 `pptx` 转成 `pptd` 并复核关键页，只改目标页、别波及范围外。转换有损，出现错乱就对照原 pptx 修。
-- **套模板**：转换后识别页型，重点读封面/总结/分节页，提取版式、可复用组件（图标/形状/正文布局）与元素样式再复用。
-- **风格迁移**：分析参考的配色、字体、版式、内容密度与组件，鼓励复用原 PDF/网页的插图与字号层级；给了 URL 不要只读文字，要看视觉。
-- **海报/信息图**：读 `reference/general-poster.md`，做成单页或少量页 PPTD，再渲染出图（普通 PPT 请求不要读它）。
-- **并行**：一轮内并行写多个 `.page` 文件，减少往返。
+- **新建**：按场景读 `reference/slides_categories.md` 对应场景的规范；指定设计系统时只读该主题（`reference/design_system/<族>/<子风格>/design.md`），**严禁混搭**。
+- **复刻**（图片/PDF → PPTD）：尽量 1:1。看不清的位置用网格线、放大观察；照片/头像这类无法用图形近似的，存 `media/` 后作为图片元素插入。
+- **编辑现有 PPT**：PR2 才给 `ppt_import`（逆向）；当前版本请用户对既有 deck 的 PPTD 工程操作。
+- **版式纪律**：多页 deck 避免版式雷同——同一套「三张等宽卡片」不要页页复用，按内容换用非对称两栏、Zig-Zag 交错、整幅图配文字条、时间轴等；层级用字重与色彩对比控制，不靠超大字号撑场面。
+- **语体纪律**：少用抽象套话与 AI 腔（"闭环/赋能/解构/主战场/看似…实则…/不是 A 而是 B"），以事实和证据说话。
 
 **配图纪律**
 
 1. 优先级：用户材料 → 官方/权威来源 → 检索到的相关图 → 生成图。
-2. 涉及产品、人物、地点、事件、界面、实验对象时优先用真实图片，别把每页都做成文字 + 色块。
+2. 涉及产品、人物、地点、事件、界面、实验对象时优先用真实图片。
 3. 先批量备好图再按比例排版；存 `media/`，**严禁拉伸变形**。
 4. 不放与页面结论无关的凑数图。
 
-**版式纪律**：多页 deck 避免版式雷同——同一套「三张等宽卡片」不要页页复用，按内容换用非对称两栏、Zig-Zag 交错、整幅图配文字条、时间轴等；层级用字重与色彩对比控制，不靠超大字号撑场面。
+### 四、校验（导出前必做）
 
-**语体纪律**：少用抽象套话与 AI 腔（"闭环/赋能/解构/主战场/看似…实则…/不是 A 而是 B"），不用口号式比喻，以事实和证据说话。
+1. **规则质检**：`ppt_check`（默认全页）。blocker（文字溢出/出界/结构坏）必须修；warning（重叠/对比度/缺字体）逐条过目。
+2. **视觉 QA**：`ppt_render` 出每页 PNG（最终 pptx 光栅化，所见即所得），逐页核对：图片清晰不变形、文字未压住关键画面、元素未越界、文字与背景对比足够、对齐/间距/字号层级统一。可疑页 `read_image` 全分辨率确认后再改，改完重跑直到全部通过。
+3. **AI 深检（按需）**：`ppt_check` 传 `ai: true`。路由不支持图像时会降级成 PNG 路径清单 + 版式摘要，由你自行 `read_image` 完成视觉复核。
 
-### 五、校验（导出前必做）
+### 五、导出与交付
 
-1. **结构校验**：对照 `reference/pptd.md` 查必填字段（`version` 必须是字符串 `v2`，否则本地导出直接退出）、类型、主题 token、资源路径，多轮修复。
-2. **视觉 QA**：
+`ppt_export` 落盘最终 .pptx（默认先跑规则质检，blocker 拦下；`skipCheck: true` 可绕过但不建议）。成功后摘要在 `manifest.exportReport` 落账。
 
-   ```bash
-   python scripts/pptd_to_png.py <deck.pptd>
-   ```
+- **交付清单**：给出绝对路径的可点击链接——工程目录、`.pptd`、`pages/`、`media/`、`.pptx`；结尾补一句后续操作提示。
+- **手动微调**：直接改 `.page` / `.pptd` 文件，然后 `ppt_render` 复核 + `ppt_export` 重出（工具层会发现磁盘内容与账本不一致并给 warning）。
 
-   缺省输出 `<工程目录>/.preview`（`page_N.png` + `overview.jpg`，`-o` 可改路径），逐页核对：图片清晰不变形、文字未压住关键画面、元素未越界、文字与背景对比足够、对齐/间距/字号层级统一、无文字溢出与遮挡。可疑页读全分辨率图确认后再改，改完重跑预览直到全部通过。`.preview/` 是中间产物，交付后可删。
+### 六、Python 逃生舱（默认不启用）
 
-   > 预览图渲染 text / shape / line / image（含 rotation），**不渲染 table、icon、chart**：含表格的页要另开 `.pptx` 核对。需要官方渲染效果时再跑 `scripts/export_images.py`（桌面增强轨道）。
-3. **模型不支持读图时**：退化为结构复核，并明确说明跳过了图像 QA。
+`scripts/` 下的 Python 脚本（`pptd_to_pptx.py` / `pptd_to_png.py` / `check_fonts.py`）是**逃生舱**：只在引擎库拒收的破损文件、或工具层明确覆盖不了的边角场景启用。常规创建/编辑/导出**不要走这条路**（本地轨道对表格/图表/动画的支持是真子集，会打 `dropped` 降级清单）。桌面增强轨道（`export_pptx.py` / `export_images.py`，字体嵌入 + 淡入淡出）属 PR3 限期删除项，本版仍可用但已 deprecated。
 
-### 六、导出与交付
+## 动画与备注
 
-两条轨道：**本地轨道**（默认，纯本地/离线/沙箱可用）产出标准可编辑 `.pptx`；**桌面增强轨道**（需桌面环境 + 网络，依赖见「二、前置检查」）在此基础上附加**字体嵌入 + 淡入淡出转场**，这两项只有桌面增强轨道提供。
-
-本地轨道的元素支持是**真子集**，未渲染或未映射的部分会向 stderr 打印 `dropped` 计数清单（末行 `dropped total: N`）：
-
-- **text / shape / line**：支持。line 的 `points` 取首末点映射到 bounds，中间控制点降级为直线（贝塞尔不实现）。
-- **image**：只插本地存在的文件；`fit` 三模式（`cover` 默认 / `contain` / `fill`）与 `crop` 正值按规范实现，`cropShape` 与 `crop` 负值（outset）降级。
-- **table**：结构、合并单元格与文本支持；主题样式做最小映射（`style` / `textStyle` 的首行强调、边框、纯色填充、zebra、字号/色/粗斜/字体族），其余样式字段降级。
-- **无 fill 的 shape** 按规范渲染为无填充；未知 `shapeName` 退成矩形；`custom` 只画灰描边占位（预览与导出一致）。
-- **icon / chart** 跳过；`notes`、`animations`、`opacity`、`flip` 本地轨道忽略；rotation 在导出轨道仅支持 shape（预览轨道支持 text / shape / line / image）。
-- deck 的 `pages` 为空时两条命令一致报错退出。
-
-deck 含降级项时改用桌面增强轨道，或如实说明差异。两条命令在输出文件已存在时都须加 `--force`，否则直接报错退出。
-
-1. **本地导出**：
-
-   ```bash
-   python scripts/pptd_to_pptx.py <deck.pptd> -o <工程目录>/deck.pptx --force
-   ```
-2. **桌面增强导出**：
-
-   ```bash
-   python scripts/export_pptx.py <deck.pptd> --output <工程目录>/deck.pptx --force
-   ```
-
-   沙箱报错（socket 权限 / 连接超时）就退回本地轨道。
-3. **导出后校验**：确认文件存在；淡入淡出须是每个 slide 的**根级唯一** `transition`（按 CT_Slide 顺序 `cSld` → 可选 `clrMapOvr` → `transition`），PPTX ZIP 完整性通过。只做字节搜索 `<p:fade>` 不算验证。
-4. **交付清单**：给出绝对路径的可点击链接——工程目录、`.pptd`、`pages/`、`media/`、`.pptx`；结尾补一句后续操作提示。
-5. **手动编辑**：直接用编辑器改 `.page`（或 `.pptd`）→ `pptd_to_png.py` 预览 → 重导出。
-6. **动画与备注**：默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才用，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。
+默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的完整清单见 `docs/pptd-v3-spec.md` 附录 A/B。

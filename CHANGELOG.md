@@ -10,6 +10,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-10-12
+
+dsh-ppt-maker 重写首发（原 dsh-kimi-ppt 改头换面，版本重启 1.0.0，不考虑旧兼容）。
+
+### 新增
+
+- **工具层（PR1）**：八个 `ppt_*` 工具（raw JSON-Schema 注册）——`ppt_create` / `ppt_themes` / `ppt_edit` / `ppt_undo` / `ppt_redo` / `ppt_render` / `ppt_export` / `ppt_check`。引擎 `@office-kit/pptx@0.24.0` pin，本地纯 TS 直出最终 .pptx；预览 `@office-kit/pptx-preview`，渲染 `@deepseek-ai/libreoffice-kit@0.1.2`。
+- **PPTD v3 自主契约**：`deck.pptd` + `pages/*.page` 单页自包含；双方言（generate 生成 / reverse 逆向超集）；动画词表 95 / 转场 42 与引擎 d.ts 逐字对拍。
+- **引擎接口层**：`engine/types.ts` 定义 DeckEngine 接口，`engine/officekit.ts` 是唯一 import `@office-kit/pptx` 的文件；富文本编译器 `richtext.ts` 覆盖 p/li/span/strong/em/u/s/sup/sub/a。
+- **修订与快照**：manifest.json 单一写者；append-only 快照 + 游标模型（undo/redo 天然成立）；baseRevision 乐观锁 409；合并窗内连续编辑合并一条快照；第 0 号创建快照不驱逐；恢复时 media 哈希校验。
+- **规则质检层**：文字溢出（auditTextLayout）、出界、重叠、对比度（WCAG ≥3）、结构健全（validatePresentation）、缺字体（missingFonts 诊断）；blocker 阻断 `ppt_export`（`skipCheck:true` 可绕过）。
+- **AI 质检层（PR1-C）**：`ppt_check ai:true` 把 libreoffice-kit 渲染的最终成品页 PNG 经 `ctx.attachments.saveImages` 入库后送当前路由多模态模型（`ctx.llm.stream`），审配色/层级/平衡/图版搭配；只出建议不阻断。路由不支持图像输入（`resolveModelInfo().inputModalities` 不含 image）时降级为 PNG 路径清单 + 版式指标摘要，由主模型自行 `read_image` 复核。
+- **语料对拍**：`tests/corpus/` 20 份脱敏 pptx（10 份真实变体 + 10 份合成）→ `loadPresentation` 断言关键字段（页数台账 / 画布尺寸 / 图表与表格计数 / 隐藏页 / 备注 / 脱敏红线抽查），进 CI。
+
+### 变更
+
+- 包名 `dsh-kimi-ppt` → `dsh-ppt-maker`；技能 key 同步换新（`skills/ppt-maker`）；`cordis.patch.yml` / locale / README 全部对齐。
+- `peerDependencies` 收窄为 `>=0.2.0-rc.2 <0.3.0-0`（放弃 0.1.x），并声明 `engines.dsh` 同区间。
+- Python 脚本降级为逃生舱（默认不启用）；桌面增强轨道（字体嵌入/淡入淡出）deprecated，PR3 限期删除。
+
+### 移除
+
+- 对 `kimi.com` / `statics.moonshot.cn` 的主链依赖（桌面增强轨道仍引用，已 deprecated）。
+
 ## [1.2.0] - 2026-10-09
 
 ### 新增
