@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "PPT Maker",
-    "description": "Create, edit and export presentations: a PPTD v3 project plus a locally generated .pptx, with create/theme/edit/undo/redo/render/check/export tools; rule-layer checks block bad exports, AI review is opt-in."
+    "description": "Create, edit and export presentations with create/theme/edit/undo/redo/render/check/export tools; rule-layer checks block bad exports, AI review is opt-in."
   }
 }
