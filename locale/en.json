@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Kimi PPT",
-    "description": "Create, edit and export presentations: a locally generated .pptx with Pillow-rendered previews, no browser needed."
+    "title": "PPT Maker",
+    "description": "Create, edit and export presentations: a PPTD v3 project plus a locally generated .pptx, with create/theme/edit/undo/redo tools."
   }
 }

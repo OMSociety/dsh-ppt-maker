@@ -2,7 +2,7 @@
 
 PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 YAML 抽象层：用 Agent 友好、单页自包含、人可肉眼审查的方式描述、生成与编辑幻灯片，并与 `.pptx` 双向转换。
 
-本文件是 PPTD **v3** 的规范性文档（normative document）：`version: "v3"` 的工程以本文件为准。本文件采用**增量规格**（incremental specification）写法——v3 新增与改动的部分在此写全文，v2 沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/kimi-ppt/reference/pptd.md`（PPTD v2 快照，2029 行）的具体章节与行号；被点名的 v2 章节与本文件同等 normative。两者冲突时以本文件为准。
+本文件是 PPTD **v3** 的规范性文档（normative document）：`version: "v3"` 的工程以本文件为准。本文件采用**增量规格**（incremental specification）写法——v3 新增与改动的部分在此写全文，v2 沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/ppt-maker/reference/pptd.md`（PPTD v2 快照，2029 行）的具体章节与行号；被点名的 v2 章节与本文件同等 normative。两者冲突时以本文件为准。
 
 ---
 

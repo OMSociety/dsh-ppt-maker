@@ -4,7 +4,7 @@
 
 ## 0. 范围与前置
 
-- **开工即改名**：package.json name → dsh-ppt-maker；plugin/index.mjs 的 name 常量与 `skills/kimi-ppt` 硬编码路径、cordis.patch.yml 的 name 断言、README 路径串、locale 同步改；技能 key 换新（不再叫 kimi-ppt）。提醒用户同步 ~/.dsh/AGENTS.md 路由表。
+- **开工即改名**：package.json name → dsh-ppt-maker；plugin/index.mjs 的 name 常量与 `skills/ppt-maker` 硬编码路径、cordis.patch.yml 的 name 断言、README 路径串、locale 同步改；技能 key 换新（不再叫 kimi-ppt）。提醒用户同步 ~/.dsh/AGENTS.md 路由表。
 - peerDeps 收窄 `>=0.2.0-rc.2 <0.3.0-0`；顺手加 `"engines": {"dsh": ">=0.2.0-rc.2 <0.3.0-0"}`（声明性）。
 - 引擎 pin `@office-kit/pptx@0.24.0`（不是 0.21.0；0.24.0 动画 95 preset、转场含 morph）。
 - D0 spike 已完成才可正式开工（字体嵌入双机实测 / L1 passthrough 比对 / libreoffice-kit 出图冒烟）。
@@ -118,4 +118,4 @@ dsh-ppt-maker/
 - ~~LLM 通路~~：已确认可行（见 §6）， spike 收敛为「resolveModelInfo 门控 + read_image 兜底」半日验证。
 - 富文本折叠（规格 1.2 六级优先级链）实现复杂，需逐条对测。
 - libreoffice-kit 是 MPL-2.0：调用其 CLI/API 合规（不链改源码），README 注明。
-- skills/kimi-ppt/ 目录改名后，Python 逃生舱脚本路径同步改。
+- skills/ppt-maker/ 目录改名后，Python 逃生舱脚本路径同步改。

@@ -1,7 +1,8 @@
-# DSH bundle layer: mount the host plugin that registers the bundled kimi-ppt skill.
+# DSH bundle layer: mount the host plugin that registers the bundled ppt-maker skill
+# and the PPT tool surface (ppt_create / ppt_themes / ppt_edit / ppt_undo / ppt_redo).
 #
 # `name` is the module specifier DSH imports (the vendor/loader resolves
 # `options.name`), so it must be the published package name, not the repo name.
 - insert:
-    - id: kimi-ppt
-      name: dsh-kimi-ppt
+    - id: ppt-maker
+      name: dsh-ppt-maker

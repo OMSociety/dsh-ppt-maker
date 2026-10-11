@@ -1,23 +1,23 @@
 {
-  "name": "dsh-kimi-ppt",
-  "version": "1.2.0",
+  "name": "dsh-ppt-maker",
+  "version": "1.0.0",
   "type": "module",
-  "description": "DeepSeek Harness plugin that bundles the kimi-ppt skill: create, edit and export PPT / slides / presentations as a locally generated .pptx with Pillow-rendered previews, no browser needed.",
+  "description": "DeepSeek Harness plugin that bundles the ppt-maker skill and the PPT tool surface: create, inspect, edit, undo and redo a PPTD v3 project that exports to a locally generated .pptx.",
   "author": "OMSociety (https://github.com/OMSociety)",
-  "homepage": "https://github.com/OMSociety/dsh-kimi-ppt#readme",
-  "bugs": "https://github.com/OMSociety/dsh-kimi-ppt/issues",
+  "homepage": "https://github.com/OMSociety/dsh-ppt-maker#readme",
+  "bugs": "https://github.com/OMSociety/dsh-ppt-maker/issues",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OMSociety/dsh-kimi-ppt.git"
+    "url": "git+https://github.com/OMSociety/dsh-ppt-maker.git"
   },
   "keywords": [
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
-    "kimi",
     "ppt",
     "pptx",
+    "pptd",
     "slides",
     "presentation",
     "skill"
@@ -26,6 +26,7 @@
   "icon": "./icon.svg",
   "exports": {
     ".": "./plugin/index.mjs",
+    "./lib/*": "./lib/*",
     "./locale/*.json": "./locale/*.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
@@ -33,6 +34,7 @@
   "files": [
     "CHANGELOG.md",
     "icon.svg",
+    "lib",
     "locale/*.json",
     "plugin",
     "skills",
@@ -41,7 +43,19 @@
     "LICENSE"
   ],
   "peerDependencies": {
-    "@deepseek-ai/dsh-skill": ">=0.1.5-rc.2 <0.2.0-0 || >=0.2.0-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh-skill": ">=0.2.0-rc.2 <0.3.0-0"
+  },
+  "dependencies": {
+    "@office-kit/pptx": "0.24.0",
+    "@xmldom/xmldom": "^0.9.8",
+    "fflate": "^0.8.2",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "dsh": {
     "bundle": {
@@ -49,9 +63,16 @@
     }
   },
   "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "prepack": "node scripts/clean-pycache.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18",
+    "dsh": ">=0.2.0-rc.2 <0.3.0-0"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true
   }
 }

@@ -1,9 +1,9 @@
 ---
-name: kimi-ppt
+name: ppt-maker
 description: 生成/编辑/复刻/导出 PPT 与演示文稿。默认产出「可编辑 PPTD 项目 + 本地生成的 .pptx」（用 python-pptx 纯本地导出；字体嵌入/淡入淡出走桌面增强轨道，需桌面环境与网络）。内置学术/咨询/金融/促销/工作等设计系统与本地导出字体映射。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
 ---
 
-# kimi-ppt：PPT 生成与本地导出
+# ppt-maker：PPT 生成与本地导出
 
 用 PPTD（YAML 中间格式，单页自包含）写 deck，再**纯本地**导出可编辑 `.pptx`。
 

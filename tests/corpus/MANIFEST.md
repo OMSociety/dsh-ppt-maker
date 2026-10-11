@@ -25,7 +25,7 @@
 
 ### 合成语料（10 份，5 设计系统 × 2 变体）
 
-公共覆盖：主题色/主题字体写入、章节（v1 3 节 / v2 2 节）、全页切换（v1 fade / v2 push）、占位图（程序生成抽象图）、备注（v1 5 页 / v2 3 页）、表格合并单元格、图片裁剪、竖排文本（v1 eaVert / v2 wordArtVert）。设计系统取自 `skills/kimi-ppt/reference/design_system/<族>/<子风格>/design.md`。
+公共覆盖：主题色/主题字体写入、章节（v1 3 节 / v2 2 节）、全页切换（v1 fade / v2 push）、占位图（程序生成抽象图）、备注（v1 5 页 / v2 3 页）、表格合并单元格、图片裁剪、竖排文本（v1 eaVert / v2 wordArtVert）。设计系统取自 `skills/ppt-maker/reference/design_system/<族>/<子风格>/design.md`。
 
 | 文件 | 页数 | 设计系统 | 覆盖说明 |
 |---|---|---|---|

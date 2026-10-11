@@ -14,7 +14,7 @@
 3. 该库 `savePresentation(pres) => Promise<Uint8Array>` 输出字节流 → 后处理拿得到完整产物；库唯一运行时依赖是 `fflate ^0.8.3` → 后处理直接用同款 fflate 解包/重打包，**不新增 zip 依赖**。库为纯 ESM，`engines: node >=22.18.0`（宿主 Node 版本兼容性属 PR 1 范围，见「风险」节）。
 4. 任务书一处需更正：`embedTrueTypeFonts` / `saveSubsetFonts` 是 **`ppt/presentation.xml` 根元素 `<p:presentation>` 的属性**，不在 `presProps.xml`（ECMA-376 CT_Presentation 属性集；ts-pptx 与 pptx-embed-fonts 两个第三方实现均如此写）。
 5. 参考实现（仅供借鉴，不直接引为依赖）：`pptx-embed-fonts`（github.com/liyao1520，JSZip+@xmldom 注入四件套）；其「字体转 EOT 字节」的方向经 D0 实测是**正确的**（PowerPoint 的 fntdata 只收 EOT 封装，见「审查修订」第 8 条），但其封装实现未经 PowerPoint 实测，不可引为成功依据；`ts-pptx` 的 `embedFont` 文档（shbernal.github.io/PptxGenJS/embedded-fonts）确认了整字体嵌入、四 face 槽位、typeface 按名匹配等语义。
-6. 现有 Python 桌面轨道的转场补丁与校验逻辑（`skills/kimi-ppt/scripts/export_pptx.py` 的 `replace_transition` / `validate_transition_order`，写出 `<p:transition spd="fast" advClick="1"><p:fade/></p:transition>`）是 PR 3 测试断言的直接移植来源；`check_fonts.py` 的注册表枚举与名称归一化逻辑是 TS 字体解析器的移植来源。
+6. 现有 Python 桌面轨道的转场补丁与校验逻辑（`skills/ppt-maker/scripts/export_pptx.py` 的 `replace_transition` / `validate_transition_order`，写出 `<p:transition spd="fast" advClick="1"><p:fade/></p:transition>`）是 PR 3 测试断言的直接移植来源；`check_fonts.py` 的注册表枚举与名称归一化逻辑是 TS 字体解析器的移植来源。
 7. 仓库现状：`main` = v1.2.0（Python 双轨道），PR 1 的 TS 引擎不在当前 checkout；本计划按任务书描述的 PR 1 架构（ppt_ 工具集、deck.pptd + pages/*.page + assets/ + manifest.json）对接，落地时文件名/路径以 PR 1 实际代码为准。
 
 ---
@@ -330,7 +330,7 @@ CHANGELOG 条目草稿（新增段）：
 - @office-kit/pptx 0.21.0 类型定义（本地解包 `dist/index-VCK9yZV2.d.ts`）：转场 API（transition-builder，TRANSITION_EFFECTS 21 项）、动画 API（shape-animation，fadeIn/fadeOut/appear/disappear，合并 timing 树）、字体 API 仅主题字体方案（PresentationFonts）；`savePresentation => Promise<Uint8Array>`；engines node>=22.18.0；依赖 fflate^0.8.3。
 - 嵌入字体包结构与属性位置：ts-pptx embedFont 文档（整字体、四槽位、typeface 按名匹配、无 embedTrueTypeFonts 则 PowerPoint 另存删除嵌入字体）；pptx-embed-fonts 源码（四件套注入顺序、fntdata ContentType、rels Type URI、embeddedFontLst 插到 defaultTextStyle 前）。
 - fsType 位定义：Microsoft Learn OpenType 规范 OS/2 表（fsType @ OS/2+8）。
-- 现仓库移植来源：`skills/kimi-ppt/scripts/export_pptx.py`（transition 补丁与校验）、`skills/kimi-ppt/scripts/check_fonts.py`（注册表枚举、归一化、替代表）、`skills/kimi-ppt/SKILL.md`（动画默认不加的纪律）。
+- 现仓库移植来源：`skills/ppt-maker/scripts/export_pptx.py`（transition 补丁与校验）、`skills/ppt-maker/scripts/check_fonts.py`（注册表枚举、归一化、替代表）、`skills/ppt-maker/SKILL.md`（动画默认不加的纪律）。
 - 子集化选型：npm subset-font@2.9.0（harfbuzzjs wasm，BSD-3）。
 
 ---

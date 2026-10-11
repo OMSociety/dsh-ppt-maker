@@ -1,23 +1,23 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/OMSociety/dsh-kimi-ppt/main/docs/logo.png" width="160" alt="dsh-kimi-ppt logo"/>
+<img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="160" alt="dsh-ppt-maker logo"/>
 
-# DSH Kimi PPT
+# DSH PPT Maker
 
-**DeepSeek Harness 插件 —— 内含 kimi-ppt 技能：创建 / 编辑 / 复刻 / 导出 PPT，DSH 内纯本地导出**
+**DeepSeek Harness 插件 —— 内含 ppt-maker 技能：创建 / 编辑 / 复刻 / 导出 PPT，DSH 内纯本地导出**
 
   <p>
-    <a href="https://www.npmjs.com/package/dsh-kimi-ppt"><img src="https://img.shields.io/npm/v/dsh-kimi-ppt?color=4f6ef7&label=version" alt="Version"></a>
+    <a href="https://www.npmjs.com/package/dsh-ppt-maker"><img src="https://img.shields.io/npm/v/dsh-ppt-maker?color=4f6ef7&label=version" alt="Version"></a>
     <a href="https://github.com/deepseek-ai/dsh"><img src="https://img.shields.io/badge/DSH-%3E%3D0.1.5--rc.2%20%3C0.3-4f6ef7" alt="DSH"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/github/license/OMSociety/dsh-kimi-ppt?color=4f6ef7" alt="License"></a>
-    <a href="https://github.com/OMSociety/dsh-kimi-ppt/stargazers"><img src="https://img.shields.io/github/stars/OMSociety/dsh-kimi-ppt?color=4f6ef7" alt="Stars"></a>
-    <a href="https://github.com/OMSociety/dsh-kimi-ppt/issues"><img src="https://img.shields.io/github/issues/OMSociety/dsh-kimi-ppt?color=4f6ef7" alt="Issues"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/OMSociety/dsh-ppt-maker?color=4f6ef7" alt="License"></a>
+    <a href="https://github.com/OMSociety/dsh-ppt-maker/stargazers"><img src="https://img.shields.io/github/stars/OMSociety/dsh-ppt-maker?color=4f6ef7" alt="Stars"></a>
+    <a href="https://github.com/OMSociety/dsh-ppt-maker/issues"><img src="https://img.shields.io/github/issues/OMSociety/dsh-ppt-maker?color=4f6ef7" alt="Issues"></a>
   </p>
 
 **目录**：• [核心特性](#核心特性) • [功能概览](#功能概览) • [安装方式](#安装方式) • [命令](#命令) • [设计系统与字体](#设计系统与字体) • [常见问题](#常见问题) • [更新日志](#更新日志)
 </div>
 
-> **免责声明**：本插件内含的 `kimi-ppt` 技能为**非官方**项目，未获 Moonshot AI 认可或支持。仅供学习与研究使用。
+> **免责声明**：本插件内含的 `ppt-maker` 技能为**非官方**项目，未获 Moonshot AI 认可或支持。仅供学习与研究使用。
 
 ## 核心特性
 
@@ -28,7 +28,7 @@
 | **设计系统** | 内置学术 / 咨询 / 金融 / 促销 / 工作等场景预设主题 |
 | **DSH 本地导出** | python-pptx 本地生成 `.pptx`，Pillow 本地渲染预览图；离线稳定 |
 | **本机字体** | 按实装字体解析，缺失自动提示 + 给本地替代（MiSans / Century Gothic…） |
-| **插件即技能** | 通过 `dsh plugin add` 安装，宿主自动注册 `skills/kimi-ppt` 技能根 |
+| **插件即技能** | 通过 `dsh plugin add` 安装，宿主自动注册 `skills/ppt-maker` 技能根 |
 
 ## 功能概览
 
@@ -43,7 +43,7 @@
 
    ```powershell
    # 先停掉正在运行的 DSH（运行中的服务会锁住依赖，装完再起）
-   dsh plugin --profile <profile> add "dsh-kimi-ppt"
+   dsh plugin --profile <profile> add "dsh-ppt-maker"
    ```
 
    > **桌面版用户**：桌面的 `desktop` profile 由应用独占管理，CLI 无法代管安装；请在桌面应用内安装此插件。
@@ -53,7 +53,7 @@
 
 ## 命令
 
-技能脚本随插件包安装，位于 profile 的 `node_modules/dsh-kimi-ppt/skills/kimi-ppt/scripts/`（desktop profile 实例：`~/.dsh/profiles/desktop/node_modules/dsh-kimi-ppt/skills/kimi-ppt/scripts/`）；脚本不会复制到 `~/.dsh/skills/`。下表中的 `scripts/...` 指该目录：
+技能脚本随插件包安装，位于 profile 的 `node_modules/dsh-ppt-maker/skills/ppt-maker/scripts/`（desktop profile 实例：`~/.dsh/profiles/desktop/node_modules/dsh-ppt-maker/skills/ppt-maker/scripts/`）；脚本不会复制到 `~/.dsh/skills/`。下表中的 `scripts/...` 指该目录：
 
 | 命令 | 说明 |
 |---|---|
