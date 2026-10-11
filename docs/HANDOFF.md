@@ -31,12 +31,13 @@
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| task-8 PR1-C（AI 质检层 + 语料对拍 + SKILL.md/README/CHANGELOG + 打包验证） | 未开工 | 施工图读 PR1 计划 §6（AI 层）/§8/§9；AI 通路：`inject` 加 `llm`+`attachments`，`ctx.llm.stream` + `ctx.llm.resolveModelInfo(...).inputModalities` 门控 + `ctx.attachments.saveImages` 入库；截图源 = ppt_render 产物页 PNG；语料对拍：tests/corpus/ 20 份 PPTD→pptx→loadPresentation 断言关键字段；打包验证：check-mounts 清零、lib/ 已提交、peerDeps 两闸、`dsh plugin add` 装载实测 |
+| PR2（逆向 + 外科手术模式 + 自研编辑器 + webServer 路由） | 未开工 | 施工图读 docs/PR2-逆向与工作台-开发计划.md；PR1 三件套已全部收口（下方已完成表），引擎 pin 与质检分层契约冻结 |
 
 ## 会话接力记录
 
 - 本会话（lead）：D0 六轮字体嵌入攻坚（见下表字体嵌入行）；任务板 task-1~8 建立与派发；HANDOFF 初版。
 - 会话 1（手动开）：完成 PR1-B（task-7），提交 `5d4f93d`；顺手把 PR1-A/B 交付明细补进本表。
+- 会话 2（task-8）：完成 PR1-C，提交 `f2c819b`（未推送）。
 
 ## 已完成
 
@@ -47,6 +48,7 @@
 | 语料 20 份 | tests/corpus/ + MANIFEST.md | 脱敏零命中、PowerPoint COM 20/20 打开成功 |
 | PR1-A（task-6） | 改名 dsh-ppt-maker + 五工具 + 解析层 + 历史层 | vitest 35/35、tsup 构建通过、提交 5452f00（**本地未推送**） |
 | PR1-B（task-7） | 引擎接口层（engine/types.ts + officekit.ts，唯一 import @office-kit/pptx 的文件）+ 富文本编译器（richtext.ts）+ 规则质检层（core/review/：auditTextLayout 溢出 / 出界 / 重叠 / 对比度 / validatePresentation / missingFonts）+ 共享管线（core/export-pipeline.ts：load→build→save/render/check 一条链）+ 三工具（ppt_render / ppt_export / ppt_check，raw JSON-Schema） | vitest 40/40（引擎 5 + e2e 全链含 export/render/check）、tsup 构建通过（lib/index.js 403.94KB）、e2e 实测：导出 pptx 落盘 + libreoffice-kit 渲染 PNG 成功 + 质检 pass |
+| PR1-C（task-8） | AI 质检层（core/review/ai.ts：零宿主 import 结构型接口、BlockAssembler 协议手卷消费、窄校验 + 坏条目丢弃、五段降级链——缺 llm/无路由/无视觉模态/saveImages 失败/解析失败全降级 performed:false + PNG 路径 + 版式摘要；路由取 requestHeader().config，resolveModelInfo 门控，attachments.saveImages 入库）+ inject 加 llm/attachments + 语料对拍 tests/corpus-roundtrip.test.ts（20 份脱敏 pptx：页数台账/画布比例/图表表格计数/隐藏页/备注/脱敏红线）+ 文档收尾（SKILL.md 工具优先重写、README、CHANGELOG [1.0.0]、locale、cordis.patch.yml） | vitest 81/81（7 文件：corpus 26 + review-ai 15 + 既有 40）、tsc 全绿、tsup lib/index.js 416.12KB、check-mounts 0 error/0 warn；提交 `f2c819b`（本地未推送）。实测 API 形态修正：`getPresentation*CountsBySlide` 返 readonly number[]、`getSlideNotes` 返 string\|null、fumunc 两份画布 18288000×10287000 EMU |
 
 ## 硬纪律（任何会话都必须遵守）
 
