@@ -57,7 +57,7 @@ PR 3  字体嵌入（收窄为 fontkit 读 + fflate 注入 + fsType 闸）+ 转�
 | 风险 | 状态 | 对策 |
 |---|---|---|
 | @office-kit/pptx 0.x 破坏性变更 | 已防 | pin 0.24.0 + 引擎接口化 + 语料对拍 |
-| 字体嵌入 EOT/MicroType | 攻坚中 | D0 实测：fntdata 只收 EOT 封装、未压缩 EOT 被拒；MTX 无公开编码器。限时 headless 攻坚（Windows SDK t2embed.h 精确签名构建 / wine 源码加载语义审计 / 开源 MTX 编码器检索）；失败则 PR3 不带嵌入交付（转场+动画+missingFonts 警告+字体包侧车），嵌入列为 1.0 后课题 |
+| 字体嵌入 EOT | **已攻克** | 六轮实测：fntdata=EOT 封装（非裸字节）、EOT Version 必须 0x00020001（真件 0x00020002 是 MicroType 压缩通道版本号，配未压缩数据必死）、flags=0 未压缩即被 t2embed 加载、fsType 不设卡（0x0004→privStatus=P&P 只读提示）、MTX 压缩非硬要求（仅影响体积）。纯 TS 自研成立（eot-wrap.mjs + embed-fonts.mjs，19/19 断言 + oracle headless 裁决器）。详见 WorkBench/spike-font-embed/REPORT.md |
 | 宿主 Node 版本 | 已排除 | 宿主 Node v24.21.0 ≥ 库要求 22.18 |
 | LLM 视觉通路 | 已确认可行 | llm + attachments 服务源码实证；resolveModelInfo 模态门控；read_image 兜底 |
 | typeface 名不匹配静默失效 | 已防 | 同源取值 + 实测兜底 |
@@ -71,7 +71,7 @@ PR 3  字体嵌入（收窄为 fontkit 读 + fflate 注入 + fsType 闸）+ 转�
 | L1 passthrough | **0 丢件**：5 份样本（含 chart/SmartArt/嵌入字体/批注/母版，最大 21.4MB）round-trip 逐部件 sha1 全同；load 30ms/save 99ms | WorkBench/spike-officekit/REPORT.md |
 | libreoffice-kit | **可用**：公开 npm 包，硬依赖定案；missingFonts 诊断现成；锁 0.1.2（0.1.5 起 koffi FFI 架构分叉） | 同上 |
 | pptx-editor | 可嵌入、中文可构建期劫持，但**用户拍板自研编辑器**；报告留档后备 | WorkBench/spike-pptx-editor/REPORT.md |
-| 字体嵌入 | 见 spike-fonts 报告（进行中） | WorkBench/spike-font-embed/ |
+| 字体嵌入 | **已攻克** | fntdata=EOT 封装（Version 0x00020001 + flags=0），t2embed headless 裁决通过（oracle64.exe 成为 CI 裁决器），纯 TS 自研成立；详见 WorkBench/spike-font-embed/REPORT.md 第六轮 |
 
 ## 计划文档索引
 
