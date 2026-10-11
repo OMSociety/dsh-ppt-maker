@@ -31,7 +31,7 @@
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| task-7 PR1-B（ppt_render/ppt_export/ppt_check） | pr1-export 中断，代码可能半成品 | 先 `git status` 看工作区；依赖已加进 package.json（libreoffice-kit@0.1.2、pptx-preview@0.15.0）需 `pnpm install`；libreoffice-kit API 形态读 `WorkBench/spike-officekit/REPORT.md`；施工图读 PR1 计划 §6 |
+| task-8 PR1-C（AI 质检层 + 语料对拍 + SKILL.md/README/CHANGELOG + 打包验证） | 未开工 | 施工图读 PR1 计划 §6（AI 层）/§8/§9；AI 通路：`inject` 加 `llm`+`attachments`，`ctx.llm.stream` + `ctx.llm.resolveModelInfo(...).inputModalities` 门控 + `ctx.attachments.saveImages` 入库；截图源 = ppt_render 产物页 PNG；语料对拍：tests/corpus/ 20 份 PPTD→pptx→loadPresentation 断言关键字段；打包验证：check-mounts 清零、lib/ 已提交、peerDeps 两闸、`dsh plugin add` 装载实测 |
 
 ## 已完成
 
@@ -41,6 +41,7 @@
 | PPTD v3 规格 | docs/pptd-v3-spec.md 1382 行 | 95 动画词表与 @office-kit/pptx@0.24.0 d.ts 逐字对拍通过 |
 | 语料 20 份 | tests/corpus/ + MANIFEST.md | 脱敏零命中、PowerPoint COM 20/20 打开成功 |
 | PR1-A（task-6） | 改名 dsh-ppt-maker + 五工具 + 解析层 + 历史层 | vitest 35/35、tsup 构建通过、提交 5452f00（**本地未推送**） |
+| PR1-B（task-7） | 引擎接口层（engine/types.ts + officekit.ts，唯一 import @office-kit/pptx 的文件）+ 富文本编译器（richtext.ts）+ 规则质检层（core/review/：auditTextLayout 溢出 / 出界 / 重叠 / 对比度 / validatePresentation / missingFonts）+ 共享管线（core/export-pipeline.ts：load→build→save/render/check 一条链）+ 三工具（ppt_render / ppt_export / ppt_check，raw JSON-Schema） | vitest 40/40（引擎 5 + e2e 全链含 export/render/check）、tsup 构建通过（lib/index.js 403.94KB）、e2e 实测：导出 pptx 落盘 + libreoffice-kit 渲染 PNG 成功 + 质检 pass |
 
 ## 硬纪律（任何会话都必须遵守）
 

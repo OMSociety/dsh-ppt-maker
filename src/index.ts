@@ -5,9 +5,9 @@
  *  1. Register the bundled `skills/ppt-maker` directory as a DSH skill so the
  *     model can load it (DSH never discovers skill files shipped inside a
  *     package on its own).
- *  2. Register the five project tools: ppt_create / ppt_themes / ppt_edit /
- *     ppt_undo / ppt_redo (raw JSON-Schema via ctx.tools.register, per the PR 1
- *     plan; ppt_render / ppt_check / ppt_export land in PR 1-B).
+ *  2. Register the eight project tools: ppt_create / ppt_themes / ppt_edit /
+ *     ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check (raw
+ *     JSON-Schema via ctx.tools.register, per the PR 1 plan).
  *
  * `inject = ['tools', 'sessions', 'skills']`: the tools need `sessions` to
  * resolve the session cwd (`exec.agent.session.id` → `sessions.get(id).header
@@ -20,9 +20,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_ROOT } from './root.js'
+import { registerCheckTool } from './tools/check.js'
 import { registerCreateTool } from './tools/create.js'
 import { registerEditTool } from './tools/edit.js'
+import { registerExportTool } from './tools/export.js'
 import { registerRedoTool } from './tools/redo.js'
+import { registerRenderTool } from './tools/render.js'
 import { registerThemesTool } from './tools/themes.js'
 import { registerUndoTool } from './tools/undo.js'
 
@@ -92,7 +95,16 @@ function registerSkill(ctx: ApplyCtx): () => void {
 export function apply(ctx: ApplyCtx): void {
   const offs: Array<() => void> = [registerSkill(ctx)]
   if (ctx.tools) {
-    for (const register of [registerCreateTool, registerThemesTool, registerEditTool, registerUndoTool, registerRedoTool]) {
+    for (const register of [
+      registerCreateTool,
+      registerThemesTool,
+      registerEditTool,
+      registerUndoTool,
+      registerRedoTool,
+      registerRenderTool,
+      registerExportTool,
+      registerCheckTool
+    ]) {
       try {
         const off = register({ tools: ctx.tools, sessions: ctx.sessions })
         if (typeof off === 'function') offs.push(off)

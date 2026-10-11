@@ -112,6 +112,18 @@ async function writeManifest(projectDir: string, manifest: Manifest): Promise<vo
   await rename(tmp, target)
 }
 
+/**
+ * Stamp an export summary into manifest.exportReport (spec §3.2 落账契约).
+ * The manifest's single-writer rule routes this through store.ts as well.
+ */
+export async function writeExportReport(cwd: string, dir: string, report: unknown): Promise<void> {
+  const abs = resolveProjectDir(cwd, dir)
+  return withProjectLock(abs, async () => {
+    const manifest = await readManifest(abs)
+    await writeManifest(abs, { ...manifest, exportReport: report })
+  })
+}
+
 /** Content checksum over deck + pages (detects external edits on load). */
 export function checksumOf(deckText: string, pages: Map<string, string>): string {
   const parts = [`deck.pptd:${sha1Of(deckText)}`]

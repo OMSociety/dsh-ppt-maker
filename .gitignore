@@ -5,3 +5,7 @@ node_modules/
 .preview/
 *.pptx
 *.pptd.bak
+# pnpm 本地装依赖的副产物（仓库锁文件口径是 package-lock.json）
+pnpm-lock.yaml
+pnpm-workspace.yaml
+

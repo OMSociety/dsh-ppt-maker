@@ -84,12 +84,21 @@ describe('宿主入口', () => {
     expect(pluginName).toBe('dsh-ppt-maker')
   })
 
-  it('apply 注册 1 个技能 + 5 个工具', () => {
+  it('apply 注册 1 个技能 + 8 个工具', () => {
     const { ctx, skillDefs } = makeCtx(cwd)
     apply(ctx)
     expect(skillDefs).toHaveLength(1)
     expect((skillDefs[0] as { name?: string }).name).toBe('ppt-maker')
-    expect([...defs.keys()].sort()).toEqual(['ppt_create', 'ppt_edit', 'ppt_redo', 'ppt_themes', 'ppt_undo'])
+    expect([...defs.keys()].sort()).toEqual([
+      'ppt_check',
+      'ppt_create',
+      'ppt_edit',
+      'ppt_export',
+      'ppt_redo',
+      'ppt_render',
+      'ppt_themes',
+      'ppt_undo'
+    ])
   })
 })
 
@@ -150,6 +159,24 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     expect(redone).toMatchObject({ ok: true, revision: 1 })
     expect((redone.redoneOps as string[]).length).toBe(3)
     expect(await fileExists('deck/pages/01.page')).toBe(true)
+
+    // export（质检通过 → 产物落盘 + exportReport 落账）
+    const exported = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
+    expect(exported.ok).toBe(true)
+    expect(await fileExists('deck/out.pptx')).toBe(true)
+    expect((exported.check as { pass: boolean }).pass).toBe(true)
+
+    // render（最终 pptx → PNG 预览）
+    const rendered = await call('ppt_render', { dir: 'deck' })
+    expect(rendered.ok).toBe(true)
+    const images = rendered.images as Array<{ page: number; path: string }>
+    expect(images.length).toBe(1)
+    expect(await fileExists(images[0].path)).toBe(true)
+
+    // check（规则质检：无 blocker）
+    const checked = await call('ppt_check', { dir: 'deck' })
+    expect(checked.ok).toBe(true)
+    expect(checked.pass).toBe(true)
   })
 
   it('错误路径：缺会话 / 越界目录 / 工程不存在', async () => {
