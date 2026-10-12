@@ -42,7 +42,15 @@
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| （无） | PR1 / PR2 / PR2 保真度修复 / PR3 全部收口 | 多 PR 全部完成；待文档重写后统一推远端（硬纪律 2） |
+| 人工三小项 | 待用户实测 | 已装桌面版工作区最新 lib（符号链接即时生效）：① 在未装 MiSans 的机器打开 `tests/corpus/roundtrip-embedded.pptx`（syn-academic-v1 嵌入产物）确认粗体数字 01/02/03/04 字形正确；② 放映态转场；③ 全角破界案例复验 |
+| 推远端 | 人工实测后 | 本地 14+ 提交（5452f00 起），全部实测收口后统一 push + 发 npm |
+
+## 已知坑登记（终验轮实测新增）
+
+- **LibreOffice 渲染路径误用嵌入的子集 EOT**：pptx 含子集字体时 LO 会安装并用它渲染，出现 CJK 字形张冠李戴（如「0」→「A」）——是 LO 行为，非产物缺陷。对策：ppt_render / ppt_check / AI 审查一律渲染**嵌字体之前的裸字节**（export-pipeline.ts）。PowerPoint 对子集字体的真实行为待人工三小项①裁决。
+- **预览缩略图只渲约 64% 画布**（px:pt≈2.6 应为 2.083）：ppt_render/质检 PNG 与工作台缩略图共用渲染源，修工具后工作台一并痊愈。
+- **fonts-embed 幂等用例全量并行下两次抖动**（单跑不现、非超时形态），已加 `{timeout:90000, retry:2}` 缓解，根因未除。
+- **TTC 表目录 offset 是文件绝对偏移**（OTSpec+fontkit 双印证），勿加 faceOffset；fontkit 的 fsType 是位域对象（如 `{editable:true}`），勿 Number() 直接比。
 
 ## 会话接力记录
 
@@ -52,6 +60,8 @@
 - 本会话（lead，接 PR2）：任务板换代重建（task-1~6），task-1 逆向引擎、task-3 三工具、task-6 整合接线由 lead 做；task-2 宿主路由与 task-4/5 客户端骨架/组件由队友 host-routes 与 client-skeleton 并行完成。vitest 全量 131/131 绿、tsc 全绿、tsup + build-client 串行构建通过。
 - 本会话（lead，PR2 保真度修复）：按 docs/PR2-逆向保真度修复.md 完成 R1/R2/R3（明细见下表末行），vitest 131→134、tsc 全绿、构建通过。
 - 本会话（lead，接 PR3）：任务板换代重建（task-1~4）：task-1 spike（fontkit/subset-font 四字体实测，WorkBench/spike-font-subset/REPORT.md——subset-font 四款全过 6–34ms、压缩 >99.8%，A 方案成立 fonttools 不进主路径；思源黑体子集产物仍 CFF/OTTO，PR3 不对 OTTO 拒嵌；LXGW 实测单 face 真 TTF 非 TTC）由子代理完成；task-2 核心层 `src/core/fonts/` 七模块（eot/fsType/resolver/subset/usage/embed/selfcheck）+ 编排层 embed-pipeline.ts 由 lead 写；task-3 接线（saveProjectPptx 嵌字体 + export 摘要落账 + check 许可预检 fontLicense.ts）由 lead 写；task-4 弃用与文档由 lead 写。关键修复三处：fsTypeOfFace TTC 偏移按 face 相对值修正；subset-font 必须传 Buffer（harfbuzzjs 对 Uint8Array 签名检查严格）；fontkit 2.x familyName 返回 `{en,zh}` 字典对象需 fontkitNameStr 拍平。vitest 134→**147/147**（新增 fonts-embed 12 例 + fonts-e2e 1 例含 oracle64 headless 裁决）、tsc 全绿、tsup 757.04KB + build-client 81.5KB、check-mounts 全绿。
+
+- 本会话（lead，终验缺陷修复轮）：按 WorkBench/ppt-reverse/review-report.md（另一会话逐页像素级终验，FAIL）修复五条缺陷，提交 `2667cde`。明细：① P1-c 根因——run 级 fontFamily 逗号栈（"Liter, MiSans"）整串进 typeface 属 OOXML 非法，ThemeResolver.fontFamily/collectFont 按 CSS 栈语义拆槽（首段 latin、次段 ea，滤通用族）；② P1-b——richtext 早就在解析 `<li>` bullet 字段但导出端零消费者，补 setParagraphBullet + 27pt 悬挂缩进；③ 主题重置——逆向捕获 clrScheme 12 槽进 theme.colors，导出端 applyDeckTheme 回写字体/色方案；④ 表头损失——mapTable 增显式单元格 fill 与水平/垂直对齐捕获；⑤ P2 占位对比度 #6B7280→#4B5563（3.90→约 6.1）。另发现 LibreOffice 渲染路径误用嵌入子集 EOT 的怪癖（见上方「已知坑登记」），渲染路径全改裸字节。回归：引擎测试 +3（151/151）、复验脚本 13 断言 ALL PASS、构建通过；fonts-embed 抖动用例加 retry。剩余：人工三小项 → 推远端。
 
 ## 已完成
 
