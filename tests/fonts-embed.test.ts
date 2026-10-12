@@ -69,21 +69,36 @@ describe('PR3 字体子系统 · fsType 位判定', () => {
   })
   it('readFsTypeAll 对 TTC 头模拟：读取每个 face 的 fsType', () => {
     if (!hasFile(MISANS_TTF)) return
-    // 手工拼一个最小 ttcf 容器：两个 face 都指向同一 TTF 的表目录
+    // 手工拼一个最小 ttcf 容器：两个 face 复用同一 TTF 数据。
+    // 合法 TTC 要求表目录 offset 为文件绝对偏移（OTSpec，fontkit 交叉验证过）：
+    // 数据从 20 起，因此 face 表目录里每个表的 offset 字段都要 +20 重定位。
     const ttf = new Uint8Array(readFileSync(MISANS_TTF))
-    const faceOff0 = 12 + 0 * 4
-    const faceOff1 = 12 + 1 * 4
-    const container = new Uint8Array(12 + 8 + ttf.length)
+    const HEADER = 20
+    const container = new Uint8Array(HEADER + ttf.length)
     container.set([0x74, 0x74, 0x63, 0x66], 0) // 'ttcf'
     const dv = new DataView(container.buffer)
     dv.setUint32(8, 2, false) // numFaces = 2
-    dv.setUint32(faceOff0, 20, false) // face0 @20
-    dv.setUint32(faceOff1, 20, false) // face1 也 @20（复用）
-    container.set(ttf, 20)
+    dv.setUint32(12, HEADER, false) // face0 @20
+    dv.setUint32(16, HEADER, false) // face1 也 @20（复用）
+    container.set(ttf, HEADER)
+    const numTables = dv.getUint16(HEADER + 4, false)
+    for (let i = 0; i < numTables; i++) {
+      const rec = HEADER + 12 + i * 16
+      dv.setUint32(rec + 8, dv.getUint32(rec + 8, false) + HEADER, false)
+    }
     const got = readFsTypeAll(container)
     expect(got).toHaveLength(2)
     expect(got[0]).toBe(0x0008)
     expect(got[1]).toBe(0x0008)
+  })
+  it('readFsTypeAll 读真件微软雅黑 TTC = 每 face 0x0008 editable', () => {
+    const YAHEI = 'C:/Windows/Fonts/msyh.ttc'
+    if (!hasFile(YAHEI)) return
+    const got = readFsTypeAll(new Uint8Array(readFileSync(YAHEI)))
+    expect(got).toHaveLength(2)
+    // fontkit 解位域 {editable: true} 印证为 0x0008（注意：fontkit 的 fsType 是对象，
+    // 直接 Number() 会得 0，勿用该法交叉验证）
+    for (const ft of got) expect(ft).toBe(0x0008)
   })
 })
 

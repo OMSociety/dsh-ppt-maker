@@ -47,7 +47,10 @@ function readUint32BE(dv: DataView, off: number): number {
 
 /** 读单个 sfnt face 的 OS/2.fsType；返回 null 表示读不到。
  * @param bytes 全字体字节
- * @param faceOffset 该 face 在容器内的偏移（TTC 用；TTF/OTF 为 0）。OS/2 表偏移为相对 face 起点。 */
+ * @param faceOffset 该 face 在容器内的偏移（TTC 用；TTF/OTF 为 0）。
+ * 注意（OTSpec 实证，fontkit 交叉验证）：表目录里的 offset 一律是相对文件起点
+ * 的绝对偏移——TTF 时 face 起点即文件起点二者重合；TTC 时**不是**相对 face 起点。
+ * 此前实现加成 faceOffset 导致 TTC 读串（雅黑 face0 误读 0x0204 拒嵌，实为 0x0000 可嵌）。 */
 function fsTypeOfFace(bytes: Uint8Array, faceOffset: number): number | null {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   if (faceOffset + 12 > dv.byteLength) return null
@@ -57,8 +60,7 @@ function fsTypeOfFace(bytes: Uint8Array, faceOffset: number): number | null {
     if (rec + 16 > dv.byteLength) break
     const tag = String.fromCharCode(bytes[rec], bytes[rec + 1], bytes[rec + 2], bytes[rec + 3])
     if (tag === 'OS/2') {
-      const relOff = readUint32BE(dv, rec + 8)
-      const absOff = faceOffset + relOff
+      const absOff = readUint32BE(dv, rec + 8)
       if (absOff + 10 > dv.byteLength) return null
       return readUint16BE(dv, absOff + 8)
     }
