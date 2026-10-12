@@ -42,7 +42,7 @@
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| PR3（字体嵌入 EOT / 转场动画 / 桌面轨道删除） | 待开工 | 施工图读 docs/PR3-去Kimi化-开发计划.md；PR1 与 PR2 已收口（见下行） |
+| PR3（字体嵌入 EOT / 转场动画 / 桌面轨道删除） | 待开工 | 施工图读 docs/PR3-去Kimi化-开发计划.md；PR1、PR2 与 PR2 保真度修复已收口（见下行） |
 
 ## 会话接力记录
 
@@ -50,6 +50,7 @@
 - 会话 1（手动开）：完成 PR1-B（task-7），提交 `5d4f93d`；顺手把 PR1-A/B 交付明细补进本表。
 - 会话 2（task-8）：完成 PR1-C，提交 `f2c819b`（未推送）。
 - 本会话（lead，接 PR2）：任务板换代重建（task-1~6），task-1 逆向引擎、task-3 三工具、task-6 整合接线由 lead 做；task-2 宿主路由与 task-4/5 客户端骨架/组件由队友 host-routes 与 client-skeleton 并行完成。vitest 全量 131/131 绿、tsc 全绿、tsup + build-client 串行构建通过。
+- 本会话（lead，PR2 保真度修复）：按 docs/PR2-逆向保真度修复.md 完成 R1/R2/R3（明细见下表末行），vitest 131→134、tsc 全绿、构建通过。
 
 ## 已完成
 
@@ -67,3 +68,4 @@
 | PR2 task-4（客户端骨架） | client/{index,store,api,styles,icons,skeleton}.tsx/ts + scripts/build-client.mjs（esbuild → lib/client.js 81.5KB）+ tests/{client-bundle.guard,client-store}.test.ts | 守卫测试 9/9 + store 纪律测试 14/14；产物 `__ModuleLoader__` 形态、9 项平台种子逐字核对、metafile 输入守卫、tsc 全绿 |
 | PR2 task-5（工作台组件） | client/{panel.tsx,components/{ProjectList,ThumbStrip,Stage,TextEditor,Inspector,Toolbar}.tsx} + client/store.ts 扩展（deck/deckPages/currentPageData/currentPageRevision + updateElement/movePage/duplicatePage/removePage/addPage/uploadMedia/exportDeck） | tests/client-store.test.ts 14/14、client-bundle.guard.test.ts 9/9；check-mounts 0 error |
 | PR2 task-6（整合接线） | package.json（`dsh.client.platform='web'`、exports["./client"]、files 含 lib、peerDependencies 加六个 dsh 包、build 接 `tsup && node scripts/build-client.mjs`）+ src/index.ts（inject 加 webServer、新增三工具注册、plugin/host/ 按需动态 import 起 webServer 前缀路由 + 工具 backchannel 桥）+ tsconfig.json（noImplicitAny=false 给 plain-JS plugin/host/ 让路）+ tests/tools-e2e.test.ts 同步（inject 列表 + 11 个工具） | vitest 全量 131/131、tsc 全绿、tsup build 457.18KB + build-client 81.5KB 串行通过 |
+| PR2 保真度修复（R1/R2/R3，施工图 docs/PR2-逆向保真度修复.md） | src/core/reverse/map.ts 单文件改造：R1 run 级富文本映射（getShapeParagraphElements + getShapeRunFormatEffective 走继承链 → `<p style>`/`<span style>`/`<strong>`/`<em>`/`<u>`/`<sup>`/`<sub>`/`<br>`/`<ul>/<ol><li>`；对齐取首个显式段落 + getShapeTextAnchor 垂直对齐，删掉 [left, top] 硬编码；读不到 run 级回落纯文本 + degraded 记账）；R2 graphicFrame 按 a:graphicData URI 分类（diagram→smartArt、chart、oleObj→ole、scene3d→object3d、未知→unknown）+ picture 内媒体剪辑经 getShapeMedia 走 media dropped，全部插占位进 report；R3 背景 slide→layout→master 继承链（resolveEffectiveBackground 取最终生效值，继承层背景记 degraded）+ deck.theme.textStyles 落 title/body 主题字体槽位 | vitest 全量 134/134（新增 3 例：R1 富文本断言 `<strong>`/`font-size:40px`/`color:#2563EB`/`text-align:center`/`line-height:1.5`/align=['center','middle']；R2 用 fflate 注入 diagram graphicFrame 断言 smartArt dropped + 占位「此处原为 SmartArt 图示」；R3 断言 slide 显式背景生效 + theme.textStyles 槽位存在）、tsc 全绿、tsup 473.92KB + build-client 81.5KB 串行通过 |

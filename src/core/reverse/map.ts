@@ -13,6 +13,10 @@
  * This module does no disk I/O; `writeProject.ts` materialises.
  */
 import {
+  getParagraphAlignment,
+  getParagraphBullet,
+  getParagraphLineSpacing,
+  getParagraphSpacing,
   getShapeAdjustValues,
   getShapeAnimation,
   getShapeCustomGeometry,
@@ -21,15 +25,28 @@ import {
   getShapeImageCrop,
   getShapeImageFillBytes,
   getShapeImageOpacity,
+  getShapeMedia,
+  getShapeParagraphCount,
+  getShapeParagraphElements,
   getShapePreset,
+  getShapeRunFormatEffective,
   getShapeStroke,
   getShapeStrokeDash,
+  getShapeTextAnchor,
   getShapeTextDirection,
   getShapeTextWrap,
+  getShapeXmlString,
   getSlideAnimations,
   getSlideBackground,
   getSlideBackgroundGradientFill,
   getSlideBackgroundImageBytes,
+  getSlideLayout,
+  getSlideLayoutBackground,
+  getSlideLayoutBackgroundGradientFill,
+  getSlideLayoutBackgroundImageBytes,
+  getSlideMasterBackground,
+  getSlideMasterBackgroundGradientFill,
+  getSlideMasterBackgroundImageBytes,
   getSlideTransition,
   getTableCellParagraphs,
   getTableCellSpan,
@@ -43,6 +60,9 @@ import {
   isShapeTextBox,
   isTableShape,
   type PresentationData,
+  type SlideBackground,
+  type SlideData,
+  type SlideLayoutData,
   type SlideShapeData
 } from '@office-kit/pptx'
 import {
@@ -137,11 +157,256 @@ function baseElement(rec: ReverseShapeRecord): Record<string, unknown> {
   }
 }
 
-function mapText(rec: ReverseShapeRecord, fonts: ReverseReadResult['fonts']): Record<string, unknown> {
+/* ------------------------------------------------------------------ *
+ * R1 — run-level rich text mapping (保真度修复计划 R1)
+ * ------------------------------------------------------------------ */
+
+const H_ALIGN_MAP: Record<string, string> = {
+  l: 'left',
+  ctr: 'center',
+  r: 'right',
+  just: 'justify',
+  dist: 'distribute',
+  justLow: 'justify',
+  thaiDist: 'distribute'
+}
+
+// getShapeTextAnchor 返回库词汇（top/center/bottom）与 OOXML token（t/ctr/b）都可能出现，两种都收。
+const V_ALIGN_MAP: Record<string, string> = {
+  top: 'top',
+  center: 'middle',
+  bottom: 'bottom',
+  t: 'top',
+  ctr: 'middle',
+  b: 'bottom',
+  just: 'middle',
+  dist: 'middle'
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function escapeAttr(s: string): string {
+  return escapeHtml(s).replace(/"/g, '&quot;')
+}
+
+/** px 值保留两位小数，去掉多余的尾零。 */
+function fmtPx(v: number): string {
+  const r = Math.round(v * 100) / 100
+  return String(r)
+}
+
+/**
+ * 把单个 run 的 ReadTextFormat + 文本编成 PPTD 富文本片段。
+ * 标签顺序：span 在外（承载字体/字号/颜色），strong/em/u 在内。
+ */
+function runToHtml(text: string, fmt: {
+  font?: string
+  fontEastAsian?: string
+  size?: number
+  color?: string | null
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean | string
+  baseline?: number
+}): string {
+  let inner = escapeHtml(text)
+  if (fmt.bold) inner = `<strong>${inner}</strong>`
+  if (fmt.italic) inner = `<em>${inner}</em>`
+  if (fmt.underline === true || (typeof fmt.underline === 'string' && fmt.underline !== 'none')) {
+    inner = `<u>${inner}</u>`
+  }
+  if (typeof fmt.baseline === 'number' && fmt.baseline !== 0) {
+    inner = fmt.baseline > 0 ? `<sup>${inner}</sup>` : `<sub>${inner}</sub>`
+  }
+  const styles: string[] = []
+  if (typeof fmt.size === 'number' && fmt.size > 0) {
+    // PPTD 富文本的 font-size 以 px 为事实单位（richtext.ts 解析 px/pt 同一数值）
+    styles.push(`font-size:${fmtPx(fmt.size)}px`)
+  }
+  if (typeof fmt.color === 'string' && fmt.color !== '') {
+    styles.push(`color:${asLiteralColor(fmt.color)}`)
+  }
+  const families: string[] = []
+  if (fmt.font) families.push(fmt.font)
+  if (fmt.fontEastAsian && fmt.fontEastAsian !== fmt.font) families.push(fmt.fontEastAsian)
+  if (families.length > 0) {
+    styles.push(`font-family:${families.join(', ')}`)
+  }
+  if (styles.length > 0) {
+    inner = `<span style="${escapeAttr(styles.join(';'))}">${inner}</span>`
+  }
+  return inner
+}
+
+interface RichParagraph {
+  html: string
+  align: string | null
+  lineSpacingPct: number | null
+  lineSpacingPts: number | null
+  spaceBeforePts: number | null
+  bulletKind: 'bullet' | 'number' | null
+  /** 段落是否读过 run 级格式（用于 degraded 判定） */
+  runsRead: boolean
+}
+
+function readRichParagraphs(
+  pres: PresentationData,
+  shape: SlideShapeData
+): RichParagraph[] | null {
+  let paraCount = 0
+  try {
+    paraCount = getShapeParagraphCount(shape)
+  } catch {
+    return null
+  }
+  if (paraCount === 0) return null
+  let elements: ReadonlyArray<ReadonlyArray<{ kind: string; text?: string; format?: Record<string, unknown> | null }>>
+  try {
+    elements = getShapeParagraphElements(shape) as unknown as typeof elements
+  } catch {
+    return null
+  }
+  const out: RichParagraph[] = []
+  for (let p = 0; p < paraCount; p++) {
+    const parts: string[] = []
+    let runsRead = false
+    const els = elements[p] ?? []
+    let runIndex = -1 // effective format 的索引只数常规 run（d.ts: numeric indices count only regular runs）
+    for (const el of els) {
+      if (el.kind === 'br') {
+        parts.push('<br>')
+        continue
+      }
+      runIndex += 1
+      const text = typeof el.text === 'string' ? el.text : ''
+      if (text === '') continue
+      let fmt: Record<string, unknown> = (el.format ?? {}) as Record<string, unknown>
+      try {
+        const eff = getShapeRunFormatEffective(pres, shape, p, runIndex)
+        if (eff) {
+          fmt = { ...eff }
+          runsRead = true
+        }
+      } catch {
+        if (el.format) runsRead = true
+      }
+      parts.push(
+        runToHtml(text, {
+          font: typeof fmt.font === 'string' ? fmt.font : undefined,
+          fontEastAsian: typeof fmt.fontEastAsian === 'string' ? fmt.fontEastAsian : undefined,
+          size: typeof fmt.size === 'number' ? fmt.size : undefined,
+          color: typeof fmt.color === 'string' ? fmt.color : null,
+          bold: fmt.bold === true,
+          italic: fmt.italic === true,
+          underline: (fmt.underline as boolean | string | undefined) ?? false,
+          baseline: typeof fmt.baseline === 'number' ? fmt.baseline : undefined
+        })
+      )
+    }
+    let align: string | null = null
+    try {
+      const a = getParagraphAlignment(shape, p)
+      if (a && H_ALIGN_MAP[a]) align = H_ALIGN_MAP[a]
+    } catch {
+      /* inherit */
+    }
+    let lineSpacingPct: number | null = null
+    let lineSpacingPts: number | null = null
+    try {
+      const ls = getParagraphLineSpacing(shape, p)
+      if (ls?.kind === 'pct') lineSpacingPct = ls.value
+      else if (ls?.kind === 'pts') lineSpacingPts = ls.value
+    } catch {
+      /* inherit */
+    }
+    let spaceBeforePts: number | null = null
+    try {
+      const sp = getParagraphSpacing(shape, p)
+      if (typeof sp?.beforePts === 'number') spaceBeforePts = sp.beforePts
+    } catch {
+      /* inherit */
+    }
+    let bulletKind: 'bullet' | 'number' | null = null
+    try {
+      const b = getParagraphBullet(shape, p)
+      if (b === 'bullet' || (typeof b === 'object' && b !== null && 'char' in b)) bulletKind = 'bullet'
+      else if (b === 'number' || (typeof b === 'object' && b !== null && 'autoNum' in b)) bulletKind = 'number'
+    } catch {
+      /* inherit */
+    }
+    out.push({ html: parts.join(''), align, lineSpacingPct, lineSpacingPts, spaceBeforePts, bulletKind, runsRead })
+  }
+  return out
+}
+
+/** 段落数组 → PPTD content.text 富文本字符串。 */
+function paragraphsToHtml(paras: RichParagraph[]): string {
+  const chunks: string[] = []
+  let listTag: 'ul' | 'ol' | null = null
+  const closeList = (): void => {
+    if (listTag) {
+      chunks.push(`</${listTag}>`)
+      listTag = null
+    }
+  }
+  for (const para of paras) {
+    const styles: string[] = []
+    if (para.align) styles.push(`text-align:${para.align}`)
+    if (para.lineSpacingPct !== null) styles.push(`line-height:${para.lineSpacingPct}`)
+    else if (para.lineSpacingPts !== null) styles.push(`line-height:${fmtPx(para.lineSpacingPts)}px`)
+    if (para.spaceBeforePts !== null) styles.push(`margin-top:${fmtPx(para.spaceBeforePts)}px`)
+    const styleAttr = styles.length > 0 ? ` style="${escapeAttr(styles.join(';'))}"` : ''
+    if (para.bulletKind) {
+      const tag = para.bulletKind === 'number' ? 'ol' : 'ul'
+      if (listTag !== tag) {
+        closeList()
+        chunks.push(`<${tag}>`)
+        listTag = tag
+      }
+      chunks.push(`<li${styleAttr}>${para.html}</li>`)
+    } else {
+      closeList()
+      chunks.push(`<p${styleAttr}>${para.html}</p>`)
+    }
+  }
+  closeList()
+  return chunks.join('')
+}
+
+function mapText(
+  rec: ReverseShapeRecord,
+  pres: PresentationData,
+  fonts: ReverseReadResult['fonts'],
+  report: ImportReport
+): Record<string, unknown> {
   const shape = rec.raw as SlideShapeData
+  const rich = readRichParagraphs(pres, shape)
+  const hasRich =
+    rich !== null && rich.some((p) => p.html !== '' || p.align !== null || p.lineSpacingPct !== null || p.lineSpacingPts !== null)
+
+  // 水平对齐取首个显式段落；垂直对齐取文本框 anchor。
+  let hAlign = 'left'
+  if (rich) {
+    for (const p of rich) {
+      if (p.align) {
+        hAlign = p.align
+        break
+      }
+    }
+  }
+  let vAlign = 'top'
+  try {
+    const anchor = getShapeTextAnchor(shape)
+    if (anchor && V_ALIGN_MAP[anchor]) vAlign = V_ALIGN_MAP[anchor]
+  } catch {
+    /* default top */
+  }
+
   const content: Record<string, unknown> = {
-    text: rec.text,
-    align: ['left', 'top'],
+    text: hasRich ? paragraphsToHtml(rich) : rec.text,
+    align: [hAlign, vAlign],
     wrap: (() => {
       try {
         return getShapeTextWrap(shape) !== 'none'
@@ -149,6 +414,15 @@ function mapText(rec: ReverseShapeRecord, fonts: ReverseReadResult['fonts']): Re
         return true
       }
     })()
+  }
+  if (rich === null && rec.text !== '') {
+    // run 级读不到（非文本形状或库不支持）→ 回落纯文本并记账
+    report.degraded.push({
+      page: rec.slideIndex,
+      elementId: elementIdOf(rec),
+      feature: 'unknown',
+      detail: 'run 级格式读取失败，文本按纯文本落盘（字体/字号/加粗/对齐继承主题默认）'
+    })
   }
   try {
     const direction = getShapeTextDirection(shape)
@@ -360,12 +634,231 @@ function mapLine(rec: ReverseShapeRecord): Record<string, unknown> {
 }
 
 /* ------------------------------------------------------------------ *
+ * R3 — 背景继承链（slide → layout → master）
+ * ------------------------------------------------------------------ */
+
+interface BackgroundSource {
+  bg: SlideBackground
+  solidColor: string | null
+  gradient: { stops: ReadonlyArray<{ offset: number; color: string }> } | null
+  imageBytes: Uint8Array | null
+  level: 'slide' | 'layout' | 'master'
+}
+
+/** 取 slide → layout → master 链上第一个显式背景；inherit 或未设置继续往上走。 */
+function resolveEffectiveBackground(rawSlide: SlideData, pres: PresentationData): BackgroundSource | null {
+  let layout: SlideLayoutData | null = null
+  try {
+    layout = getSlideLayout(rawSlide)
+  } catch {
+    layout = null
+  }
+
+  const slideBg = (() => {
+    try {
+      return getSlideBackground(rawSlide)
+    } catch {
+      return { kind: 'inherit' } as SlideBackground
+    }
+  })()
+
+  const readLevel = (
+    bg: SlideBackground,
+    gradient: BackgroundSource['gradient'],
+    imageBytes: Uint8Array | null,
+    level: BackgroundSource['level']
+  ): BackgroundSource | null => {
+    if (bg.kind === 'solid') {
+      return { bg, solidColor: bg.color, gradient, imageBytes, level }
+    }
+    if (bg.kind === 'gradient') {
+      if (gradient && gradient.stops.length > 0) {
+        return { bg, solidColor: null, gradient, imageBytes, level }
+      }
+      return null // 读不出 stops 的渐变当未设置，继续往上
+    }
+    if (bg.kind === 'image') {
+      if (imageBytes) return { bg, solidColor: null, gradient, imageBytes, level }
+      return null
+    }
+    return null // inherit / pattern / unknown → 往上
+  }
+
+  // slide 层
+  if (slideBg.kind !== 'inherit') {
+    let gradient: BackgroundSource['gradient'] = null
+    let imageBytes: Uint8Array | null = null
+    try {
+      if (slideBg.kind === 'gradient') {
+        const g = getSlideBackgroundGradientFill(rawSlide)
+        if (g) gradient = { stops: g.stops.map((s) => ({ offset: s.offset, color: String(s.color) })) }
+      } else if (slideBg.kind === 'image') {
+        imageBytes = getSlideBackgroundImageBytes(rawSlide)
+      }
+    } catch {
+      /* fall through */
+    }
+    const src = readLevel(slideBg, gradient, imageBytes, 'slide')
+    if (src) return src
+  }
+
+  // layout 层
+  if (layout) {
+    let layoutBg: SlideBackground | null = null
+    try {
+      layoutBg = getSlideLayoutBackground(layout)
+    } catch {
+      layoutBg = null
+    }
+    if (layoutBg && layoutBg.kind !== 'inherit') {
+      let gradient: BackgroundSource['gradient'] = null
+      let imageBytes: Uint8Array | null = null
+      try {
+        if (layoutBg.kind === 'gradient') {
+          const g = getSlideLayoutBackgroundGradientFill(layout)
+          if (g) gradient = { stops: g.stops.map((s) => ({ offset: s.offset, color: String(s.color) })) }
+        } else if (layoutBg.kind === 'image') {
+          imageBytes = getSlideLayoutBackgroundImageBytes(pres, layout)
+        }
+      } catch {
+        /* fall through */
+      }
+      const src = readLevel(layoutBg, gradient, imageBytes, 'layout')
+      if (src) return src
+    }
+
+    // master 层
+    let masterBg: SlideBackground | null = null
+    try {
+      masterBg = getSlideMasterBackground(pres, layout)
+    } catch {
+      masterBg = null
+    }
+    if (masterBg && masterBg.kind !== 'inherit') {
+      let gradient: BackgroundSource['gradient'] = null
+      let imageBytes: Uint8Array | null = null
+      try {
+        if (masterBg.kind === 'gradient') {
+          const g = getSlideMasterBackgroundGradientFill(pres, layout)
+          if (g) gradient = { stops: g.stops.map((s) => ({ offset: s.offset, color: String(s.color) })) }
+        } else if (masterBg.kind === 'image') {
+          imageBytes = getSlideMasterBackgroundImageBytes(pres, layout)
+        }
+      } catch {
+        /* fall through */
+      }
+      const src = readLevel(masterBg, gradient, imageBytes, 'master')
+      if (src) return src
+    }
+  }
+  return null
+}
+
+function applyBackgroundChain(
+  rawSlide: SlideData,
+  pres: PresentationData,
+  slideIndex: number,
+  page: Page,
+  media: ReverseMediaAsset[],
+  report: ImportReport
+): void {
+  let src: BackgroundSource | null = null
+  try {
+    src = resolveEffectiveBackground(rawSlide, pres)
+  } catch {
+    src = null
+  }
+  if (!src) return
+  if (src.solidColor !== null) {
+    page.background = { type: 'solid', color: asLiteralColor(src.solidColor) }
+  } else if (src.gradient) {
+    page.background = {
+      type: 'gradient',
+      gradientType: 'linear',
+      stops: src.gradient.stops.map((s) => ({ position: s.offset, color: asLiteralColor(s.color) }))
+    }
+  } else if (src.imageBytes) {
+    const partName = `ppt/media/bg-${slideIndex}-${src.level}.png`
+    media.push({ bytes: src.imageBytes, ext: '.png', partName })
+    page.background = { type: 'image', src: `media/${partName.split('/').pop()}` }
+  }
+  if (src.level !== 'slide') {
+    report.degraded.push({
+      page: slideIndex,
+      elementId: null,
+      feature: 'unknown',
+      detail: `页面背景继承自${src.level === 'layout' ? '版式' : '母版'}（slide 未显式设置），已按最终生效值落盘`
+    })
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * R2 — graphicFrame 细分识别（SmartArt / OLE / 3D / 未知）
+ * ------------------------------------------------------------------ */
+
+/** ECMA-376 a:graphicData URI → dropped 通道的 originalType。 */
+const GRAPHIC_DATA_URI_TYPES: ReadonlyArray<[uriFragment: string, type: 'smartArt' | 'chart' | 'ole' | 'object3d']> = [
+  ['drawingml/2006/diagram', 'smartArt'],
+  ['drawingml/2006/chart', 'chart'],
+  ['oleobject', 'ole'],
+  ['drawingml/2006/3d', 'object3d']
+]
+
+/**
+ * 从 graphicFrame（或非表/图的形状）XML 里读出 graphicData 的 URI，
+ * 归类到 dropped 通道；oleObj / p:oleObj 与 picture 内的 media 也在这里分流。
+ * 返回 null 表示识别不出（调用方走 unknown）。
+ */
+function classifyUnhandledShape(shape: SlideShapeData, kind: ReverseShapeRecord['kind']): {
+  originalType: 'chart' | 'smartArt' | 'group' | 'media' | 'ole' | 'object3d' | 'unknown'
+  reason: string
+} | null {
+  let xml = ''
+  try {
+    xml = getShapeXmlString(shape)
+  } catch {
+    xml = ''
+  }
+  if (xml !== '') {
+    const uriMatch = /a:graphicData[^>]*\suri="([^"]+)"/.exec(xml)
+    if (uriMatch) {
+      const uri = uriMatch[1]
+      for (const [fragment, type] of GRAPHIC_DATA_URI_TYPES) {
+        if (uri.includes(fragment)) {
+          return { originalType: type, reason: `graphicData URI ${uri} 不映射为 PPTD 元素` }
+        }
+      }
+      return { originalType: 'unknown', reason: `graphicData URI ${uri} 未建模` }
+    }
+    if (/<p:oleObj[\s>]|<p:graphicFrame[^>]*>[\s\S]*oleObj/.test(xml)) {
+      return { originalType: 'ole', reason: 'OLE 嵌入对象不映射为 PPTD 元素' }
+    }
+    if (/<p:sp[^>]*>[\s\S]*scene3d|sp3d/.test(xml)) {
+      return { originalType: 'object3d', reason: '三维图形不映射为 PPTD 元素' }
+    }
+  }
+  try {
+    const media = getShapeMedia(shape)
+    if (media) {
+      return { originalType: 'media', reason: `媒体剪辑（${media.kind}）不映射为 PPTD 元素` }
+    }
+  } catch {
+    /* not media */
+  }
+  if (kind === 'graphicFrame') {
+    return { originalType: 'unknown', reason: 'graphicFrame 无 graphicData URI，无法归类' }
+  }
+  return null
+}
+
+/* ------------------------------------------------------------------ *
  * Page-level assembly
  * ------------------------------------------------------------------ */
 
 function mapPage(
   slide: ReverseSlideRecord,
   pres: PresentationData,
+  fonts: ReverseReadResult['fonts'],
   media: ReverseMediaAsset[],
   report: ImportReport
 ): Page {
@@ -383,32 +876,9 @@ function mapPage(
   if (slide.notes !== null && slide.notes !== '') page.notes = slide.notes
   if (slide.title !== null && slide.title !== '') page.title = slide.title
 
-  // background
-  const rawSlide = slide.raw as Parameters<typeof getSlideBackground>[0]
-  try {
-    const bg = getSlideBackground(rawSlide)
-    if (bg.kind === 'solid') {
-      page.background = { type: 'solid', color: asLiteralColor(bg.color) }
-    } else if (bg.kind === 'gradient') {
-      const g = getSlideBackgroundGradientFill(rawSlide)
-      if (g) {
-        page.background = {
-          type: 'gradient',
-          gradientType: 'linear',
-          stops: g.stops.map((s) => ({ position: s.offset, color: asLiteralColor(String(s.color)) }))
-        }
-      }
-    } else if (bg.kind === 'image') {
-      const bytes = getSlideBackgroundImageBytes(rawSlide)
-      if (bytes) {
-        const partName = `ppt/media/bg-${slide.slideIndex}.png`
-        media.push({ bytes, ext: '.png', partName })
-        page.background = { type: 'image', src: `media/${partName.split('/').pop()}` }
-      }
-    }
-  } catch {
-    /* fall back to implicit white */
-  }
+  // background — R3：slide → layout → master 链，取最终生效的背景
+  const rawSlide = slide.raw as SlideData
+  applyBackgroundChain(rawSlide, pres, slide.slideIndex, page, media, report)
 
   // transition
   try {
@@ -444,7 +914,7 @@ function mapPage(
           // Distinguish preset shapes from text boxes: both come back with
           // kind='shape' from getShapeKind; only the latter maps to PPTD `text`.
           if (isShapeTextBox(rawShape)) {
-            page.elements.push(mapText(rec, null) as Page['elements'][number])
+            page.elements.push(mapText(rec, pres, fonts, report) as Page['elements'][number])
             break
           }
           let isCustom = false
@@ -466,16 +936,35 @@ function mapPage(
           page.elements.push(mapShape(rec) as Page['elements'][number])
           break
         }
-        case 'picture':
-          page.elements.push(mapImage(rec, media, report) as Page['elements'][number])
-          break
         case 'connector':
           page.elements.push(mapLine(rec) as Page['elements'][number])
           break
+        case 'graphicFrame': {
+          // R2：表/图已在上面分流；其余 graphicFrame（SmartArt/ole/未知）走 dropped + 占位
+          const cls = classifyUnhandledShape(rawShape, rec.kind)
+          ensurePlaceholder(
+            page,
+            rec,
+            cls?.originalType ?? 'unknown',
+            report,
+            cls?.reason ?? 'graphicFrame 无法归类'
+          )
+          break
+        }
+        case 'picture': {
+          // R2：带媒体剪辑的 picture 不进 image 通道，走 dropped + 占位
+          const cls = classifyUnhandledShape(rawShape, rec.kind)
+          if (cls && cls.originalType === 'media') {
+            ensurePlaceholder(page, rec, 'media', report, cls.reason)
+          } else {
+            page.elements.push(mapImage(rec, media, report) as Page['elements'][number])
+          }
+          break
+        }
         default: {
           const textBox = isShapeTextBox(rawShape)
           if (textBox || rec.text !== '') {
-            page.elements.push(mapText(rec, null) as Page['elements'][number])
+            page.elements.push(mapText(rec, pres, fonts, report) as Page['elements'][number])
           } else {
             page.elements.push(mapShape(rec) as Page['elements'][number])
           }
@@ -554,13 +1043,36 @@ export function mapReverseModel(
   }
 
   for (const slide of read.slides) {
-    pages.push(mapPage(slide, pres, media, report))
+    pages.push(mapPage(slide, pres, read.fonts, media, report))
   }
 
   const deck: Presentation = {
     version: 'v3',
     profile: 'reverse',
     size: sizePx,
+    // R3：母版 txStyles 不可完整还原；主题字体落到 title/body 两个
+    // textStyles 槽位，作为占位符未显式设字体时的默认（render 端 run 级
+    // 富文本已逐字携带字体，textStyles 只兜底空文本与新建文本框）。
+    ...(read.fonts
+      ? {
+          theme: {
+            textStyles: {
+              title: {
+                fontFamily: {
+                  latin: read.fonts.majorLatin ?? 'Calibri',
+                  ea: read.fonts.majorEastAsian ?? read.fonts.majorLatin ?? 'Calibri'
+                }
+              },
+              body: {
+                fontFamily: {
+                  latin: read.fonts.minorLatin ?? 'Calibri',
+                  ea: read.fonts.minorEastAsian ?? read.fonts.minorLatin ?? 'Calibri'
+                }
+              }
+            }
+          }
+        }
+      : {}),
     export: { fontEmbed: 'subset', transition: 'fade', animations: 'auto' },
     pages: pages.map((_, i) => `pages/${slideIndexLabel(i + 1)}.page`),
     source: {
