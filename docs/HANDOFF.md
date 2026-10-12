@@ -42,7 +42,7 @@
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| 人工三小项 | 待用户实测 | 已装桌面版工作区最新 lib（符号链接即时生效）：① 在未装 MiSans 的机器打开 `tests/corpus/roundtrip-embedded.pptx`（syn-academic-v1 嵌入产物）确认粗体数字 01/02/03/04 字形正确；② 放映态转场；③ 全角破界案例复验 |
+| 人工三小项 | 待用户实测 | 本机 MiSans/Liter 全装系统级，改用**未安装的阿里巴巴普惠体**造实测件：`WorkBench/font-embed-usertest/puhuiti-embedded.pptx`（子集嵌入 9.72MB→48.5KB，oracle64 exit=0；fsType=0x0004 故 PowerPoint 会提示「只读嵌入式字体」，属预期）。看点：① 粗体数字 01 02 03 04 与汉字是否渲染为普惠体（裁决 PowerPoint 对子集字体的真实行为）；② 第二页项目符号/悬挂缩进；③ 放映态转场 |
 | 推远端 | 人工实测后 | 本地 14+ 提交（5452f00 起），全部实测收口后统一 push + 发 npm |
 
 ## 已知坑登记（终验轮实测新增）
