@@ -776,10 +776,10 @@ interface PageTransition {
 
 ### 9.3 字体来源与匹配
 
-- 解析优先级：工程 `media/fonts/` 自带字体 > 用户显式指定路径 > 目标机已装字体 > 失败（报错 + 替代建议清单）；
+- 解析优先级：工程 `assets/fonts/` 自带字体 > 用户显式指定路径 > 目标机已装字体 > 失败（报错 + 替代建议清单）；
 - **typeface 按名全等匹配**：嵌入声明里的 typeface 与正文 run 的 fontFace 必须同源同串，不一致时 PowerPoint 静默忽略嵌入字体并回落系统字体，因此两者一律取 PPTD 里声明的目标机实装名；
 - 槽位（slot）判定：出现粗体即需 bold 槽，粗斜组合需 boldItalic 槽；缺对应 face 文件时只嵌 regular，由 PowerPoint 合成仿粗/仿斜，记 info 级日志；
-- TTC（TrueType Collection，如 `msyh.ttc` / `simsun.ttc`）按 face 提取后嵌入；
+- TTC（TrueType Collection，如 `msyh.ttc` / `simsun.ttc`）按 face 枚举匹配族名后嵌入对应 face；
 - 许可口径：嵌入即随文件再分发，授权责任在用户侧；fsType 一律以运行时实测为准，不设白名单。
 
 ### 9.4 导出摘要字段
@@ -789,12 +789,15 @@ exportReport:
   revision: 7
   fontEmbed:
     mode: subset
-    facesEmbedded: 4
-    facesSkipped:
-      - {typeface: "方正兰亭黑", slot: regular, reason: "fsType=Restricted"}
-    subsetChars: 1284
-    bytesBefore: 62914560
-    bytesAfter: 4823119
+    facesEmbedded: 4            # 嵌入 face 数
+    skipped: 1                  # 跳过 face 数
+    skippedDetail:
+      - {typeface: "方正兰亭黑", slot: regular, reason: "许可禁止嵌入（Restricted）"}
+    subset:                     # 子集化审计（subset 档）
+      - {typeface: "MiSans", slot: regular, beforeBytes: 8122324, afterBytes: 14520}
+    rawBytes: 62914560          # 未嵌字体的 pptx 字节数
+    finalBytes: 4823119         # 嵌入后最终字节数
+    warnings: ["..."]           # fsType 只读/No Subset/解析降级等全部警告
   transition:
     mode: fade
     pagesWritten: 24

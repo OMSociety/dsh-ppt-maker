@@ -59,7 +59,8 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
         }
 
         const pipeline = await buildProjectDeck(cwd, dir)
-        const bytes = await saveProjectPptx(pipeline)
+        const saved = await saveProjectPptx(pipeline)
+        const bytes = saved.bytes
 
         const absOut = path.resolve(cwd, out)
         const rel = path.relative(cwd, absOut)
@@ -77,6 +78,18 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
           fontsUsed: pipeline.fontsUsed,
           transition: loaded.deck.export?.transition ?? 'fade',
           animations: loaded.deck.export?.animations ?? 'auto',
+          fontEmbed: saved.fontEmbed
+            ? {
+                mode: saved.fontEmbed.mode,
+                facesEmbedded: saved.fontEmbed.facesEmbedded.length,
+                skipped: saved.fontEmbed.skipped.length,
+                rawBytes: saved.fontEmbed.rawBytes,
+                finalBytes: saved.fontEmbed.finalBytes,
+                warnings: saved.fontEmbed.warnings,
+                subset: saved.fontEmbed.subset,
+                skippedDetail: saved.fontEmbed.skipped
+              }
+            : { mode: 'off' as const },
           buildWarnings: pipeline.buildWarnings
         }
         await writeExportReport(cwd, dir, report)
@@ -88,6 +101,19 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
           bytes: bytes.byteLength,
           fontsUsed: pipeline.fontsUsed,
           warnings: pipeline.buildWarnings,
+          fontEmbed: saved.fontEmbed
+            ? {
+                mode: saved.fontEmbed.mode,
+                facesEmbedded: saved.fontEmbed.facesEmbedded,
+                facesEmbeddedCount: saved.fontEmbed.facesEmbedded.length,
+                skipped: saved.fontEmbed.skipped,
+                skippedCount: saved.fontEmbed.skipped.length,
+                rawBytes: saved.fontEmbed.rawBytes,
+                finalBytes: saved.fontEmbed.finalBytes,
+                subset: saved.fontEmbed.subset,
+                warnings: saved.fontEmbed.warnings
+              }
+            : { mode: 'off' as const, facesEmbedded: [], facesEmbeddedCount: 0, skipped: [], skippedCount: 0, rawBytes: bytes.byteLength, finalBytes: bytes.byteLength, warnings: [] },
           check: { pass: true, blockerCount: 0 }
         }
       } catch (err) {

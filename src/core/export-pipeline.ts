@@ -14,6 +14,9 @@ import type { BuildContext, DeckBuildResult } from './engine/types.js'
 import { reviewDeck, type ReviewIssue } from './review/index.js'
 import { aiIssuesAsReviewIssues, runAiReview, type AiReviewDeps, type AiReviewResult } from './review/ai.js'
 import { getSlides, type PresentationData } from '@office-kit/pptx'
+import { embedFontsForPptx, modeOfExportConfig, type FontEmbedSummary } from './fonts/embed-pipeline.js'
+import type { Page, Presentation } from './pptd/schema.js'
+import { reviewFontLicenses } from './review/fontLicense.js'
 
 export interface PipelineResult {
   dir: string
@@ -21,6 +24,9 @@ export interface PipelineResult {
   built: DeckBuildResult
   buildWarnings: string[]
   fontsUsed: string[]
+  /** 供 saveProjectPptx 嵌字体用：deck + pages 再次递进来 */
+  deck: Presentation
+  pages: Page[]
 }
 
 /** Build the native deck for a project. Shared by all three tools. */
@@ -54,14 +60,25 @@ export async function buildProjectDeck(cwd: string, dir: string): Promise<Pipeli
     revision: loaded.manifest.revision,
     built,
     buildWarnings: warnings,
-    fontsUsed: built.fontsUsed
+    fontsUsed: built.fontsUsed,
+    deck: loaded.deck,
+    pages
   }
 }
 
-/** Save the built deck to pptx bytes. */
-export async function saveProjectPptx(pipeline: PipelineResult): Promise<Uint8Array> {
+/** Save the built deck to pptx bytes ( fonts embedded按 deck.export.fontEmbed 模式 ) */
+export async function saveProjectPptx(pipeline: PipelineResult): Promise<{ bytes: Uint8Array; fontEmbed: FontEmbedSummary | null }> {
   const engine = createOfficeKitEngine()
-  return engine.saveDeck(pipeline.built.native)
+  const rawBytes = await engine.saveDeck(pipeline.built.native)
+  const mode = modeOfExportConfig(pipeline.deck)
+  if (mode === 'off') {
+    return { bytes: rawBytes, fontEmbed: null }
+  }
+  const { bytes, summary } = await embedFontsForPptx(rawBytes, pipeline.built, pipeline.deck, pipeline.pages, {
+    projectDir: pipeline.dir,
+    mode
+  })
+  return { bytes, fontEmbed: summary }
 }
 
 /** Media loader: project-relative path or http(s) URL → bytes. */
@@ -154,6 +171,9 @@ export async function checkProject(cwd: string, dir: string, options: CheckOptio
   const pres = pipeline.built.native as PresentationData
   const review = reviewDeck(pres, { pages: options.pages })
 
+  // PR3：字体许可预检（不动导出也可见）——收集 fsType 位与缺字体清单
+  const fontLicenseIssues = await reviewFontLicenses(pipeline.deck, pipeline.pages, { projectDir: pipeline.dir })
+
   let missingFonts: string[] = []
   let ai: AiReviewResult | undefined
 
@@ -161,7 +181,8 @@ export async function checkProject(cwd: string, dir: string, options: CheckOptio
   let pptxBytes: Uint8Array | null = null
   if (needsRender) {
     try {
-      pptxBytes = await saveProjectPptx(pipeline)
+      const saved = await saveProjectPptx(pipeline)
+      pptxBytes = saved.bytes
     } catch {
       pptxBytes = null
     }
@@ -203,7 +224,7 @@ export async function checkProject(cwd: string, dir: string, options: CheckOptio
     }
   }
 
-  const issues: ReviewIssue[] = [...review.issues]
+  const issues: ReviewIssue[] = [...fontLicenseIssues, ...review.issues]
   for (const family of missingFonts) {
     issues.push({
       page: 0,

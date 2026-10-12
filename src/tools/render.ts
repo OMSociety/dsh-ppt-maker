@@ -39,7 +39,8 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
         const cwd = resolveSessionCwd(exec, ctx.sessions)
         const dir = args.dir as string
         const pipeline = await buildProjectDeck(cwd, dir)
-        const bytes = await saveProjectPptx(pipeline)
+        const saved = await saveProjectPptx(pipeline)
+        const bytes = saved.bytes
 
         const rendered = await renderPptxImages(bytes, {
           pages: args.pages as number[] | undefined,

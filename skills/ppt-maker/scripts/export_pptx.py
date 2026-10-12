@@ -885,6 +885,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    print(
+        "[dsh-ppt-maker] 桌面增强轨道（kimi.com 网页编辑器导出）已弃用："
+        "本地 TS 链路已原生支持字体嵌入与淡入淡出转场（ppt_export 工具），"
+        "本脚本将于下个次版本删除。",
+        file=sys.stderr,
+    )
     args = parse_args(argv)
     try:
         manifest = find_manifest(args.input)

@@ -75,12 +75,23 @@ description: 生成/编辑/导出 PPT 与演示文稿。工具优先：用插件
 
 `ppt_export` 落盘最终 .pptx（默认先跑规则质检，blocker 拦下；`skipCheck: true` 可绕过但不建议）。成功后摘要在 `manifest.exportReport` 落账。
 
+### 字体嵌入（本地 TS 链路原生，默认开启）
+
+导出时自动把 deck 实际用到的字体嵌入 .pptx（`ppt/fonts/*.fntdata` + `embeddedFontLst`，EOT 封装），目标机未装字体也能正确渲染。
+
+- **三档模式**（`deck.pptd` 的 `export.fontEmbed`）：`subset`（默认，只嵌用到的字符，体积小；他人在 PowerPoint 里新增未覆盖字符会豆腐块，与 PowerPoint 官方默认一致）、`full`（整字体嵌入，可自由编辑，体积大）、`off`（不嵌入）。
+- **许可闸**：逐字体读 OS/2.fsType——Restricted / BitmapOnly 跳过并在摘要给出警告；Preview & Print 嵌入但目标机只读；No Subset 强制整字体。`ppt_check` 会提前列出每款字体的许可判定与缺失替代建议，不动导出也可见。
+- **授权口径**：嵌入即随文件再分发，字体授权责任在用户侧；内置设计系统推荐的免费商用字体（MiSans / 思源系 / 阿里妈妈系 / 站酷 / LXGW 等）一般可嵌，一律以运行时实测 fsType 为准。
+- **淡入淡出**：`export.transition`（默认 `fade`）页面级转场、`export.animations`（默认 `auto`）按 `.page` 的 `animations` 字段写入元素入场动画，均与原桌面轨道产物语义一致。
+
 - **交付清单**：给出绝对路径的可点击链接——工程目录、`.pptd`、`pages/`、`media/`、`.pptx`；结尾补一句后续操作提示。
 - **手动微调**：直接改 `.page` / `.pptd` 文件，然后 `ppt_render` 复核 + `ppt_export` 重出（工具层会发现磁盘内容与账本不一致并给 warning）。
 
 ### 六、Python 逃生舱（默认不启用）
 
-`scripts/` 下的 Python 脚本（`pptd_to_pptx.py` / `pptd_to_png.py` / `check_fonts.py`）是**逃生舱**：只在引擎库拒收的破损文件、或工具层明确覆盖不了的边角场景启用。常规创建/编辑/导出**不要走这条路**（本地轨道对表格/图表/动画的支持是真子集，会打 `dropped` 降级清单）。桌面增强轨道（`export_pptx.py` / `export_images.py`，字体嵌入 + 淡入淡出）属 PR3 限期删除项，本版仍可用但已 deprecated。
+`scripts/` 下的 Python 脚本（`pptd_to_pptx.py` / `pptd_to_png.py` / `check_fonts.py`）是**逃生舱**：只在引擎库拒收的破损文件、或工具层明确覆盖不了的边角场景启用。常规创建/编辑/导出**不要走这条路**（本地轨道对表格/图表/动画的支持是真子集，会打 `dropped` 降级清单）。
+
+> **提示**：桌面增强轨道（`export_pptx.py` / `export_images.py`）**已弃用**——字体嵌入与淡入淡出转场已由本地 TS 链路原生提供（见下「字体嵌入」），全程离线、不依赖 kimi.com 网页编辑器。这两个脚本将于下个次版本删除，运行时会在 stderr 打印弃用提示。
 
 ## 动画与备注
 

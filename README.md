@@ -28,6 +28,8 @@
 | **PPTD v3** | 自主契约的 YAML DSL（`deck.pptd` + `pages/*.page`），单页自包含、可视即所得；双方言（generate 生成 / reverse 逆向超集） |
 | **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板），所见即所得：双击文字就地改、拖拽调页序、图片一键替换、撤销/重做、409 冲突提示与「外部已修改」banner |
 | **质检分层** | 规则层（文字溢出/出界/重叠/对比度/结构/缺字体）阻断式，blocker 拦导出；AI 层按需（`ppt_check ai:true`）把最终渲染页 PNG 送多模态模型看配色/层级/平衡，只出建议不阻断 |
+| **字体嵌入** | 导出自动嵌入实际用到的字体（EOT 封装 `fntdata` + `embeddedFontLst`），未装字体的机器渲染不回落；子集/整字体/关闭三档（`export.fontEmbed`），逐字体 fsType 许可闸，`ppt_check` 预检许可与替代建议 |
+| **转场与动画** | 页面级淡入淡出转场（`export.transition`）与元素入场动画（`export.animations`，95 种 preset 词表），本地链路原生写出 |
 | **修订与快照** | manifest.json 单一写者 + append-only 快照（游标模型，undo/redo 天然成立）+ baseRevision 乐观锁（409） |
 | **设计系统** | 内置学术 / 咨询 / 金融 / 促销 / 工作五族预设主题，选题后整套版式配色层级一致 |
 | **本地渲染预览** | 面板缩略图与「精确预览」都用 `@deepseek-ai/libreoffice-kit` 光栅化最终 pptx；每页（page, revision）磁盘缓存 |
@@ -69,6 +71,8 @@
 2. **重启 DSH**：技能目录自动发现；对话里直接说「帮我做一份 PPT」即触发。
 
 > **依赖**：工具链全 TS，主链无 Python。`ppt_render` 用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。Python 脚本（`skills/ppt-maker/scripts/`）仅作逃生舱，见 SKILL.md「六、Python 逃生舱」。
+
+> **提示**：桌面增强轨道（kimi.com 网页编辑器导出，`export_pptx.py` / `export_images.py`）**已弃用**——字体嵌入与淡入淡出转场已由本地 TS 导出链路原生提供，全程离线。这两个脚本将于下个次版本删除，仍在使用的用户直接升级即可获得等价产物。
 
 ## 质检体系
 

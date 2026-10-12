@@ -26,6 +26,12 @@ dsh-ppt-maker 重写首发（原 dsh-kimi-ppt 改头换面，版本重启 1.0.0�
 - **规则质检层**：文字溢出（auditTextLayout）、出界、重叠、对比度（WCAG ≥3）、结构健全（validatePresentation）、缺字体（missingFonts 诊断）；blocker 阻断 `ppt_export`（`skipCheck:true` 可绕过）。
 - **AI 质检层（PR1-C）**：`ppt_check ai:true` 把 libreoffice-kit 渲染的最终成品页 PNG 经 `ctx.attachments.saveImages` 入库后送当前路由多模态模型（`ctx.llm.stream`），审配色/层级/平衡/图版搭配；只出建议不阻断。路由不支持图像输入（`resolveModelInfo().inputModalities` 不含 image）时降级为 PNG 路径清单 + 版式指标摘要，由主模型自行 `read_image` 复核。
 - **语料对拍**：`tests/corpus/` 20 份脱敏 pptx（10 份真实变体 + 10 份合成）→ `loadPresentation` 断言关键字段（页数台账 / 画布尺寸 / 图表与表格计数 / 隐藏页 / 备注 / 脱敏红线抽查），进 CI。
+- **字体嵌入（PR3）**：本地导出链路原生嵌入实际用到的字体——`ppt/fonts/*.fntdata`（EOT 0x00020001 封装）+ `[Content_Types]` Override + rels font Relationship + `presentation.xml` 根属性 `embedTrueTypeFonts` 与 `p:embeddedFontLst`（含 panose/charset，插位 notesSz 之后 / defaultTextStyle 之前）。三档模式 `export.fontEmbed`：`subset`（默认，subset-font/HarfBuzz WASM 按 deck 去重字符集 + 保底字符集子集化）、`full`（整字体）、`off`。fsType 许可闸逐 face 判定：Restricted / BitmapOnly 跳过 + 摘要警告，Preview & Print 嵌入 + 只读警告，No Subset 强制整字体；`ppt_check` 新增字体许可预检（不动导出也可见，缺字体给替代建议）。导出摘要与 `manifest.exportReport` 落账嵌入 face 数 / 跳过原因 / 子集前后体积 / 警告列表；注入后自检（部件数 / EOT 头 / rId 双向一致 / embeddedFontLst 插位）失败即导出失败，headless 裁决（t2embed!TTLoadEmbeddedFont）进测试门。
+- **转场与动画本地化（PR3）**：页面级淡入淡出转场（`export.transition`，默认 fade）与元素入场动画（`export.animations`，默认 auto 按 `.page` 显式声明，95 种 preset 词表）由本地引擎原生写出，与原桌面增强轨道产物语义逐项对齐。
+
+### 弃用
+
+- 桌面增强轨道（kimi.com 网页编辑器导出，`skills/ppt-maker/scripts/export_pptx.py` / `export_images.py`）：增量能力（字体嵌入 + 淡入淡出）已由本地 TS 链路原生提供，本版起标 deprecated，运行时在 stderr 打印弃用提示，将于下个次版本删除。
 
 ### 变更
 
