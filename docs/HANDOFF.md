@@ -42,8 +42,26 @@
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| 人工三小项 | 待用户实测 | 本机 MiSans/Liter 全装系统级，改用**未安装的阿里巴巴普惠体**造实测件：`WorkBench/font-embed-usertest/puhuiti-embedded.pptx`（子集嵌入 9.72MB→48.5KB，oracle64 exit=0；fsType=0x0004 故 PowerPoint 会提示「只读嵌入式字体」，属预期）。看点：① 粗体数字 01 02 03 04 与汉字是否渲染为普惠体（裁决 PowerPoint 对子集字体的真实行为）；② 第二页项目符号/悬挂缩进；③ 放映态转场 |
-| 推远端 | 人工实测后 | 本地 14+ 提交（5452f00 起），全部实测收口后统一 push + 发 npm |
+| 用户视角验收 | 待用户操作（重启宿主后进行，当前运行实例的 lib 停在 6c55740，831d62e 的 resolver 修复要重启才加载） | 验收脚本见下方「用户视角验收清单」 |
+| 推远端 | 验收过后 | 本地 17 提交（5452f00 起），用户已许可「PR 可以先合」 |
+| npm 发包 | **用户明确暂缓**（m01692：「先不急发npm」） | 发 dsh-ppt-maker@1.0.0 + deprecate dsh-kimi-ppt，等用户发话 |
+
+## 用户视角验收清单（重启宿主后逐项过）
+
+1. 侧栏出现「PPT 创客」页签，空态正常渲染
+2. 对话里让 agent 做一份 PPT（走 ppt_create→ppt_build→ppt_export 链），导出文件能打开
+3. ppt_import 导入一份现有 pptx（tests/corpus/ 任选），工作台里翻页、点元素、改字
+4. ppt_patch 外科手术改一处文字，源文件不被原地改写
+5. 撤销/重做（ppt_undo/ppt_redo 或工作台按钮）
+6. ppt_render 渲染 PNG 预览（应是完整画布，不是 64% 裁切——若仍裁切即为已知坑复现）
+7. ppt_check 质检（规则层 + 字体许可预检）
+8. 导出含字体的工程（assets/fonts/ 放字体 → fontEmbed subset），产物在 PowerPoint 打开
+
+## 人工实测记录（2026-10-13 用户 PowerPoint 实测 puhuiti-embedded.pptx）
+
+- 只读弹窗按 fsType=0x0004 预期出现，PowerPoint 准确认出嵌入字体名「Alibaba PuHuiTi」
+- **子集嵌入字体在 PowerPoint 消费完全正常**：粗体数字 01-04 无乱码、汉字/全角标点渲染正确——终验报告的 01→AÅ 确证为 LibreOffice 渲染怪癖，非产物缺陷
+- 项目符号 • + 悬挂缩进在真机渲染正确（P1-b 修复闭环）
 
 ## 已知坑登记（终验轮实测新增）
 
