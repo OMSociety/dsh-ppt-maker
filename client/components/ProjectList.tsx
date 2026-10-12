@@ -21,11 +21,6 @@ export function ProjectList({ store }: { store: PptStore }) {
             <span>PPT 工作台</span>
           </div>
           <p>本会话还没有登记过任何演示文稿工程。</p>
-          <p>
-            问模型「把 xx.pptx 逆向导入」或「打开 xx 工程」，
-            它会调 <strong>ppt_import</strong> / <strong>ppt_open</strong>，
-            面板会自动弹出那份工程。
-          </p>
         </div>
       </div>
     )

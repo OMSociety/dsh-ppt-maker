@@ -77,11 +77,6 @@ function BlankEmpty() {
           <span>PPT 工作台</span>
         </div>
         <p>还没有打开的演示文稿。</p>
-        <p>
-          问模型「把 xx.pptx 逆向导入」或「打开 xx 工程」，
-          它会调 <strong>ppt_import</strong> / <strong>ppt_open</strong>，
-          这边面板会自动弹出来。
-        </p>
       </div>
     </div>
   )
