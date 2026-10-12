@@ -355,10 +355,9 @@ export function _resetFontIndexForTests(): void {
  * 公开 API
  * ------------------------------------------------------------------ */
 
-/** 项目 assets/fonts/ 下按文件名（去扩展名 casefold）查找 */
+/** 项目 assets/fonts/ 下按字体内部族名查找（文件名 stem 仅作预筛提示，不作判据——发行名多为连字符形） */
 async function resolveFromAssets(typeface: string, assetsDir: string): Promise<IndexedFont | null> {
   if (!existsSync(assetsDir)) return null
-  const wanted = normalizeName(typeface)
   let files: string[]
   try {
     files = await readdir(assetsDir)
@@ -367,13 +366,12 @@ async function resolveFromAssets(typeface: string, assetsDir: string): Promise<I
   }
   for (const f of files) {
     if (!FONT_EXTS.some((ext) => f.toLowerCase().endsWith(ext))) continue
-    const stem = f.replace(/\.[^.]+$/, '')
-    if (normalizeName(stem) === wanted || normalizeName(stem).startsWith(wanted)) {
-      const full = path.join(assetsDir, f)
-      const tmp = new Map<string, IndexedFont[]>()
-      await indexOne(full, tmp)
-      // 直接拿第一 face（assets 自带的多为单 face；用户 TTC 会按族名匹配）
-      for (const arr of tmp.values()) if (arr.length > 0) return arr[0]
+    const full = path.join(assetsDir, f)
+    const tmp = new Map<string, IndexedFont[]>()
+    await indexOne(full, tmp)
+    for (const [fam, arr] of tmp) {
+      // matches() 容忍字重/变体后缀（空格或连字符续接）
+      if (arr.length > 0 && matches(fam, typeface)) return arr[0]
     }
   }
   return null

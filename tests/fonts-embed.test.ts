@@ -245,3 +245,18 @@ describe('PR3 字体子系统 · 整链 smoke（空工程走通）', () => {
     expect(r.summary.warnings).toEqual([])
   })
 })
+
+describe('PR3 resolver · assets/fonts 连字符发行名命中（终验人工实测轮暴露的缺陷）', () => {
+  it.runIf(hasFile(PUHUITI_TTF))('Alibaba-PuHuiTi-Regular.ttf 应被 "Alibaba PuHuiTi" 命中（按字体内部族名而非文件 stem）', async () => {
+    const { mkdtempSync, mkdirSync, copyFileSync } = await import('node:fs')
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'ppt-resolver-'))
+    const fontsDir = path.join(tmp, 'assets', 'fonts')
+    mkdirSync(fontsDir, { recursive: true })
+    copyFileSync(PUHUITI_TTF, path.join(fontsDir, 'Alibaba-PuHuiTi-Regular.ttf'))
+    const { resolveTypeface } = await import('../src/core/fonts/resolver.js')
+    const hit = await resolveTypeface('Alibaba PuHuiTi', 'regular', { projectDir: tmp })
+    expect(hit).not.toBeNull()
+    expect(hit!.familyName).toBe('Alibaba PuHuiTi')
+    expect(hit!.slot).toBe('regular')
+  })
+})
