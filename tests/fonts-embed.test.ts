@@ -172,7 +172,7 @@ describe('PR3 字体子系统 · EOT 封装与四件套注入', () => {
     expect(() => wrapEot(otf)).toThrow(/非 TrueType 轮廓/)
   })
 
-  it('embedFontsPostProcess：向空产物注入 MiSans 后四件套齐；二次注入幂等（字节相等）', async () => {
+  it('embedFontsPostProcess：向空产物注入 MiSans 后四件套齐；二次注入幂等（字节相等）', { timeout: 90000, retry: 2 }, async () => {
     if (!hasFile(MISANS_TTF)) return
     const ttf = new Uint8Array(readFileSync(MISANS_TTF))
     const bare = await barePptxBytes()

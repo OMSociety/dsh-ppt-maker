@@ -30,7 +30,11 @@ import {
   mergeTableCells,
   renameShape,
   savePresentation,
+  setParagraphBullet,
+  setParagraphIndent,
   setParagraphLineSpacing,
+  setPresentationFonts,
+  setPresentationTheme,
   setShapeAnimation,
   setShapeBounds,
   setShapeCustomGeometry,
@@ -71,8 +75,10 @@ import {
   type LineEndType,
   type ParagraphSpec,
   type PresentationData,
+  type PresentationFontsInput,
   type SlideData,
   type SlideShapeData,
+  type TableCellData,
   type TextFormat,
   type TransitionOptions
 } from '@office-kit/pptx'
@@ -114,7 +120,14 @@ class ThemeResolver {
 
   /** Resolve a possibly-{latin,ea} font family into engine font fields. */
   fontFamily(value: unknown): { font?: string; fontEastAsian?: string } {
-    if (typeof value === 'string') return { font: value, fontEastAsian: value }
+    if (typeof value === 'string') {
+      // A comma stack is the CSS-style latin,ea pair the reverse map writes
+      // (e.g. "Liter, MiSans"); OOXML has two separate slots, so the stack
+      // must be split — writing it whole produces an illegal typeface name.
+      const parts = splitFontStack(value)
+      if (parts.length === 0) return {}
+      return { font: parts[0], fontEastAsian: parts.length > 1 ? parts[1] : parts[0] }
+    }
     if (value && typeof value === 'object') {
       const rec = value as { latin?: unknown; ea?: unknown }
       const out: { font?: string; fontEastAsian?: string } = {}
@@ -127,13 +140,25 @@ class ThemeResolver {
 
   /** Record a font family string into fontsUsed. */
   static collectFont(into: Set<string>, value: unknown): void {
-    if (typeof value === 'string' && value !== '') into.add(value)
-    else if (value && typeof value === 'object') {
+    if (typeof value === 'string') {
+      for (const part of splitFontStack(value)) into.add(part)
+    } else if (value && typeof value === 'object') {
       const rec = value as { latin?: unknown; ea?: unknown }
       if (typeof rec.latin === 'string') into.add(rec.latin)
       if (typeof rec.ea === 'string') into.add(rec.ea)
     }
   }
+}
+
+/** CSS generic family keywords never map onto an OOXML typeface slot. */
+const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'default'])
+
+/** Split a CSS-style font stack ("Liter, MiSans") into plain family names. */
+function splitFontStack(value: string): string[] {
+  return value
+    .split(',')
+    .map((s) => s.trim().replace(/^["']+|["']+$/g, ''))
+    .filter((s) => s !== '' && !GENERIC_FAMILIES.has(s.toLowerCase()))
 }
 
 /* ------------------------------------------------------------------ *
@@ -284,6 +309,25 @@ function applyParagraphMetrics(
       setParagraphLineSpacing(shape, index, { kind: 'pts', value: lhPx })
     } else if (lh !== undefined) {
       setParagraphLineSpacing(shape, index, { kind: 'pct', value: lh })
+    }
+  })
+}
+
+/**
+ * Consume parsed list markup: per-paragraph bullet + hanging indent.
+ * The 27px(=pt) hanging indent mirrors the reference desktop app's level-0
+ * list default and is what the reverse map reads back from real decks.
+ */
+function applyParagraphBullets(shape: SlideShapeData | TableCellData, paragraphs: RichParagraph[]): void {
+  paragraphs.forEach((para, index) => {
+    const bullet = para.props.bullet
+    if (bullet === undefined || bullet === null) return
+    try {
+      setParagraphBullet(shape, index, bullet === 'number' ? 'number' : 'bullet')
+      const left = para.props.marginLeft !== undefined ? para.props.marginLeft : 27
+      setParagraphIndent(shape, index, { leftEmu: toEmu(left), firstLineEmu: toEmu(-left) })
+    } catch {
+      // Bullet/indent failure must not drop the paragraph text already written.
     }
   })
 }
@@ -442,6 +486,7 @@ function buildText(
   const specs = richRunsToSpecs(parsed.paragraphs, base, resolver, fonts)
   setShapeParagraphs(shape, specs)
   applyParagraphMetrics(shape, parsed.paragraphs, base)
+  applyParagraphBullets(shape, parsed.paragraphs)
   // marginTop → per-paragraph space-before is not exposed by the library's
   // public API; approximate with paragraph line spacing already applied and
   // record the degradation once.
@@ -513,21 +558,27 @@ function buildPlaceholder(
   const label = typeof element.label === 'string' ? element.label : PLACEHOLDER_DEFAULT_LABELS[originalType] ?? PLACEHOLDER_DEFAULT_LABELS.unknown
   const labelStyle = (element.labelStyle ?? {}) as Record<string, unknown>
   const fontSize = typeof labelStyle.fontSize === 'number' ? labelStyle.fontSize : 14
-  const color = resolver.color(labelStyle.color) ?? ('#6B7280' as Color)
+  // 默认标签色 #4B5563：对默认底 #E5E7EB 对比度约 6.1:1，过 WCAG AA 4.5:1
+  const color = resolver.color(labelStyle.color) ?? ('#4B5563' as Color)
   const alignPair: [string, string] = Array.isArray(labelStyle.align) ? (labelStyle.align as [string, string]) : ['center', 'middle']
 
-  setShapeParagraphs(shape, [
-    {
-      align: ALIGN_MAP[alignPair[0]] ?? 'center',
-      runs: [{ text: label, format: { size: fontSize, color } }]
-    }
-  ])
+  // Text-body properties come first on purpose: `addSlideShape` gives an
+  // autoshape no `<p:txBody>`, and the library only creates one through
+  // setShapeTextAnchor / setShapeTextWrap (its internal ensureTxBody) — calling
+  // setShapeParagraphs first throws `shape "…" has no <p:txBody>` and the whole
+  // placeholder (label included) is dropped from the export.
   applyTextBodyProps(
     shape,
     { align: alignPair, wrap: true, font: {} },
     ctx.warnings,
     where
   )
+  setShapeParagraphs(shape, [
+    {
+      align: ALIGN_MAP[alignPair[0]] ?? 'center',
+      runs: [{ text: label, format: { size: fontSize, color } }]
+    }
+  ])
   fonts.add('default')
   applyCommonGeometry(shape, element as ElementBase, ctx, where)
   return shape
@@ -783,6 +834,7 @@ function applyTableCells(
       const parsed = parseRichText(text)
       const specs = richRunsToSpecs(parsed.paragraphs, content, resolver, fonts)
       setTableCellParagraphs(handle, specs)
+      applyParagraphBullets(handle, parsed.paragraphs)
       const anchor = (content.align[1] ?? 'middle') as string
       setTableCellAnchor(handle, anchor === 'top' ? 'top' : anchor === 'bottom' ? 'bottom' : 'center')
 
@@ -1195,6 +1247,74 @@ async function applyBackground(
 }
 
 /* ------------------------------------------------------------------ *
+ * Deck theme → pptx theme part
+ * ------------------------------------------------------------------ */
+
+/** OOXML clrScheme slot names that may appear verbatim in theme.colors. */
+const THEME_COLOR_SLOTS = [
+  'dark1', 'light1', 'dark2', 'light2',
+  'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6',
+  'hyperlink', 'followedHyperlink'
+] as const
+
+/**
+ * Brand the output package with the deck's theme instead of the library's
+ * Office default (Calibri + Office palette):
+ *  - title/body textStyles' fontFamily → major/minor font scheme;
+ *  - theme.colors entries under canonical clrScheme slot names → clrScheme.
+ * Both setters throw when the package has no theme part; failures degrade
+ * to a warning, never abort the build.
+ */
+function applyDeckTheme(pres: PresentationData, theme: Theme | undefined, warnings: string[]): void {
+  if (theme === undefined) return
+
+  const familyOf = (key: string): { latin?: string; ea?: string } => {
+    const fam = theme.textStyles?.[key]?.fontFamily as unknown
+    if (typeof fam === 'string') {
+      const parts = splitFontStack(fam)
+      return parts.length > 0 ? { latin: parts[0], ea: parts.length > 1 ? parts[1] : parts[0] } : {}
+    }
+    if (fam && typeof fam === 'object') {
+      const rec = fam as { latin?: unknown; ea?: unknown }
+      return {
+        ...(typeof rec.latin === 'string' ? { latin: rec.latin } : {}),
+        ...(typeof rec.ea === 'string' ? { ea: rec.ea } : {})
+      }
+    }
+    return {}
+  }
+  const title = familyOf('title')
+  const body = familyOf('body')
+  const fontsInput: PresentationFontsInput = {
+    ...(title.latin !== undefined ? { majorLatin: title.latin } : {}),
+    ...(title.ea !== undefined ? { majorEastAsian: title.ea } : {}),
+    ...(body.latin !== undefined ? { minorLatin: body.latin } : {}),
+    ...(body.ea !== undefined ? { minorEastAsian: body.ea } : {})
+  }
+  if (Object.keys(fontsInput).length > 0) {
+    try {
+      setPresentationFonts(pres, fontsInput)
+    } catch (err) {
+      warnings.push(`主题字体方案写入失败：${(err as Error).message}`)
+    }
+  }
+
+  const colors = (theme.colors ?? {}) as Record<string, unknown>
+  const slots: Record<string, string> = {}
+  for (const key of THEME_COLOR_SLOTS) {
+    const value = colors[key]
+    if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) slots[key] = value
+  }
+  if (Object.keys(slots).length > 0) {
+    try {
+      setPresentationTheme(pres, slots)
+    } catch (err) {
+      warnings.push(`主题色方案写入失败：${(err as Error).message}`)
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * The engine
  * ------------------------------------------------------------------ */
 
@@ -1212,6 +1332,7 @@ export function createOfficeKitEngine(): DeckEngine {
       const ratio = size[0] / (size[1] || 1)
       const pres: PresentationData = createPresentation({ size: Math.abs(ratio - 4 / 3) < 0.01 ? '4:3' : '16:9' })
       setSlideSize(pres, { width: toEmu(size[0]), height: toEmu(size[1]) })
+      applyDeckTheme(pres, deck.theme, warnings)
 
       const exportCfg = deck.export ?? {}
       const transitionMode = exportCfg.transition ?? 'fade'

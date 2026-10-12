@@ -1,11 +1,12 @@
 /**
  * ppt_render — render project pages to PNG previews via libreoffice-kit
- * (PR 1 plan §2): { ok, images: [{ page, path }] }. Renders the FINAL pptx
- * bytes (build → save → render), never an intermediate approximation.
+ * (PR 1 plan §2): { ok, images: [{ page, path }] }. Renders the engine-built
+ * pptx bytes BEFORE font embedding (LibreOffice 会误用嵌入的子集 EOT 字体，
+ * 预览必须走未嵌入字节，由系统字体承担渲染).
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { buildProjectDeck, renderPptxImages, saveProjectPptx } from '../core/export-pipeline.js'
+import { buildProjectDeck, renderPptxImages, saveRawProjectPptx } from '../core/export-pipeline.js'
 import { renderSummary, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined {
@@ -39,8 +40,9 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
         const cwd = resolveSessionCwd(exec, ctx.sessions)
         const dir = args.dir as string
         const pipeline = await buildProjectDeck(cwd, dir)
-        const saved = await saveProjectPptx(pipeline)
-        const bytes = saved.bytes
+        // 渲染用未嵌字体的裸字节：LibreOffice 会误用嵌入的子集 EOT（字形错乱），
+        // 预览必须反映版面本身，由系统字体承担渲染。
+        const bytes = await saveRawProjectPptx(pipeline)
 
         const rendered = await renderPptxImages(bytes, {
           pages: args.pages as number[] | undefined,

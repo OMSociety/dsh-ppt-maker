@@ -6,7 +6,7 @@
  * test doubles as a golden round-trip check on the mapping rules.
  */
 import { describe, expect, it } from 'vitest'
-import { loadPresentation, getSlides, getSlideShapes, getShapeText, getShapeBounds, getSlideSize, getSlideTransition } from '@office-kit/pptx'
+import { loadPresentation, getSlides, getSlideShapes, getShapeText, getShapeBounds, getSlideSize, getSlideTransition, getShapeXmlString, getPresentationFonts, getPresentationTheme } from '@office-kit/pptx'
 import { createOfficeKitEngine } from '../src/core/engine/officekit.js'
 import type { BuildContext } from '../src/core/engine/types.js'
 import type { Page, Presentation } from '../src/core/pptd/parse.js'
@@ -139,5 +139,77 @@ describe('officekit engine', () => {
     const back = await loadPresentation(bytes)
     const shape = getSlideShapes(getSlides(back)[0])[0]
     expect(getShapeText(shape)).toBe('正常加粗与斜体')
+  })
+
+  // 终验缺陷 P1-c 回归：逆向 map 把 latin/ea 拼成逗号栈写进 font-family，
+  // 导出端必须拆回两个 OOXML 槽位，绝不允许 "Liter, MiSans" 整体进 typeface。
+  it('splits run-level comma font stacks into latin/ea slots', async () => {
+    const engine = createOfficeKitEngine()
+    const page: Page = {
+      elements: [
+        {
+          elementId: 't1',
+          elementType: 'text',
+          bounds: [10, 10, 300, 60],
+          content: { text: '<span style="font-family:Liter, MiSans">01 目录</span>', fontSize: 26 }
+        }
+      ]
+    }
+    const built = await engine.buildDeck({ deck: deck(), pages: [page] }, ctx())
+    expect(built.fontsUsed).toContain('Liter')
+    expect(built.fontsUsed).toContain('MiSans')
+    expect(built.fontsUsed.some((f) => f.includes(','))).toBe(false)
+    const bytes = await engine.saveDeck(built.native)
+    const back = await loadPresentation(bytes)
+    const xml = getShapeXmlString(getSlideShapes(getSlides(back)[0])[0])
+    expect(xml).toContain('typeface="Liter"')
+    expect(xml).toContain('typeface="MiSans"')
+    expect(xml).not.toContain('Liter, MiSans')
+  })
+
+  // 终验缺陷 P1-b 回归：<ul>/<li> 必须落成 buChar + 27pt 悬挂缩进。
+  it('consumes list markup into buChar and hanging indent', async () => {
+    const engine = createOfficeKitEngine()
+    const page: Page = {
+      elements: [
+        {
+          elementId: 't1',
+          elementType: 'text',
+          bounds: [10, 10, 400, 200],
+          content: { text: '<ul><li>第一条</li><li>第二条</li></ul>', fontSize: 20 }
+        }
+      ]
+    }
+    const built = await engine.buildDeck({ deck: deck(), pages: [page] }, ctx())
+    const bytes = await engine.saveDeck(built.native)
+    const back = await loadPresentation(bytes)
+    const xml = getShapeXmlString(getSlideShapes(getSlides(back)[0])[0])
+    expect(xml).toContain('<a:buChar char="•"/>')
+    expect(xml).toContain('marL="342900"')
+    expect(xml).toContain('indent="-342900"')
+  })
+
+  // 终验缺陷「主题被重置」回归：title/body textStyles 的字体与 colors 里的
+  // 规范色槽必须回写进包的主题部件，而不是停在库的 Office 默认。
+  it('brands the package theme from deck theme (fonts + clrScheme)', async () => {
+    const engine = createOfficeKitEngine()
+    const themed = deck({
+      theme: {
+        colors: { primary: '#2563EB', accent1: '#009682', dark1: '#000000', light1: '#FFFFFF' },
+        textStyles: {
+          title: { fontFamily: { latin: 'Liter', ea: 'MiSans' } },
+          body: { fontFamily: { latin: 'Liter', ea: 'MiSans' } }
+        }
+      }
+    })
+    const built = await engine.buildDeck({ deck: themed, pages: [{ elements: [] }] }, ctx())
+    const bytes = await engine.saveDeck(built.native)
+    const back = await loadPresentation(bytes)
+    const fonts = getPresentationFonts(back)
+    expect(fonts?.majorLatin).toBe('Liter')
+    expect(fonts?.majorEastAsian).toBe('MiSans')
+    expect(fonts?.minorLatin).toBe('Liter')
+    const theme = getPresentationTheme(back)
+    expect(theme?.accent1).toBe('#009682')
   })
 })

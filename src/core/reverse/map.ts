@@ -48,7 +48,11 @@ import {
   getSlideMasterBackgroundGradientFill,
   getSlideMasterBackgroundImageBytes,
   getSlideTransition,
+  getPresentationTheme,
   getTableCellParagraphs,
+  getTableCellAlignment,
+  getTableCellAnchor,
+  getTableCellFill,
   getTableCellSpan,
   getTableCellText,
   getTableColumnWidths,
@@ -593,6 +597,30 @@ function mapTable(
         } catch {
           /* keep flat text */
         }
+        // 显式单元格填充（表头实色块等）：导出端消费 cell.fill 还原
+        try {
+          const fill = getTableCellFill(cell)
+          if (fill) {
+            cellObj.fill = { type: 'solid', color: fill.startsWith('scheme:') || fill.startsWith('#') ? fill : `#${fill}` }
+          }
+        } catch {
+          /* ignore */
+        }
+        // 显式对齐：水平经 <p style="text-align">（richtext → ParagraphSpec.align），
+        // 垂直经 cell.align[1]（导出端 setTableCellAnchor）
+        try {
+          const algn = getTableCellAlignment(cell)
+          const anchor = getTableCellAnchor(cell)
+          const hMap: Record<string, string> = { l: 'left', ctr: 'center', r: 'right', just: 'justify', dist: 'distributed', justLow: 'justify', thaiDist: 'distributed' }
+          const h = algn ? hMap[algn] : undefined
+          const v = anchor === 'center' ? 'middle' : anchor === 'bottom' ? 'bottom' : anchor === 'top' ? 'top' : undefined
+          if (h && h !== 'left' && typeof cellObj.text === 'string' && cellObj.text !== '' && !cellObj.text.includes('<')) {
+            cellObj.text = `<p style="text-align:${h}">${escapeHtml(cellObj.text)}</p>`
+          }
+          if (h || v) cellObj.align = [h ?? 'left', v ?? 'middle']
+        } catch {
+          /* ignore */
+        }
         row.push(cellObj)
       }
       rows.push(row)
@@ -614,7 +642,7 @@ function mapTable(
         page: rec.slideIndex,
         elementId: elementIdOf(rec),
         feature: 'table.styleId',
-        detail: '内置表格样式 id 记入 builtinStyle，渲染以 rows 字面量为准',
+        detail: '内置表格样式 id 记入 builtinStyle；显式单元格填充/对齐已按字面量还原，样式表派生的条纹与首行强调不还原',
         originalValue: styleId
       })
     }
@@ -1046,6 +1074,10 @@ export function mapReverseModel(
     pages.push(mapPage(slide, pres, read.fonts, media, report))
   }
 
+  // clrScheme 12 槽原样落 theme.colors 规范键（accent1 等），导出端据此
+  // 回写主题色方案（setPresentationTheme），避免成品被重置成 Office 默认色板。
+  const themeColors = getPresentationTheme(pres)
+
   const deck: Presentation = {
     version: 'v3',
     profile: 'reverse',
@@ -1053,23 +1085,46 @@ export function mapReverseModel(
     // R3：母版 txStyles 不可完整还原；主题字体落到 title/body 两个
     // textStyles 槽位，作为占位符未显式设字体时的默认（render 端 run 级
     // 富文本已逐字携带字体，textStyles 只兜底空文本与新建文本框）。
-    ...(read.fonts
+    // 导出端同时用它们回写 major/minor 字体方案（setPresentationFonts）。
+    ...(read.fonts || themeColors
       ? {
           theme: {
-            textStyles: {
-              title: {
-                fontFamily: {
-                  latin: read.fonts.majorLatin ?? 'Calibri',
-                  ea: read.fonts.majorEastAsian ?? read.fonts.majorLatin ?? 'Calibri'
+            ...(themeColors
+              ? {
+                  colors: {
+                    dark1: themeColors.dark1,
+                    light1: themeColors.light1,
+                    dark2: themeColors.dark2,
+                    light2: themeColors.light2,
+                    accent1: themeColors.accent1,
+                    accent2: themeColors.accent2,
+                    accent3: themeColors.accent3,
+                    accent4: themeColors.accent4,
+                    accent5: themeColors.accent5,
+                    accent6: themeColors.accent6,
+                    hyperlink: themeColors.hyperlink,
+                    followedHyperlink: themeColors.followedHyperlink
+                  }
                 }
-              },
-              body: {
-                fontFamily: {
-                  latin: read.fonts.minorLatin ?? 'Calibri',
-                  ea: read.fonts.minorEastAsian ?? read.fonts.minorLatin ?? 'Calibri'
+              : {}),
+            ...(read.fonts
+              ? {
+                  textStyles: {
+                    title: {
+                      fontFamily: {
+                        latin: read.fonts.majorLatin ?? 'Calibri',
+                        ea: read.fonts.majorEastAsian ?? read.fonts.majorLatin ?? 'Calibri'
+                      }
+                    },
+                    body: {
+                      fontFamily: {
+                        latin: read.fonts.minorLatin ?? 'Calibri',
+                        ea: read.fonts.minorEastAsian ?? read.fonts.minorLatin ?? 'Calibri'
+                      }
+                    }
+                  }
                 }
-              }
-            }
+              : {})
           }
         }
       : {}),

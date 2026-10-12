@@ -66,6 +66,16 @@ export async function buildProjectDeck(cwd: string, dir: string): Promise<Pipeli
   }
 }
 
+/**
+ * 不嵌字体的裸保存——供预览/质检渲染用。
+ * 实测：LibreOffice 对嵌入的子集 EOT 字体会误用（字形张冠李戴），
+ * 预览渲染必须走嵌字体之前的字节，由系统字体承担渲染。
+ */
+export async function saveRawProjectPptx(pipeline: PipelineResult): Promise<Uint8Array> {
+  const engine = createOfficeKitEngine()
+  return engine.saveDeck(pipeline.built.native)
+}
+
 /** Save the built deck to pptx bytes ( fonts embedded按 deck.export.fontEmbed 模式 ) */
 export async function saveProjectPptx(pipeline: PipelineResult): Promise<{ bytes: Uint8Array; fontEmbed: FontEmbedSummary | null }> {
   const engine = createOfficeKitEngine()
@@ -181,8 +191,9 @@ export async function checkProject(cwd: string, dir: string, options: CheckOptio
   let pptxBytes: Uint8Array | null = null
   if (needsRender) {
     try {
-      const saved = await saveProjectPptx(pipeline)
-      pptxBytes = saved.bytes
+      // 预览/质检渲染用未嵌字体的裸字节：LibreOffice 会误用嵌入的子集
+      // EOT（字形张冠李戴），系统字体渲染才是版面的诚实快照。
+      pptxBytes = await saveRawProjectPptx(pipeline)
     } catch {
       pptxBytes = null
     }
