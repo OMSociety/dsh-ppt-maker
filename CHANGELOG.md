@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 修复
 
 - **P0：插件整体不挂载（全部 `ppt_*` 工具与 webServer 路由消失，技能却注册成功）**：根因是 `src/index.ts` 的 `inject` 把 `llm` / `attachments` 两个插件装载上下文不保证提供的服务写进了声明——Cordis 对注入但缺席的服务会把 `apply()` 无限期挂起且全程静默。`inject` 收窄为 `['tools', 'sessions', 'skills', 'webServer']`（与官方工具包同口径）；`llm` / `attachments` 改为工具执行时经 `ctx.get()` 懒取（dsh-config-manager 同款纪律），缺席时 AI 质检按既有逻辑显式降级。回归测试锁定：inject 不得含 `llm`/`attachments`；`ctx.get` 在场或缺席都不影响注册。
+- **预览渲染：旋转形状被裁成碎片**（`scripts/pptd_to_png.py`）：`Image.rotate(expand=False)` 在原 bounds 内旋转，宽扁条带稍转即被四角裁剪（452×14 转 -22° 只剩中心一截）。改为 `expand=True` 取旋转外接框、按 bounds 中心对齐贴回，与 PPT `rot` 语义一致。
+- **预览渲染：文本不受 bounds 宽度约束、超宽互相覆盖**（同文件）：`draw_text` 只按段落断行、从不按宽度折行（`wrap` 字段被无视）。新增贪心折行（逐字试排、优先空格断词、CJK 按字断，spec 默认 `wrap:true` 生效；显式 `wrap:false` 保持原样），垂直居中/底对齐随折行后的实际行高定位。PPTX 导出链（`pptd_to_pptx.py` 原生 `word_wrap`/`rotation`）不受影响，两链不同源。
 
 ## [1.0.0] - 2026-10-12
 

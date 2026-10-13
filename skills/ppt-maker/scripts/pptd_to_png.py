@@ -252,10 +252,14 @@ def _crop_fractions(crop):
 _PREVIEW_SHAPES = ("rect", "ellipse", "circle", "roundRect", "triangle", "diamond", "chevron")
 
 def _rotated_layer(bw, bh, angle, fn):
-    """在 bounds 尺寸透明层上绘制后绕中心旋转（PIL 逆时针为正，PPT 为顺时针）。"""
+    """在 bounds 尺寸透明层上绘制后绕中心旋转（PIL 逆时针为正，PPT 为顺时针）。
+
+    expand=True：旋转后的外接框大于原 bounds，expand=False 会把四角裁掉
+    （实测 452×14 的条带转 -22° 只剩中心一截）。返回 (旋转后的层, 无)。
+    """
     layer = Image.new("RGBA", (max(1, int(bw)), max(1, int(bh))), (0, 0, 0, 0))
     fn(layer)
-    return layer.rotate(-float(angle), expand=False)
+    return layer.rotate(-float(angle), expand=True, resample=Image.BICUBIC)
 
 def resolve_color(c, theme_colors, fallback=None):
     if c is None:
@@ -352,12 +356,40 @@ def _draw_line_range(d, el, colors, scale, ox, oy):
            width=max(1, int(float((el.get("border") or {}).get("width", 1)) * scale)))
 
 def _emit(img, x, y, bw, bh, angle, paint):
-    """把 paint(container, ox, oy) 落图；rotation ≠ 0 时画进透明层绕中心旋转后贴回。"""
+    """把 paint(container, ox, oy) 落图；rotation ≠ 0 时画进透明层绕中心旋转后贴回。
+
+    贴回以 bounds 中心为锚：旋转层外接框更大，按中心对齐偏移，
+    保证旋转后视觉中心仍落在原 bounds 中心（与 PPT 的 rot 语义一致）。
+    """
     if angle:
-        layer = _rotated_layer(bw, bh, angle, lambda L: paint(L, 0, 0))
-        img.paste(layer, (int(x), int(y)), layer)
+        rot = _rotated_layer(bw, bh, angle, lambda L: paint(L, 0, 0))
+        cx, cy = x + bw / 2, y + bh / 2
+        img.paste(rot, (int(round(cx - rot.width / 2)), int(round(cy - rot.height / 2))), rot)
     else:
         paint(img, x, y)
+
+def _wrap_line(draw, line, font, max_w):
+    """贪心换行到 max_w：逐字试排，优先在最近的空格处断（西文不断词），
+    无空格（CJK 常态）则按字断。预览近似，不做标点避头尾。"""
+    if max_w <= 0 or draw.textlength(line, font=font) <= max_w:
+        return [line]
+    out, cur = [], ""
+    for ch in line:
+        trial = cur + ch
+        if not cur or draw.textlength(trial, font=font) <= max_w:
+            cur = trial
+            continue
+        sp = cur.rfind(" ")
+        if sp > 0:
+            out.append(cur[:sp].rstrip())
+            cur = cur[sp + 1:] + ch
+        else:
+            out.append(cur)
+            cur = "" if ch == " " else ch
+    if cur.strip():
+        out.append(cur.rstrip())
+    return out or [line]
+
 
 def draw_text(draw, el, theme, scale, colors, ox, oy):
     c = el.get("content", {})
@@ -392,6 +424,10 @@ def draw_text(draw, el, theme, scale, colors, ox, oy):
         except Exception:
             font = ImageFont.load_default()
     line_h = int(font_size * lh)
+    # 换行：spec 默认 wrap:true——段落按 bounds 宽度贪心折行（此前完全不换行，
+    # 超宽文本直接溢出 bounds 互相覆盖）；显式 wrap:false 保持原样。
+    if c.get("wrap", True) and font is not None:
+        lines = [w for para in lines for w in _wrap_line(draw, para, font, bw)] or [""]
     # 总文本高
     total_h = line_h * max(1, len(lines))
     # 垂直定位
