@@ -42,7 +42,7 @@
 
 | 任务 | 状态 | 接手输入 |
 |---|---|---|
-| 用户视角验收 | 待用户操作（重启宿主后进行）——**10-14 实测反馈修复轮已落盘**：P0 插件不挂载根因=inject 声明了装载上下文不保证的 llm/attachments（Cordis 静默挂起 apply），已收窄为 tools/sessions/skills/webServer + 懒取（70ecc35）；逃生舱 PNG 两个 P1（旋转裁剪/文本不折行）已修（a043179）；技能 base 旧路径随重启自愈 | 验收脚本见下方「用户视角验收清单」，第 1 条应能看到 ppt_* 工具出现在工具表 |
+| 用户视角验收 | 待用户操作（重启宿主后进行）——**10-14 第二轮修复已落盘（273132c）**：11 个 ppt_* 工具全灭的根因是 `output.schema` 缺席被宿主 `assertSupportedJsonSchema` 拒收、又被逐工具 try/catch 吞成 warn；12 个工具补 schema + render 契约对齐（shared.ts 的 output 改必填、新增 resultSchema、renderSummary 返回内容块数组）。更早两轮：P0 插件不挂载=inject 声明了装载上下文不保证的 llm/attachments（70ecc35）；逃生舱 PNG 旋转裁剪/文本不折行（a043179） | 验收脚本见下方「用户视角验收清单」，第 2 条懒展开核验为关键判据 |
 | 推远端 | 验收过后 | 本地 19 提交（5452f00 起），用户已许可「PR 可以先合」 |
 | npm 发包 | **用户明确暂缓**（m01692：「先不急发npm」） | 发 dsh-ppt-maker@1.0.0 + deprecate dsh-kimi-ppt，等用户发话 |
 
