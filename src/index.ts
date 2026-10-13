@@ -9,14 +9,16 @@
  *     ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check (raw
  *     JSON-Schema via ctx.tools.register, per the PR 1 plan).
  *
- * `inject = ['tools', 'sessions', 'skills', 'llm', 'attachments']`: the tools
- * need `sessions` to resolve the session cwd (`exec.agent.session.id` →
- * `sessions.get(id).header.cwd`); there is deliberately no process.cwd()
- * fallback. `llm` + `attachments` power the opt-in AI review pass of
- * ppt_check (PR 1 plan §6, added in PR1-C). `webServer` joins in PR 2.
- *
- * Note: Cordis refuses bare service access without declaring it in `inject`,
- * and refuses to run apply() at all when an injected service is missing.
+ * `inject = ['tools', 'sessions', 'skills', 'webServer']`——只声明插件装载
+ * 上下文里**保证存在**的服务（与 dsh-fishpai / 官方工具包同一口径）。
+ * `llm` / `attachments`（ppt_check 的 opt-in AI 视觉质检用）**不得进 inject**：
+ * Cordis 对注入但缺席的服务会把 apply() 无限期挂起且全程静默——实测症状是
+ * 技能注册成功（目录里看得见）而全部 ppt_* 工具与 webServer 路由凭空消失。
+ * 二者改在调用时经 `ctx.get()` 懒取（dsh-config-manager 同款纪律：
+ * never injected → never blocks the fiber），缺席时 ai.ts 显式降级。
+ * the tools need `sessions` to resolve the session cwd
+ * (`exec.agent.session.id` → `sessions.get(id).header.cwd`); there is
+ * deliberately no process.cwd() fallback.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -44,7 +46,7 @@ import { registerThemesTool } from './tools/themes.js'
 import { registerUndoTool } from './tools/undo.js'
 
 export const name = 'dsh-ppt-maker'
-export const inject = ['tools', 'sessions', 'skills', 'llm', 'attachments', 'webServer']
+export const inject = ['tools', 'sessions', 'skills', 'webServer']
 export { PACKAGE_ROOT }
 
 const SKILL_DIR = path.join(PACKAGE_ROOT, 'skills', 'ppt-maker')
@@ -84,6 +86,8 @@ interface ApplyCtx {
   }
   logger?: { warn?: (message: string) => void }
   effect?: (fn: () => void | (() => void)) => void
+  /** Cordis `ctx.get(name)`：懒取 inject 之外的可选服务（llm / attachments）。 */
+  get?: (name: string) => unknown
 }
 
 /* ------------------------------------------------------------------ *
@@ -245,8 +249,14 @@ export function apply(ctx: ApplyCtx): void {
         const off = register({
           tools: ctx.tools,
           sessions: ctx.sessions,
-          llm: ctx.llm,
-          attachments: ctx.attachments,
+          // llm / attachments 懒取：它们不在 inject 里（缺席会静默挂死 apply，
+          // 见文件头注释），工具每次执行时才经 ctx.get() 现取；缺席由 ai.ts 降级。
+          get llm() {
+            return ctx.get?.('llm') as ApplyCtx['llm']
+          },
+          get attachments() {
+            return ctx.get?.('attachments') as ApplyCtx['attachments']
+          },
           pptMaker: undefined,
           // Lazy getter: the bridge is filled in once the host-store module
           // finishes loading (microtask after apply). Tool calls always come

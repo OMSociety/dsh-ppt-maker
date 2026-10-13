@@ -79,9 +79,33 @@ afterEach(async () => {
 })
 
 describe('宿主入口', () => {
-  it('inject 声明 tools/sessions/skills + llm/attachments + webServer（PR2）', () => {
-    expect(inject).toEqual(['tools', 'sessions', 'skills', 'llm', 'attachments', 'webServer'])
+  it('inject 只声明装载上下文保证存在的服务（llm/attachments 懒取，禁入 inject）', () => {
+    // llm / attachments 一旦进 inject：Cordis 对注入但缺席的服务把 apply() 静默
+    // 挂起——实测症状为技能注册成功而全部 ppt_* 工具消失（P0 事故，见 CHANGELOG）。
+    expect(inject).toEqual(['tools', 'sessions', 'skills', 'webServer'])
+    expect(inject).not.toContain('llm')
+    expect(inject).not.toContain('attachments')
     expect(pluginName).toBe('dsh-ppt-maker')
+  })
+
+  it('ctx.get 在场或缺席都不影响 apply 注册（llm/attachments 走调用时懒取）', () => {
+    // 带 get 的宿主：哨兵值不应在注册期被读取（getter 必须懒）。
+    let getCalls = 0
+    const withGet = makeCtx(cwd)
+    const ctxWithGet = {
+      ...withGet.ctx,
+      get: (_name: string) => {
+        getCalls++
+        return { sentinel: true }
+      }
+    }
+    apply(ctxWithGet)
+    expect(defs.size).toBe(11)
+    expect(getCalls).toBe(0)
+    // 无 get 的宿主（默认 makeCtx）：同样必须全量注册，不抛。
+    const plain = makeCtx(cwd)
+    apply(plain.ctx)
+    expect(defs.size).toBe(11)
   })
 
   it('apply 注册 1 个技能 + 11 个工具', () => {

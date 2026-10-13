@@ -10,6 +10,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [未发布]
+
+### 修复
+
+- **P0：插件整体不挂载（全部 `ppt_*` 工具与 webServer 路由消失，技能却注册成功）**：根因是 `src/index.ts` 的 `inject` 把 `llm` / `attachments` 两个插件装载上下文不保证提供的服务写进了声明——Cordis 对注入但缺席的服务会把 `apply()` 无限期挂起且全程静默。`inject` 收窄为 `['tools', 'sessions', 'skills', 'webServer']`（与官方工具包同口径）；`llm` / `attachments` 改为工具执行时经 `ctx.get()` 懒取（dsh-config-manager 同款纪律），缺席时 AI 质检按既有逻辑显式降级。回归测试锁定：inject 不得含 `llm`/`attachments`；`ctx.get` 在场或缺席都不影响注册。
+
 ## [1.0.0] - 2026-10-12
 
 dsh-ppt-maker 重写首发（原 dsh-kimi-ppt 改头换面，版本重启 1.0.0，不考虑旧兼容）。
