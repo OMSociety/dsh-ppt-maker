@@ -3,7 +3,7 @@
  */
 import { listThemes, type ThemeInfo } from '../core/theme.js'
 import { PACKAGE_ROOT } from '../root.js'
-import { renderSummary, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerThemesTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -19,6 +19,21 @@ export function registerThemesTool(ctx: PluginToolCtx): (() => void) | undefined
       }
     },
     output: {
+      schema: resultSchema({
+        themes: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              designSystem: { type: 'string' },
+              theme: { type: 'string' },
+              name: { type: 'string' },
+              path: { type: 'string' }
+            }
+          }
+        }
+      }),
       render: renderSummary((r) => `共 ${(r.themes as ThemeInfo[] | undefined)?.length ?? 0} 个主题`)
     },
     execute: async (args) => {

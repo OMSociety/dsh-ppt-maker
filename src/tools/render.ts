@@ -7,7 +7,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { buildProjectDeck, renderPptxImages, saveRawProjectPptx } from '../core/export-pipeline.js'
-import { renderSummary, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -30,6 +30,24 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
       }
     },
     output: {
+      schema: resultSchema({
+        revision: { type: 'integer' },
+        images: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              page: { type: 'integer' },
+              path: { type: 'string' },
+              width: { type: 'integer' },
+              height: { type: 'integer' }
+            }
+          }
+        },
+        missingFonts: { type: 'array', items: { type: 'string' } },
+        warnings: { type: 'array', items: { type: 'string' } }
+      }),
       render: renderSummary((r) => {
         const images = (r.images as Array<{ page: number }> | undefined) ?? []
         return `已渲染 ${images.length} 页预览`

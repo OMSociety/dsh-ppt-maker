@@ -16,7 +16,7 @@ import path from 'node:path'
 import { access, readFile } from 'node:fs/promises'
 import { reverseImport, ReverseImportError } from '../core/reverse/index.js'
 import { ProjectError, resolveProjectDir } from '../core/project/store.js'
-import { renderSummary, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 import type { PluginToolCtxWithOpen } from './open.js'
 
 async function manifestRevisionOf(projectDir: string): Promise<number> {
@@ -57,6 +57,19 @@ export function registerImportTool(ctx: PluginToolCtxWithOpen): (() => void) | u
       }
     },
     output: {
+      schema: resultSchema({
+        mode: { type: 'string' },
+        source: { type: 'string' },
+        guidance: { type: 'string' },
+        projectDir: { type: 'string' },
+        pageCount: { type: 'integer' },
+        mediaCount: { type: 'integer' },
+        revision: { type: 'integer' },
+        dropped: { type: 'integer' },
+        degraded: { type: 'integer' },
+        droppedList: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        degradedList: { type: 'array', items: { type: 'object', additionalProperties: true } }
+      }),
       render: renderSummary((r) => {
         if (r.mode === 'surgical') return `surgical 模式：请用 ppt_patch 直接对 ${String(r.source)} 做轻改`
         return `已导入 ${String(r.pageCount)} 页 / 媒体 ${String(r.mediaCount)} 件 / dropped ${String(r.dropped)} / degraded ${String(r.degraded)}`

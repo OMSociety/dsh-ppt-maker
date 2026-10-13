@@ -5,7 +5,7 @@
  * `manifest.revision === 0`.
  */
 import { createProject, DEFAULT_SIZE } from '../core/project/store.js'
-import { renderSummary, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerCreateTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -32,6 +32,9 @@ export function registerCreateTool(ctx: PluginToolCtx): (() => void) | undefined
       }
     },
     output: {
+      schema: resultSchema({
+        manifest: { type: 'object', additionalProperties: true, properties: { revision: { type: 'integer' } } }
+      }),
       render: renderSummary((r) => `已创建工程：${(r.manifest as { revision?: number })?.revision === 0 ? 'revision 0' : ''}（ppt_edit 开始编辑）`)
     },
     execute: async (args, exec) => {

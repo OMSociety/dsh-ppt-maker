@@ -2,7 +2,7 @@
  * ppt_undo — move the revision cursor backwards (`{ ok, revision, undoneOps }`).
  */
 import { undoProject } from '../core/project/store.js'
-import { renderSummary, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerUndoTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -20,6 +20,11 @@ export function registerUndoTool(ctx: PluginToolCtx): (() => void) | undefined {
       }
     },
     output: {
+      schema: resultSchema({
+        revision: { type: 'integer' },
+        undoneOps: { type: 'array', items: { type: 'string' } },
+        warnings: { type: 'array', items: { type: 'string' } }
+      }),
       render: renderSummary((r) => `已撤销到 revision ${String(r.revision)}（${(r.undoneOps as string[] | undefined)?.length ?? 0} 个 op）`)
     },
     execute: async (args, exec) => {

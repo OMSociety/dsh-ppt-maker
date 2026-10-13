@@ -10,7 +10,7 @@
  * advisory only — they never block; rule-layer blockers do.
  */
 import { checkProject } from '../core/export-pipeline.js'
-import { sessionIdOf, renderSummary, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
+import { sessionIdOf, renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -34,6 +34,25 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
       }
     },
     output: {
+      schema: resultSchema({
+        pass: { type: 'boolean' },
+        issues: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              page: { type: 'integer' },
+              severity: { type: 'string' },
+              category: { type: 'string' },
+              elementId: { type: 'string' },
+              description: { type: 'string' },
+              suggestion: { type: 'string' }
+            }
+          }
+        },
+        ai: { type: 'object', additionalProperties: true }
+      }),
       render: renderSummary((r) => {
         const issues = (r.issues as Array<{ severity?: string }> | undefined) ?? []
         const blockers = issues.filter((i) => i.severity === 'blocker').length

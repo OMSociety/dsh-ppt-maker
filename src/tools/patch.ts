@@ -40,7 +40,7 @@ import {
 } from '@office-kit/pptx'
 import { ProjectError } from '../core/project/store.js'
 import { listPackageParts } from '@office-kit/pptx'
-import { renderSummary, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 type PatchOp =
   | { op: 'set_text'; slide: number; shapeId?: number; shapeName?: string; at?: [number, number]; text: string }
@@ -174,6 +174,17 @@ export function registerPatchTool(ctx: PluginToolCtx): (() => void) | undefined 
       }
     },
     output: {
+      schema: resultSchema({
+        out: { type: 'string' },
+        bytes: { type: 'integer' },
+        appliedOps: { type: 'integer' },
+        appliedList: { type: 'array', items: { type: 'string' } },
+        unchangedParts: { type: 'integer' },
+        lostParts: { type: 'array', items: { type: 'string' } },
+        beforeSha1: { type: 'string' },
+        afterSha1: { type: 'string' },
+        sessionId: { type: 'string' }
+      }),
       render: renderSummary((r) => {
         const lost = Array.isArray(r.lostParts) ? r.lostParts.length : 0
         return `已写入 ${String(r.out ?? '')}（${String(r.appliedOps)} 个 op；未建模部件 ${String(r.unchangedParts)} 件全数保留，丢件 ${lost}）`

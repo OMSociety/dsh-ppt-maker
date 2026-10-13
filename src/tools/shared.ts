@@ -42,8 +42,32 @@ export interface ToolDef {
   name: string
   description: string
   parameters: Record<string, unknown>
-  output?: { schema?: Record<string, unknown>; render?: (result: never) => string }
+  /**
+   * The host's ToolRuntime.register rejects a definition whose `output.schema`
+   * is absent (`unsupported JSON schema: schema must be a schema object`) and
+   * renders the committed value through `render(args, value)`, whose result
+   * must be lossless JSON content blocks — not a bare string.
+   */
+  output: { schema: Record<string, unknown>; render: (args: unknown, result: never) => unknown }
   execute: (args: Record<string, unknown>, exec: unknown) => Promise<unknown>
+}
+
+/**
+ * Result-envelope schema for the ppt_* tools.
+ *
+ * Only `ok` is required: every tool answers either `{ok:true, ...}` or the
+ * uniform `{ok:false, error}` failure payload from `toolError`, so requiring
+ * anything else would make a clean failure envelope fail output validation.
+ * Extras stay admitted (`additionalProperties: true`) — each tool documents
+ * further fields, but the schema is a floor, not a ceiling.
+ */
+export function resultSchema(properties: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    type: 'object',
+    required: ['ok'],
+    additionalProperties: true,
+    properties: { ok: { type: 'boolean' }, ...properties }
+  }
 }
 
 export interface PluginToolCtx {
@@ -80,13 +104,22 @@ export function resolveSessionCwd(exec: unknown, sessions: SessionsLike | undefi
   return cwd
 }
 
-/** Short human/agent-facing line for the host's result panel. */
-export function renderSummary(line: (result: Record<string, unknown>) => string): (result: never) => string {
-  return ((result: Record<string, unknown>) => {
+/**
+ * Build the host-facing `output.render` projection for one tool.
+ *
+ * The host calls this as `render(exec.arguments, value)` and requires the
+ * return value to be lossless JSON — an array of content blocks, the shape
+ * every shipped DSH plugin uses. Returning a bare string (as this module did
+ * before) is not a content-block projection.
+ *
+ * `line` keeps its one-argument shape: it receives the committed result value.
+ */
+export function renderSummary(line: (result: Record<string, unknown>) => string): (args: unknown, result: never) => unknown {
+  return ((_args: unknown, result: Record<string, unknown>) => {
     if (result && result.ok === false) {
       const error = result.error as { code?: string; message?: string } | undefined
-      return `失败 [${error?.code ?? 'Error'}] ${error?.message ?? ''}`.trim()
+      return [{ type: 'text', text: `失败 [${error?.code ?? 'Error'}] ${error?.message ?? ''}`.trim() }]
     }
-    return line(result)
-  }) as (result: never) => string
+    return [{ type: 'text', text: line(result) }]
+  }) as (args: unknown, result: never) => unknown
 }

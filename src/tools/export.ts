@@ -10,7 +10,7 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { buildProjectDeck, checkProject, saveProjectPptx } from '../core/export-pipeline.js'
 import { loadProject, ProjectError, writeExportReport } from '../core/project/store.js'
-import { renderSummary, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -29,6 +29,19 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
       }
     },
     output: {
+      schema: resultSchema({
+        path: { type: 'string' },
+        revision: { type: 'integer' },
+        bytes: { type: 'integer' },
+        fontsUsed: { type: 'array', items: { type: 'string' } },
+        warnings: { type: 'array', items: { type: 'string' } },
+        fontEmbed: { type: 'object', additionalProperties: true },
+        check: {
+          type: 'object',
+          additionalProperties: true,
+          properties: { pass: { type: 'boolean' }, blockerCount: { type: 'integer' } }
+        }
+      }),
       render: renderSummary((r) => {
         const p = r.path as string | undefined
         const check = r.check as { pass?: boolean; blockerCount?: number } | undefined

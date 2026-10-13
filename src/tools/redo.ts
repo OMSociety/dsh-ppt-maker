@@ -2,7 +2,7 @@
  * ppt_redo — move the revision cursor forwards (`{ ok, revision, redoneOps }`).
  */
 import { redoProject } from '../core/project/store.js'
-import { renderSummary, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerRedoTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -20,6 +20,11 @@ export function registerRedoTool(ctx: PluginToolCtx): (() => void) | undefined {
       }
     },
     output: {
+      schema: resultSchema({
+        revision: { type: 'integer' },
+        redoneOps: { type: 'array', items: { type: 'string' } },
+        warnings: { type: 'array', items: { type: 'string' } }
+      }),
       render: renderSummary((r) => `已重做到 revision ${String(r.revision)}（${(r.redoneOps as string[] | undefined)?.length ?? 0} 个 op）`)
     },
     execute: async (args, exec) => {

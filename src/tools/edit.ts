@@ -10,7 +10,7 @@
  *  - returns `{ ok, revision, appliedOps, warnings }`.
  */
 import { editProject, OP_NAMES, type OpRecord } from '../core/project/store.js'
-import { renderSummary, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -45,6 +45,12 @@ export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
       }
     },
     output: {
+      schema: resultSchema({
+        revision: { type: 'integer' },
+        appliedOps: { type: 'array', items: { type: 'string' } },
+        warnings: { type: 'array', items: { type: 'string' } },
+        merged: { type: 'boolean' }
+      }),
       render: renderSummary((r) => {
         const applied = (r.appliedOps as string[] | undefined)?.length ?? 0
         return `已应用 ${applied} 个 op，revision → ${String(r.revision)}${r.merged === true ? '（合并窗口内，修订号保持）' : ''}`

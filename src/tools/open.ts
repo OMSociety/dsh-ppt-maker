@@ -15,7 +15,7 @@
 import path from 'node:path'
 import { access, readFile } from 'node:fs/promises'
 import { ProjectError, resolveProjectDir } from '../core/project/store.js'
-import { renderSummary, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 /**
  * Backchannel injected by the host plugin. Mirrors plugin/host/store.mjs:
@@ -62,6 +62,10 @@ export function registerOpenTool(ctx: PluginToolCtxWithOpen): (() => void) | und
       }
     },
     output: {
+      schema: resultSchema({
+        dir: { type: 'string' },
+        requested: { type: 'boolean' }
+      }),
       render: renderSummary((r) => `已请求打开 ${String(r.dir ?? '')}`)
     },
     execute: async (args, exec) => {
