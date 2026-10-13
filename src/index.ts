@@ -5,9 +5,10 @@
  *  1. Register the bundled `skills/ppt-maker` directory as a DSH skill so the
  *     model can load it (DSH never discovers skill files shipped inside a
  *     package on its own).
- *  2. Register the eight project tools: ppt_create / ppt_themes / ppt_edit /
- *     ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check (raw
- *     JSON-Schema via ctx.tools.register, per the PR 1 plan).
+ *  2. Register the eleven project tools（ppt_create / ppt_themes / ppt_edit /
+ *     ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check + PR2 的
+ *     ppt_import / ppt_open / ppt_patch；raw JSON-Schema via ctx.tools.register）——
+ *     经 src/lazy-tools.ts 懒展开：技能被 invoke 前工具不进会话工具表。
  *
  * `inject = ['tools', 'sessions', 'skills', 'webServer']`——只声明插件装载
  * 上下文里**保证存在**的服务（与 dsh-fishpai / 官方工具包同一口径）。
@@ -33,6 +34,7 @@ import {
   undoProject,
   writeExportReport
 } from './core/project/store.js'
+import { armLazyTools } from './lazy-tools.js'
 import { registerCheckTool } from './tools/check.js'
 import { registerCreateTool } from './tools/create.js'
 import { registerEditTool } from './tools/edit.js'
@@ -88,6 +90,10 @@ interface ApplyCtx {
   effect?: (fn: () => void | (() => void)) => void
   /** Cordis `ctx.get(name)`：懒取 inject 之外的可选服务（llm / attachments）。 */
   get?: (name: string) => unknown
+  /** Cordis 事件总线（懒展开用）：tools/result、session/event、session/created。 */
+  on?: (event: string, handler: (...args: never[]) => void) => unknown
+  /** Cordis `ctx.inject(deps, cb)`：服务到达回调（懒展开扫 sessions 用）。 */
+  inject?: (deps: readonly string[], cb: (ctx: ApplyCtx) => void) => unknown
 }
 
 /* ------------------------------------------------------------------ *
@@ -230,50 +236,67 @@ export function apply(ctx: ApplyCtx): void {
   const resolveBridge = (): PptMakerHostBridge | undefined => cachedBridge
 
   if (ctx.tools) {
-    for (const register of [
-      registerCreateTool,
-      registerThemesTool,
-      registerEditTool,
-      registerUndoTool,
-      registerRedoTool,
-      registerRenderTool,
-      registerExportTool,
-      registerCheckTool,
-      // PR 2 tools (raw JSON-Schema; rely on the optional bridge for ppt_open /
-      // the open=true path of ppt_import).
-      registerImportTool,
-      registerOpenTool,
-      registerPatchTool
-    ]) {
-      try {
-        const off = register({
-          tools: ctx.tools,
-          sessions: ctx.sessions,
-          // llm / attachments 懒取：它们不在 inject 里（缺席会静默挂死 apply，
-          // 见文件头注释），工具每次执行时才经 ctx.get() 现取；缺席由 ai.ts 降级。
-          get llm() {
-            return ctx.get?.('llm') as ApplyCtx['llm']
-          },
-          get attachments() {
-            return ctx.get?.('attachments') as ApplyCtx['attachments']
-          },
-          pptMaker: undefined,
-          // Lazy getter: the bridge is filled in once the host-store module
-          // finishes loading (microtask after apply). Tool calls always come
-          // after apply, so by the time execute runs the bridge is present.
-          ...(register === registerImportTool || register === registerOpenTool
-            ? {
-                get pptMaker() {
-                  return resolveBridge()
+    const tools = ctx.tools
+    /** 注册全部 11 个 ppt_* 工具，返回合并注销函数。懒展开触发时整组进场。 */
+    const registerToolSuite = (): (() => void) => {
+      const suiteOffs: Array<() => void> = []
+      for (const register of [
+        registerCreateTool,
+        registerThemesTool,
+        registerEditTool,
+        registerUndoTool,
+        registerRedoTool,
+        registerRenderTool,
+        registerExportTool,
+        registerCheckTool,
+        // PR 2 tools (raw JSON-Schema; rely on the optional bridge for ppt_open /
+        // the open=true path of ppt_import).
+        registerImportTool,
+        registerOpenTool,
+        registerPatchTool
+      ]) {
+        try {
+          const off = register({
+            tools,
+            sessions: ctx.sessions,
+            // llm / attachments 懒取：它们不在 inject 里（缺席会静默挂死 apply，
+            // 见文件头注释），工具每次执行时才经 ctx.get() 现取；缺席由 ai.ts 降级。
+            get llm() {
+              return ctx.get?.('llm') as ApplyCtx['llm']
+            },
+            get attachments() {
+              return ctx.get?.('attachments') as ApplyCtx['attachments']
+            },
+            pptMaker: undefined,
+            // Lazy getter: the bridge is filled in once the host-store module
+            // finishes loading (microtask after apply). Tool calls always come
+            // after apply, so by the time execute runs the bridge is present.
+            ...(register === registerImportTool || register === registerOpenTool
+              ? {
+                  get pptMaker() {
+                    return resolveBridge()
+                  }
                 }
-              }
-            : {})
-        })
-        if (typeof off === 'function') offs.push(off)
-      } catch (err) {
-        ctx.logger?.warn?.(`[dsh-ppt-maker] tool registration failed: ${(err as Error).message}`)
+              : {})
+          })
+          if (typeof off === 'function') suiteOffs.push(off)
+        } catch (err) {
+          ctx.logger?.warn?.(`[dsh-ppt-maker] tool registration failed: ${(err as Error).message}`)
+        }
+      }
+      return () => {
+        for (const off of suiteOffs.splice(0)) {
+          try {
+            off()
+          } catch {
+            /* teardown must not throw */
+          }
+        }
       }
     }
+    // 懒展开（browser-skill 同款）：常驻的只有技能目录行；模型 invoke "ppt-maker"
+    // 技能成功后整组工具才进场。webServer 路由不进懒展开——工作台面板随时要用。
+    offs.push(armLazyTools(ctx, registerToolSuite))
   }
 
   // webServer 路由在 apply 之后再起：先把 store/bridge 装配好，再让 handler

@@ -21,8 +21,13 @@ let disposed: number
 function makeCtx(cwdDir: string) {
   defs = new Map()
   const skillDefs: unknown[] = []
+  const handlers = new Map<string, Array<(...args: never[]) => void>>()
+  const fire = (event: string, ...args: never[]) => {
+    for (const h of handlers.get(event) ?? []) h(...args)
+  }
   return {
     skillDefs,
+    fire,
     ctx: {
       tools: {
         register(def: ToolDef) {
@@ -40,6 +45,15 @@ function makeCtx(cwdDir: string) {
         }
       },
       logger: { warn: () => {} },
+      on: (event: string, handler: (...args: never[]) => void) => {
+        const list = handlers.get(event) ?? []
+        list.push(handler)
+        handlers.set(event, list)
+        return () => {
+          const i = (handlers.get(event) ?? []).indexOf(handler)
+          if (i >= 0) handlers.get(event)!.splice(i, 1)
+        }
+      },
       effect: (fn: () => void | (() => void)) => {
         const cleanup = fn()
         if (typeof cleanup === 'function') {
@@ -50,6 +64,11 @@ function makeCtx(cwdDir: string) {
       }
     }
   }
+}
+
+/** 模拟宿主广播：技能 invoke 成功的 tools/result → 触发懒展开。 */
+function revealTools(fire: (event: string, ...args: never[]) => void): void {
+  fire('tools/result', { name: 'skill', arguments: { name: 'ppt-maker' } } as never, { isError: false } as never)
 }
 
 const exec = { agent: { session: { id: 's-e2e' } } }
@@ -88,31 +107,46 @@ describe('宿主入口', () => {
     expect(pluginName).toBe('dsh-ppt-maker')
   })
 
-  it('ctx.get 在场或缺席都不影响 apply 注册（llm/attachments 走调用时懒取）', () => {
-    // 带 get 的宿主：哨兵值不应在注册期被读取（getter 必须懒）。
-    let getCalls = 0
+  it('ctx.get 在场或缺席都不影响注册（llm/attachments 走调用时懒取）', () => {
+    // 带 get 的宿主：llm/attachments 在注册期与展开后执行前都不得被读
+    // （getter 必须懒）；sessions 的读是懒展开扫描的合法行为，不在此限。
+    const getNames: string[] = []
     const withGet = makeCtx(cwd)
     const ctxWithGet = {
       ...withGet.ctx,
-      get: (_name: string) => {
-        getCalls++
+      get: (name: string) => {
+        getNames.push(name)
         return { sentinel: true }
       }
     }
     apply(ctxWithGet)
+    expect(defs.size).toBe(0)
+    revealTools(withGet.fire)
     expect(defs.size).toBe(11)
-    expect(getCalls).toBe(0)
+    expect(getNames.filter((n) => n === 'llm' || n === 'attachments')).toEqual([])
     // 无 get 的宿主（默认 makeCtx）：同样必须全量注册，不抛。
     const plain = makeCtx(cwd)
     apply(plain.ctx)
+    revealTools(plain.fire)
     expect(defs.size).toBe(11)
   })
 
-  it('apply 注册 1 个技能 + 11 个工具', () => {
-    const { ctx, skillDefs } = makeCtx(cwd)
+  it('apply 常驻只注册 1 个技能；invoke ppt-maker 技能成功后懒展开 11 个工具', () => {
+    const { ctx, skillDefs, fire } = makeCtx(cwd)
     apply(ctx)
     expect(skillDefs).toHaveLength(1)
     expect((skillDefs[0] as { name?: string }).name).toBe('ppt-maker')
+    // 懒展开：技能未 invoke 时工具不进表
+    expect(defs.size).toBe(0)
+    // 别的技能被 invoke 不触发
+    fire('tools/result', { name: 'skill', arguments: { name: 'fishpai' } } as never, { isError: false } as never)
+    expect(defs.size).toBe(0)
+    // 技能 invoke 失败不触发
+    fire('tools/result', { name: 'skill', arguments: { name: 'ppt-maker' } } as never, { isError: true } as never)
+    expect(defs.size).toBe(0)
+    // 成功 invoke → 整组进场（幂等：再触发不重复注册）
+    revealTools(fire)
+    revealTools(fire)
     expect([...defs.keys()].sort()).toEqual([
       'ppt_check',
       'ppt_create',
@@ -131,8 +165,9 @@ describe('宿主入口', () => {
 
 describe('ppt_* 工具全链（e2e stub）', () => {
   it('create → edit×3 → undo → redo', async () => {
-    const { ctx } = makeCtx(cwd)
+    const { ctx, fire } = makeCtx(cwd)
     apply(ctx)
+    revealTools(fire)
 
     // themes：仓库内自带设计系统
     const themes = await call('ppt_themes', {})
@@ -207,8 +242,9 @@ describe('ppt_* 工具全链（e2e stub）', () => {
   })
 
   it('错误路径：缺会话 / 越界目录 / 工程不存在', async () => {
-    const { ctx } = makeCtx(cwd)
+    const { ctx, fire } = makeCtx(cwd)
     apply(ctx)
+    revealTools(fire)
 
     const noExec = (await defs.get('ppt_create')!.execute({ dir: 'x' }, {})) as ToolResult
     expect(noExec).toMatchObject({ ok: false, error: { code: 'SessionMissing' } })

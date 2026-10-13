@@ -49,7 +49,8 @@
 ## 用户视角验收清单（重启宿主后逐项过）
 
 1. 侧栏出现「PPT 创客」页签，空态正常渲染
-2. 对话里让 agent 做一份 PPT（走 ppt_create→ppt_build→ppt_export 链），导出文件能打开
+2. **懒展开核验（新行为）**：新会话开口时工具表**不应**有 ppt_* 工具；对话里说「做一份 PPT」→ 模型 invoke `ppt-maker` 技能 → 下一轮起 11 个 ppt_* 工具进场。若 invoke 技能后下一轮仍无工具，记 bug（查 tools/result 事件形态）
+3. 对话里让 agent 做一份 PPT（走 ppt_create→ppt_build→ppt_export 链），导出文件能打开
 3. ppt_import 导入一份现有 pptx（tests/corpus/ 任选），工作台里翻页、点元素、改字
 4. ppt_patch 外科手术改一处文字，源文件不被原地改写
 5. 撤销/重做（ppt_undo/ppt_redo 或工作台按钮）

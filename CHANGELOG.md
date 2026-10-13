@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [未发布]
 
+### 新增
+
+- **工具组懒展开（progressive disclosure）**：11 个 `ppt_*` 工具不再常驻每个会话的工具表，常驻的只有 `ppt-maker` 技能目录行；模型 invoke 该技能成功后才整组注册进场（browser-skill `lazyTools` 同款机制，只用 `tools/result`、`session/event`、`session/created` 公开事件 seam）。三条进场通道：本会话技能调用成功、会话事件流折叠识别历史 invoke、启动时全量扫描老会话；注册失败置 pending 下轮重试，不静默。webServer 路由不进懒展开（工作台面板随时要用）。
+
 ### 修复
 
 - **P0：插件整体不挂载（全部 `ppt_*` 工具与 webServer 路由消失，技能却注册成功）**：根因是 `src/index.ts` 的 `inject` 把 `llm` / `attachments` 两个插件装载上下文不保证提供的服务写进了声明——Cordis 对注入但缺席的服务会把 `apply()` 无限期挂起且全程静默。`inject` 收窄为 `['tools', 'sessions', 'skills', 'webServer']`（与官方工具包同口径）；`llm` / `attachments` 改为工具执行时经 `ctx.get()` 懒取（dsh-config-manager 同款纪律），缺席时 AI 质检按既有逻辑显式降级。回归测试锁定：inject 不得含 `llm`/`attachments`；`ctx.get` 在场或缺席都不影响注册。
