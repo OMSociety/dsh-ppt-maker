@@ -30,6 +30,7 @@ import {
   ProjectError,
   editProject,
   loadProject,
+  projectUndoState,
   redoProject,
   undoProject,
   writeExportReport
@@ -121,6 +122,7 @@ interface HostRoutesModule {
       editProject: typeof editProject
       undoProject: typeof undoProject
       redoProject: typeof redoProject
+      projectUndoState: typeof projectUndoState
       buildProjectDeck: typeof buildProjectDeck
       saveProjectPptx: typeof saveProjectPptx
       writeExportReport: typeof writeExportReport
@@ -181,6 +183,7 @@ function registerRoutes(ctx: ApplyCtx, bridge: PptMakerHostBridge): () => void {
             editProject,
             undoProject,
             redoProject,
+            projectUndoState,
             buildProjectDeck,
             saveProjectPptx,
             writeExportReport,

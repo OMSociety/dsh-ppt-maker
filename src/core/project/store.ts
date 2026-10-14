@@ -635,3 +635,19 @@ export async function redoProject(cwd: string, dir: string, steps = 1): Promise<
   const target = Math.min(max, loaded.manifest.revision + steps)
   return moveCursor(cwd, dir, target, 'redo')
 }
+
+/**
+ * Undo/redo availability for UI surfaces (e.g. the workbench toolbar).
+ * Cursor model: canUndo = cursor > 0; canRedo = cursor < max snapshot revision.
+ * Read-only, no mutex (pure query).
+ */
+export async function projectUndoState(
+  cwd: string,
+  dir: string
+): Promise<{ canUndo: boolean; canRedo: boolean }> {
+  const loaded = await loadProject(cwd, dir)
+  const abs = resolveProjectDir(cwd, dir)
+  const snapshots = await listSnapshots(abs)
+  const max = snapshots.length > 0 ? snapshots[snapshots.length - 1].revision : 0
+  return { canUndo: loaded.manifest.revision > 0, canRedo: loaded.manifest.revision < max }
+}

@@ -3,7 +3,7 @@
  * init 把 /state 拉进快照；applyPoll 无草稿静默重载、有草稿只亮「外部已修改」；
  * stage 立 flush、409 挂 conflict 且 draft 留身；undo 之前草稿必须先 flush。
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // client/store.ts 只在相对路径里 import './api'，vitest 的 vi.mock 按同样的相对路径抓。
 const mockApi = vi.hoisted(() => ({
@@ -17,7 +17,6 @@ const mockApi = vi.hoisted(() => ({
   redo: vi.fn(),
   uploadMedia: vi.fn(),
   exportPptx: vi.fn(),
-  thumbUrl: vi.fn(() => '/ppt-maker/api/thumb'),
   mediaUrl: vi.fn(() => '/ppt-maker/api/media'),
 }))
 vi.mock('../client/api', async (importOriginal) => {
@@ -35,8 +34,6 @@ const STATE_R1 = {
   activeKey: 'k1',
   openRequests: [],
   manifest: { revision: 1, title: 'T', pageCount: 3 },
-  canUndo: false,
-  canRedo: false,
 }
 
 const DECK = {
@@ -73,6 +70,11 @@ function seedStore(): PptStore {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('PptStore（S6 骨架纪律）', () => {
@@ -102,9 +104,10 @@ describe('PptStore（S6 骨架纪律）', () => {
   it('applyPoll 有冲突时 revision 前进也只亮「外部已修改」，不静默重载', async () => {
     const store = seedStore()
     await store.actions.init()
-    // stage → flush → 409：conflict 就位、draft 留身
+    // stage → 攒批 → flush → 409：conflict 就位、draft 留身
     mockApi.edit.mockRejectedValueOnce(new ConflictError(5))
     await store.actions.stage({ kind: 'update_page', pageIndex: 0, set: {} })
+    await vi.runAllTimersAsync() // 过防抖窗，flush 真的发出并撞 409
     expect(store.getSnapshot().conflict).toEqual({ revision: 5 })
     // 冲突未决时 applyPoll 撞 revision 前进：只亮 banner，绝不推进 lastSeenRevision
     await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 6 } })
@@ -123,11 +126,10 @@ describe('PptStore（S6 骨架纪律）', () => {
           resolvePending = resolve
         }),
     )
-    // stage 会立即 flush；flush 在飞期间 draft 留着、saving=true
-    const stagePromise = store.actions.stage({ kind: 'update_page', pageIndex: 0, set: {} })
-    // 让 stage 内部的 patch 先发生，再让 flush 发出 fetch（这时候 fetch 还挂着）
-    await Promise.resolve()
-    await Promise.resolve()
+    // stage 只攒批不立即 flush；过防抖窗后 flush 发出 fetch，此时 fetch 还挂着
+    await store.actions.stage({ kind: 'update_page', pageIndex: 0, set: {} })
+    expect(store.getSnapshot().saving).toBe(false) // 还没过防抖窗，fetch 未发
+    await vi.runAllTimersAsync() // 过防抖窗，flush 发出（edit 是 pending 的）
     expect(store.getSnapshot().saving).toBe(true)
     expect(store.getSnapshot().draft).not.toBeNull()
     // 轮询撞上来：不得推进 lastSeenRevision（在飞那次成功了会自动推）
@@ -136,7 +138,7 @@ describe('PptStore（S6 骨架纪律）', () => {
     expect(store.getSnapshot().lastSeenRevision).toBe(1)
     // flush 成功：draft 清掉、conflict/externalChange 也一并收走（flush 成功补丁里显式清了）
     resolvePending?.({ ok: true, revision: 2, applied: 1 })
-    await stagePromise
+    await vi.runAllTimersAsync()
     expect(store.getSnapshot().saving).toBe(false)
     expect(store.getSnapshot().draft).toBeNull()
     expect(store.getSnapshot().externalChange).toBeNull()
@@ -144,11 +146,15 @@ describe('PptStore（S6 骨架纪律）', () => {
     store.dispose()
   })
 
-  it('stage 一杆 op：先记入 draft，再 flush；成功后 draft 清空，lastSeenRevision 推进', async () => {
+  it('stage 一杆 op：先记入 draft，过防抖窗再 flush；成功后 draft 清空，lastSeenRevision 推进', async () => {
     const store = seedStore()
     await store.actions.init()
     const ok = await store.actions.stage({ kind: 'update_page', pageIndex: 0, set: { 'a.b': 1 } })
     expect(ok).toBe(true)
+    // 攒批：还没过防抖窗，fetch 未发，draft 留着
+    expect(mockApi.edit).not.toHaveBeenCalled()
+    expect(store.getSnapshot().draft).not.toBeNull()
+    await vi.runAllTimersAsync() // 过防抖窗，flush 发出并成功
     expect(mockApi.edit).toHaveBeenCalledWith('s1', 'k1', 1, [{ kind: 'update_page', pageIndex: 0, set: { 'a.b': 1 } }])
     const snap = store.getSnapshot()
     expect(snap.draft).toBeNull()
@@ -162,7 +168,8 @@ describe('PptStore（S6 骨架纪律）', () => {
     await store.actions.init()
     mockApi.edit.mockRejectedValueOnce(new ConflictError(5))
     const ok = await store.actions.stage({ kind: 'remove_page', pageIndex: 0 })
-    expect(ok).toBe(false)
+    expect(ok).toBe(true) // stage 只攒批：409 在过防抖窗那次 flush 才撞
+    await vi.runAllTimersAsync()
     const snap = store.getSnapshot()
     expect(snap.conflict).toEqual({ revision: 5 })
     expect(snap.draft, '409 不许清草稿：用户要在横幅上决定').not.toBeNull()
@@ -179,14 +186,15 @@ describe('PptStore（S6 骨架纪律）', () => {
   it('undo 前必须先把草稿 flush：canUndo=false 时不调 /undo，游标要靠 /state 上来', async () => {
     const store = seedStore()
     await store.actions.init()
-    // stage（骨架期立 flush 得先成功）→ 推 canUndo=true 的 state 进来 → undo 才通过
+    // stage（攒批）→ 过防抖窗 flush 成功 → 推 canUndo=true 的 state 进来 → undo 才通过
     await store.actions.stage({ kind: 'move_page', from: 0, to: 1 })
+    await vi.runAllTimersAsync()
     expect(store.getSnapshot().lastSeenRevision).toBe(2)
     // 此刻 canUndo=false（STATE_R1 的），undo 不该发出
     await store.actions.undo()
     expect(mockApi.undo).not.toHaveBeenCalled()
     // 推 host 说可撤销
-    await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 2 }, canUndo: true })
+    await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 2, canUndo: true } })
     await store.actions.undo()
     expect(mockApi.undo).toHaveBeenCalledWith('s1', 'k1')
     expect(store.getSnapshot().lastSeenRevision).toBe(1)
@@ -198,6 +206,7 @@ describe('PptStore（S6 骨架纪律）', () => {
     await store.actions.init()
     mockApi.edit.mockRejectedValueOnce(new ConflictError(5))
     await store.actions.stage({ kind: 'add_page', at: 0 })
+    await vi.runAllTimersAsync() // 过防抖窗，flush 撞 409，draft 留身
     expect(store.getSnapshot().draft).not.toBeNull()
     await store.actions.openProject('other')
     expect(store.getSnapshot().activeKey).toBe('k1')
@@ -229,8 +238,9 @@ describe('PptStore（S6 骨架纪律）', () => {
     // 翻页
     mockApi.page.mockResolvedValueOnce({ ok: true, path: 'pages/02.page', page: { elements: [] }, revision: 1 })
     store.actions.setPage(1)
-    // setPage 里顺手调了一次 ensurePageLoaded——它在另一只 promise 上，等一下
-    await new Promise((r) => setTimeout(r, 0))
+    // setPage 里顺手调了一次 ensurePageLoaded——它在另一只 promise 上，等一个微任务 + 时钟 tick
+    await Promise.resolve()
+    await vi.runAllTimersAsync()
     const after = store.getSnapshot()
     expect(after.currentPage).toBe(1)
     expect(after.currentPageData).toEqual({ elements: [] })
@@ -244,6 +254,9 @@ describe('PptStore（S6 骨架纪律）', () => {
     await store.actions.ensurePageLoaded()
     const ok = await store.actions.updateElement('el-1', { content: { text: '改了' } })
     expect(ok).toBe(true)
+    // 攒批：过防抖窗才真正 flush
+    expect(mockApi.edit).not.toHaveBeenCalled()
+    await vi.runAllTimersAsync()
     expect(mockApi.edit).toHaveBeenCalledWith('s1', 'k1', 1, [
       { op: 'update_element', page: 'pages/01.page', elementId: 'el-1', patch: { content: { text: '改了' } } },
     ])
@@ -253,34 +266,41 @@ describe('PptStore（S6 骨架纪律）', () => {
   it('movePage / duplicatePage / removePage / addPage 各自走对应 op 的 stage', async () => {
     const store = seedStore()
     await store.actions.init()
-    // mockApi.edit 总是回 revision: 2——所以第二次 stage 的 base 仍是 2（一杆一送的语义：每次都重置 draft）
-    // 这里只关心「各 action 构造出来的 op 形状」，base 值就让 seedStore 那份 mock 来定。
+    // 攒批期：每次 stage 都把 op 加进 draft，过防抖窗一次性送出——所以四次 stage 合并成一次 edit 调用
     await store.actions.movePage('pages/01.page', 1)
-    expect(mockApi.edit.mock.calls[0]).toEqual(['s1', 'k1', 1, [{ op: 'move_page', page: 'pages/01.page', toIndex: 1 }]])
     await store.actions.duplicatePage('pages/02.page')
-    expect(mockApi.edit.mock.calls[1][3]).toEqual([{ op: 'page_duplicate', page: 'pages/02.page' }])
     await store.actions.removePage('pages/02.page')
-    expect(mockApi.edit.mock.calls[2][3]).toEqual([{ op: 'remove_page', page: 'pages/02.page' }])
     await store.actions.addPage()
-    expect(mockApi.edit.mock.calls[3][3]).toEqual([{ op: 'add_page', content: { elements: [] } }])
+    await vi.runAllTimersAsync()
+    expect(mockApi.edit).toHaveBeenCalledTimes(1)
+    expect(mockApi.edit.mock.calls[0][3]).toEqual([
+      { op: 'move_page', page: 'pages/01.page', toIndex: 1 },
+      { op: 'page_duplicate', page: 'pages/02.page' },
+      { op: 'remove_page', page: 'pages/02.page' },
+      { op: 'add_page', content: { elements: [] } },
+    ])
     store.dispose()
   })
 
-  it('undo 成功后推进 lastSeenRevision、清页缓存，并随后自动重拉页内容', async () => {
+  it('undo 成功后推进 lastSeenRevision、清页 AST 缓存，并随后自动重拉页内容', async () => {
     const store = seedStore()
     await store.actions.init()
     await store.actions.stage({ op: 'update_page', page: 'pages/01.page', patch: {} })
+    await vi.runAllTimersAsync() // 过防抖窗 flush 成功，lastSeenRevision 才到 2
     expect(store.getSnapshot().lastSeenRevision).toBe(2)
-    await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 2 }, canUndo: true })
-    await store.actions.cacheThumb(1, 'data:image/png;base64,x', 2)
-    expect(store.getSnapshot().pageCache[1]).toBeTruthy()
+    await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 2, canUndo: true } })
+    // 先拉一页进 pagesAst，验证 undo 会清掉它
+    mockApi.page.mockResolvedValueOnce({ ok: true, path: 'pages/01.page', page: { elements: [{ elementId: 'e1' }] }, revision: 2 })
+    await store.actions.ensurePageAst(0)
+    expect(store.getSnapshot().pagesAst[0]).toBeTruthy()
     mockApi.undo.mockResolvedValueOnce({ ok: true, revision: 3, undoneOps: ['u1'] })
     mockApi.page.mockResolvedValueOnce({ ok: true, path: 'pages/01.page', page: { elements: [] }, revision: 3 })
     await store.actions.undo()
     expect(store.getSnapshot().lastSeenRevision).toBe(3)
-    expect(store.getSnapshot().pageCache).toEqual({})
-    // undo 完了之后顺手 ensurePageLoaded：等一个 tick 让那次 async 走完，currentPageData 就该拉起来了
-    await new Promise((r) => setTimeout(r, 0))
+    expect(store.getSnapshot().pagesAst).toEqual({})
+    // undo 完了之后顺手 ensurePageLoaded：等一个微任务 + 时钟 tick 让那次 async 走完
+    await Promise.resolve()
+    await vi.runAllTimersAsync()
     expect(store.getSnapshot().currentPageData).toEqual({ elements: [] })
     expect(store.getSnapshot().currentPageRevision).toBe(3)
     store.dispose()

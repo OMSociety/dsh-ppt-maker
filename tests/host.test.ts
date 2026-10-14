@@ -16,7 +16,7 @@ import { createServer, type Server } from 'node:http'
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as sessionStore from '../plugin/host/store.mjs'
 import { API_PREFIX, createApiHandler, MAX_ASSET_BYTES, sameOrigin } from '../plugin/host/routes.mjs'
@@ -25,6 +25,7 @@ import {
   editProject,
   loadProject,
   ProjectError,
+  projectUndoState,
   redoProject,
   undoProject,
   writeExportReport,
@@ -40,6 +41,7 @@ const core = {
   editProject,
   undoProject,
   redoProject,
+  projectUndoState,
   buildProjectDeck,
   saveProjectPptx,
   writeExportReport,
@@ -50,8 +52,15 @@ const core = {
 
 const SESSION = 's-test'
 let cwd: string
+let home: string
 let server: Server | null = null
 let port = 0
+
+beforeEach(async () => {
+  home = await mkdtemp(path.join(tmpdir(), 'ppt-host-home-'))
+  vi.stubEnv('DSH_HOME', home) // store.mjs 持久化的落点——不能碰真实 ~/.dsh
+  sessionStore.__clearAllSessionsForTest()
+})
 
 interface Capture {
   status: number | undefined
@@ -124,7 +133,9 @@ afterEach(async () => {
   await stopServer()
   const anySS = sessionStore as unknown as { sessions?: Map<string, unknown> }
   if (anySS.sessions instanceof Map) anySS.sessions.clear()
+  vi.unstubAllEnvs()
   await rm(cwd, { recursive: true, force: true })
+  if (home) await rm(home, { recursive: true, force: true })
 })
 
 // ── sameOrigin 栅栏 ─────────────────────────────────────────────────
@@ -181,6 +192,50 @@ describe('host 路由', () => {
     expect(r.json!.activeKey).toBeNull()
     expect(r.json!.openRequests).toEqual([])
     expect(r.json!.manifest).toBeNull()
+  })
+
+  it('GET /state 带活动工程时回 canUndo/canRedo（工作台撤销重做按钮态）', async () => {
+    await startServer()
+    const { key } = await seedProject()
+    sessionStore.setActive(SESSION, key)
+
+    // 新工程 revision 0：不可撤销、不可重做
+    let r = await apiJson(`${API_PREFIX}/state?sessionId=${SESSION}`)
+    let manifest = r.json!.manifest as Record<string, unknown>
+    expect(manifest.canUndo).toBe(false)
+    expect(manifest.canRedo).toBe(false)
+
+    // edit 一次后 revision 1：可撤销、不可重做
+    await apiJson(`${API_PREFIX}/edit`, {
+      method: 'POST',
+      body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', content: { elements: [] } }] },
+    })
+    r = await apiJson(`${API_PREFIX}/state?sessionId=${SESSION}`)
+    manifest = r.json!.manifest as Record<string, unknown>
+    expect(manifest.canUndo).toBe(true)
+    expect(manifest.canRedo).toBe(false)
+
+    // undo 后游标回到 0：不可撤销、可重做
+    await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key } })
+    r = await apiJson(`${API_PREFIX}/state?sessionId=${SESSION}`)
+    manifest = r.json!.manifest as Record<string, unknown>
+    expect(manifest.canUndo).toBe(false)
+    expect(manifest.canRedo).toBe(true)
+  })
+
+  it('GET /state 触发磁盘恢复：宿主重启后面板拿回上次打开的工程', async () => {
+    await startServer()
+    const { key } = await seedProject()
+    // 模拟重启：进程内会话全清（磁盘 state.json 仍在临时 DSH_HOME 里）
+    sessionStore.__clearAllSessionsForTest()
+
+    const r = await apiJson(`${API_PREFIX}/state?sessionId=${SESSION}`)
+    expect(r.status).toBe(200)
+    expect(r.json!.activeKey).toBe(key)
+    expect(r.json!.projects).toEqual([{ key, dir: 'proj' }])
+    // manifest 也能正常加载（工程目录还在 cwd 临时区里）
+    const manifest = r.json!.manifest as Record<string, unknown>
+    expect(manifest.title).toBe('host 测试工程')
   })
 
   it('写方法没 content-type: application/json → 415', async () => {

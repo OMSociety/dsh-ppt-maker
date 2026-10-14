@@ -1,101 +1,71 @@
 /**
- * Stage：画布——GET /thumb?rev=N 渲出的 PNG 做大图 + ElementOverlay 盖透明选择框。
+ * Stage：画布——PptdView 把页 AST 直接渲染成 DOM，ElementOverlay 盖透明选择框。
  *
- * 尺寸取 deck.size（[w, h]，单位 px，与 OOXML EMU 同源换算）；
- * 画布外层有一个可滚容器，大图自然撑开（不责任适配，那是 TextEditor/Inspector 的活）。
+ * 历史：旧版用「GET /thumb 光栅化 PNG」做底图，要点按钮、等 libreoffice 冷启动、
+ * 还有 px:pt 系数错位（靠右元素视觉偏移）。现在底图就是 DOM（PptdView），
+ * 打开即渲染、与选择框同坐标系、恒清晰（矢量）。
  *
- * 单击选中：点透明覆盖层上某个元素 → store.actions.setSelection([elementId])。
- * 双击进入就地编辑 → Stage 进入 editing 态 → 在那里挂 TextEditor；失焦 / Ctrl+Enter 提交，
- * Esc 取消。区域外的单击 = 取消选择。
+ * 坐标系：deck.size（pt）为逻辑坐标。ElementOverlay 作为 PptdView 的 overlay 传进
+ * 逻辑画布内部，随整体 scale 缩放——所以 overlay 里的元素直接用 pt 坐标即可对齐。
  *
- * Element 字段读 PPTD：
- *   elementId / elementType / bounds:[x,y,w,h] / content.text? / content.color?
+ * 交互：
+ *   - 单击覆盖层元素 → store.actions.setSelection([elementId])（同时触发右栏展开）。
+ *   - 双击文本元素 → 就地编辑（TextEditor 顶在该元素位置）。
+ *   - 点画布空白 → 取消选择（右栏随之收起）。
  */
 import * as React from 'react'
 import type { PptStore } from '../store'
+import { PptdView, type PptdElement, type PptdPage } from './PptdView'
 import { TextEditor } from './TextEditor'
-
-interface PptElement {
-  elementId?: string
-  elementType?: string
-  bounds?: [number, number, number, number]
-  content?: {
-    text?: string
-    color?: string
-    align?: [string, string]
-    fontSize?: number
-    [key: string]: unknown
-  }
-  [key: string]: unknown
-}
-
-interface PptPage {
-  background?: { type?: string; color?: string }
-  elements?: PptElement[]
-  [key: string]: unknown
-}
 
 export function Stage({ store }: { store: PptStore }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const [editing, setEditing] = React.useState<string | null>(null)
 
-  // Stage 挂载或翻页时主动拉页 AST；确保 ElementOverlay 有几何可用
+  // Stage 挂载或翻页时主动拉页 AST；确保 PptdView 与 ElementOverlay 有几何可用
   React.useEffect(() => {
     if (state.activeKey) void store.actions.ensurePageLoaded()
   }, [state.activeKey, state.currentPage, store])
 
-  if (!state.activeKey) return <div className="ppt-stage ppt-stage-empty" />
-  const size = (state.deck?.size ?? [960, 540]) as [number, number]
-  const thumb = state.pageCache[state.currentPage + 1]
-  const pageNo = state.currentPage + 1
-  const page = (state.currentPageData ?? null) as PptPage | null
-  const elements = Array.isArray(page?.elements) ? (page!.elements as PptElement[]) : []
-
+  // 在翻页或切工程时退出编辑态
   React.useEffect(() => {
-    // 在翻页或 activeKey 变化时退出编辑态
     setEditing(null)
   }, [state.activeKey, state.currentPage])
 
-  const canvasStyle: React.CSSProperties = {
-    width: size[0],
-    height: size[1],
-    background: 'var(--dsw-alias-bg-layer-2)',
-  }
+  if (!state.activeKey) return <div className="ppt-stage ppt-stage-empty" />
+
+  const size = (state.deck?.size ?? [960, 540]) as [number, number]
+  const theme = (state.deck as { theme?: unknown } | null)?.theme as Parameters<typeof PptdView>[0]['theme']
+  const page = (state.currentPageData ?? null) as PptdPage | null
+  const elements = Array.isArray(page?.elements) ? (page!.elements as PptdElement[]) : []
 
   return (
-    <div className="ppt-stage" data-page={pageNo}>
-      <div className="ppt-stage-canvas" style={canvasStyle}>
-        {thumb ? (
-          <img className="ppt-stage-bg" src={thumb.dataUrl} alt={`第 ${pageNo} 页渲染`} draggable={false} />
-        ) : (
-          <button
-            type="button"
-            className="ppt-stage-loadthumb"
-            onClick={() => void store.actions.ensureThumb(pageNo, state.lastSeenRevision)}
-          >
-            渲染这一页的缩略图（第一次点会等 libreoffice 几秒）
-          </button>
-        )}
-        <ElementOverlay
-          elements={elements}
-          selection={state.selection}
-          onSelect={(ids) => store.actions.setSelection(ids)}
-          onEnterEdit={(elementId) => setEditing(elementId)}
-        />
-        {editing && (
-          <TextEditor
-            store={store}
-            elementId={editing}
-            onDone={() => setEditing(null)}
-          />
-        )}
-      </div>
+    <div className="ppt-stage" data-page={state.currentPage + 1}>
+      <PptdView
+        page={page}
+        size={size}
+        theme={theme}
+        resolveMedia={(src) => store.actions.mediaUrl(src)}
+        className="ppt-stage-pptd"
+        overlay={
+          <>
+            <ElementOverlay
+              elements={elements}
+              selection={state.selection}
+              onSelect={(ids) => store.actions.setSelection(ids)}
+              onEnterEdit={(elementId) => setEditing(elementId)}
+            />
+            {editing ? <TextEditor store={store} elementId={editing} onDone={() => setEditing(null)} /> : null}
+          </>
+        }
+      />
     </div>
   )
 }
 
 /**
  * 透明选择框：每元素一个绝对定位的 div，单击 setSelection([id])、双击 onEnterEdit。
+ * 坐标与 PptdView 逻辑画布同系（pt），随整体 scale——因此天然与渲染元素对齐。
  * 双击后组件就地卸载（TextEditor 直接顶在这个位置）。
  */
 function ElementOverlay({
@@ -104,14 +74,22 @@ function ElementOverlay({
   onSelect,
   onEnterEdit,
 }: {
-  elements: PptElement[]
+  elements: PptdElement[]
   selection: { page: number; ids: string[] } | null
   onSelect: (ids: string[]) => void
   onEnterEdit: (elementId: string) => void
 }) {
   const selectedId = selection && selection.ids.length ? selection.ids[0] : null
   return (
-    <div className="ppt-overlay" aria-hidden={false}>
+    // 容器接收「点空白」→ 取消选择；元素框自己 stopPropagation，不会误触取消。
+    // 容器要 pointer-events:auto 才收得到空白点击（样式里 overlay 默认 none，这里覆盖）。
+    <div
+      className="ppt-overlay ppt-overlay-active"
+      aria-hidden={false}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onSelect([])
+      }}
+    >
       {elements.map((el) => {
         const id = el.elementId
         const bounds = el.bounds

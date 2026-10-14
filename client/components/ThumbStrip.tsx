@@ -2,7 +2,8 @@
  * ThumbStrip：页缩略图竖条。
  *
  * 三件事：
- *   1. 按 `deckPages` 排页；每页一张 img，拉的是 `GET /thumb?rev=…` 渲出的 PNG。
+ *   1. 按 `deckPages` 排页；每页一张缩略图，用 PptdView 直接渲染该页 AST（DOM 直渲，
+ *      不走光栅化 PNG——打开即出、与画布同渲染管线、无 px:pt 系数错位）。
  *   2. 点选 → store.actions.setPage（面板同步到 Stage 与 Inspector）。
  *   3. 悬停动作按钮：复制（page_duplicate）、删除（remove_page）；顶部「+ 新页」（add_page）。
  *
@@ -12,6 +13,7 @@
 import * as React from 'react'
 import type { PptStore } from '../store'
 import { NewPageGlyph } from '../icons'
+import { PptdView, type PptdPage } from './PptdView'
 
 interface DragState {
   fromPath: string | null
@@ -23,6 +25,9 @@ export function ThumbStrip({ store }: { store: PptStore }) {
   const [drag, setDrag] = React.useState<DragState>({ fromPath: null, overIndex: null })
 
   const pages = state.deckPages
+  const size = (state.deck?.size ?? [960, 540]) as [number, number]
+  const theme = (state.deck as { theme?: unknown } | null)?.theme as Parameters<typeof PptdView>[0]['theme']
+
   if (!pages.length) {
     return (
       <div className="ppt-thumbs">
@@ -79,7 +84,7 @@ export function ThumbStrip({ store }: { store: PptStore }) {
       </button>
       <div className="ppt-thumblist" role="list">
         {pages.map((pagePath, index) => {
-          const thumb = state.pageCache[index + 1]
+          const ast = state.pagesAst[index]
           const pageNo = index + 1
           const active = index === state.currentPage
 
@@ -104,15 +109,19 @@ export function ThumbStrip({ store }: { store: PptStore }) {
                   title={`第 ${pageNo} 页（${pagePath}）`}
                   aria-pressed={active}
                 >
-                  {thumb ? (
-                    <img className="ppt-thumb-img" src={thumb.dataUrl} alt={`第 ${pageNo} 页`} draggable={false} />
+                  {ast ? (
+                    <PptdView
+                      page={ast.page as PptdPage}
+                      size={size}
+                      theme={theme}
+                      resolveMedia={(src) => store.actions.mediaUrl(src)}
+                      className="ppt-thumb-pptd"
+                    />
                   ) : (
-                    <span className="ppt-thumb-preview-placeholder">
-                      <ThumbSkeleton
-                        onVisible={() => void store.actions.ensureThumb(pageNo, state.lastSeenRevision)}
-                      />
-                      <span className="ppt-thumb-num">第 {pageNo} 页</span>
-                    </span>
+                    <ThumbAstLoader
+                      onVisible={() => void store.actions.ensurePageAst(index)}
+                      label={`第 ${pageNo} 页`}
+                    />
                   )}
                 </button>
                 <div className="ppt-thumb-actions">
@@ -143,9 +152,13 @@ export function ThumbStrip({ store }: { store: PptStore }) {
   )
 }
 
-/** 拖进可视区才拉缩略图（IntersectionObserver 兜底，Element 级惰性）。 */
-function ThumbSkeleton({ onVisible }: { onVisible: () => void }) {
-  const ref = React.useRef<HTMLDivElement | null>(null)
+/**
+ * 缩略图占位 + 惰性拉取：进可视区才 ensurePageAst（IntersectionObserver）。
+ * 没有 IO 的环境（老 WebView）直接拉。编辑后 pagesAst 被清，本组件重新挂载，
+ * 已离开可视区的页不会立刻重拉——滚动到它们时才拉（这就是懒加载的意义）。
+ */
+function ThumbAstLoader({ onVisible, label }: { onVisible: () => void; label: string }) {
+  const ref = React.useRef<HTMLSpanElement | null>(null)
   React.useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -161,7 +174,11 @@ function ThumbSkeleton({ onVisible }: { onVisible: () => void }) {
     })
     io.observe(el)
     return () => io.disconnect()
-    // onVisible 只触发一次就够（ensureThumb 有内部缓存守卫）。
-  }, [])
-  return <div ref={ref} className="ppt-thumb-skeleton" aria-hidden="true" />
+  }, [onVisible])
+  return (
+    <span ref={ref} className="ppt-thumb-preview-placeholder">
+      <span className="ppt-thumb-skeleton" aria-hidden="true" />
+      <span className="ppt-thumb-num">{label}</span>
+    </span>
+  )
 }

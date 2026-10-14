@@ -288,7 +288,7 @@ describe('客户端 bundle 形态', () => {
   it('apply() 在右侧栏服务不存在时也安全，注册的东西可收回', async () => {
     const harness = loadBundle({
       services: { sidebarRightTabs: undefined, sidebarRight: undefined },
-      fetchImpl: () => ({ ok: true, cwd: '', projects: [], active: null, openRequest: null, canUndo: false, canRedo: false }),
+      fetchImpl: () => ({ ok: true, cwd: '', projects: [], activeKey: null, openRequests: [], canUndo: false, canRedo: false }),
     })
     harness.apply()
     await flush()
@@ -313,8 +313,8 @@ describe('客户端 bundle 形态', () => {
             ok: true,
             cwd: 'C:/ws',
             projects: [{ key: 'k1', path: 'a/deck.pptd', title: 'T', pageCount: 3, revision: 3, updatedAt: 1 }],
-            active: { key: 'k1', path: 'a/deck.pptd', title: 'T', revision: 3 },
-            openRequest: { key: 'k1', at: 1 },
+            activeKey: 'k1',
+            openRequests: [{ key: 'k1', at: 1 }],
             canUndo: false,
             canRedo: false,
           }
@@ -356,7 +356,7 @@ describe('客户端 bundle 形态', () => {
         sessions: { list: { getSnapshot: () => ({ ids: ['only'], byId: {} }) } },
         sidebarRight: { openTab: () => {} },
       },
-      fetchImpl: () => ({ ok: true, projects: [], active: null, openRequest: null, canUndo: false, canRedo: false }),
+      fetchImpl: () => ({ ok: true, projects: [], activeKey: null, openRequests: [], canUndo: false, canRedo: false }),
     })
     single.apply()
     await flush()
