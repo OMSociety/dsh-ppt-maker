@@ -46,7 +46,7 @@ export const MAX_ASSET_BYTES = 5 * 1024 * 1024
  * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} undoProject
  * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} redoProject
  * @property {(cwd: string, dir: string) => Promise<object>} buildProjectDeck
- * @property {(pipeline: object) => Promise<Uint8Array>} saveProjectPptx
+ * @property {(pipeline: object) => Promise<{ bytes: Uint8Array, fontEmbed: object | null }>} saveProjectPptx
  * @property {(cwd: string, dir: string, report: unknown) => Promise<void>} writeExportReport
  * @property {new (...args: unknown[]) => Error & { status?: number }} ProjectError
  */
@@ -157,6 +157,18 @@ function missingKeyError(key) {
   const err = new Error(`没有这个工程：${key}`)
   err.status = 404
   return err
+}
+
+/**
+ * 工程 key → 安全文件名主干：挡掉路径分隔符与 Windows 保留字符，空串回落到 `deck`。
+ * 面板导出的落盘文件名用它，避免 key 里的怪字符把路径带出 export/ 之外。
+ */
+function safeFileStem(key) {
+  const stem = String(key || '')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/^[.\-\s]+/, '')
+    .trim()
+  return stem || 'deck'
 }
 
 /** key → { dir, abs }；key 不存在由路由层归一到 404（`error.status` 被接住）。 */
@@ -307,7 +319,7 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
           /* 没命中 → 现渲染 */
         }
         const pipeline = await buildProjectDeck(cwd, relDir)
-        const bytes = await saveProjectPptx(pipeline)
+        const { bytes } = await saveProjectPptx(pipeline)
         const tmpRoot = path.join(abs, '.thumb-cache')
         const tmp = await fsp.mkdtemp(path.join(tmpRoot, 'tmp-'))
         const inputPath = path.join(tmp, 'deck.pptx')
@@ -408,22 +420,41 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
       if (route === 'POST /export') {
         const { sessionId, cwd } = sessionOf(body, url)
         const key = String(body.key || '')
-        const { dir } = projectOf(ss, sessionId, cwd, key)
+        const { dir, abs } = projectOf(ss, sessionId, cwd, key)
         const pipeline = await buildProjectDeck(cwd, dir)
-        const bytes = await saveProjectPptx(pipeline)
+        const { bytes, fontEmbed } = await saveProjectPptx(pipeline)
+        const buffer = Buffer.from(bytes)
+        // 面板导出（body.save）落到工程目录 export/ 并回相对路径：桌面外壳的下载没有
+        // 可回读的落点，磁盘上的文件 + 可见路径才是「点了就有反应」的确定性口径。
+        const saveToProject = body.save === true
         await writeExportReport(cwd, dir, {
-          kind: 'browser-export',
+          kind: saveToProject ? 'panel-export' : 'browser-export',
           at: new Date().toISOString(),
           revision: pipeline.revision,
+          bytes: buffer.length,
+          fontEmbed: fontEmbed ?? null,
           issues: pipeline.issues ?? pipeline.buildWarnings ?? null,
         })
         ss.markSeenRevision(sessionId, key, pipeline.revision)
+        if (saveToProject) {
+          const filename = `${safeFileStem(key)}-r${pipeline.revision}.pptx`
+          const outDir = path.join(abs, 'export')
+          await fsp.mkdir(outDir, { recursive: true })
+          await fsp.writeFile(path.join(outDir, filename), buffer)
+          return json(res, 200, {
+            ok: true,
+            filename,
+            relativePath: path.posix.join(String(dir).replace(/\\/g, '/'), 'export', filename),
+            revision: pipeline.revision,
+            bytes: buffer.length,
+          })
+        }
         res.writeHead(200, {
           'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           'content-disposition': 'attachment; filename="deck.pptx"',
           'cache-control': 'no-store',
         })
-        return res.end(Buffer.from(bytes))
+        return res.end(buffer)
       }
 
       if (route === 'POST /active') {

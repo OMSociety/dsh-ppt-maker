@@ -553,15 +553,18 @@ export function createPptStore(sessionId: string) {
     },
 
     /**
-     * 「导出 .pptx」请求体（返回 Blob，不调 document——真正的「点出下载气泡」由组件干）。
-     * store 不碰 DOM：vitest 的 environment:node 没有 document；Toolbar 拿到 Blob 后自己触发。
+     * 「导出 .pptx」：宿主把 pptx 落到工程目录 `export/` 下，回相对路径 + 字节数。
+     * 不走浏览器下载——桌面外壳的下载没有可回读的落点，磁盘上的文件才是确定的结果，
+     * 所以这里只报告落点（store 不碰 DOM）。
      */
-    async exportDeck(): Promise<{ blob: Blob; filename: string } | null> {
+    async exportDeck(): Promise<{ relativePath: string; filename: string } | null> {
       if (!state.activeKey) return null
       try {
-        const { blob, revision } = await api.exportPptx(state.sessionId, state.activeKey)
-        if (revision) patch({ lastSeenRevision: Number(revision) || state.lastSeenRevision })
-        return { blob, filename: `${state.activeKey}.pptx` }
+        const saved = await api.exportPptxToProject(state.sessionId, state.activeKey)
+        if (saved.revision) patch({ lastSeenRevision: saved.revision })
+        const kb = Math.max(1, Math.round(saved.bytes / 1024))
+        toast(`已导出 ${saved.relativePath || saved.filename}（${kb} KB）`, 'info')
+        return saved
       } catch (error) {
         toast(`导出失败：${(error as Error).message}`, 'error')
         return null

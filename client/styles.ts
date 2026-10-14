@@ -137,7 +137,7 @@ export const CSS = `
   color:var(--dsw-alias-label-secondary);
 }
 
-/* ── 提示横幅（保存态 / 冲突 / 外部已修改）────────────────── */
+/* ── 提示横幅（冲突 / 外部已修改 / 错误）──────────────────── */
 .ppt-banner{
   display:flex;align-items:center;gap:6px;flex:none;
   padding:5px 8px;font-size:11.5px;
@@ -147,6 +147,20 @@ export const CSS = `
 }
 .ppt-banner[data-kind="error"]{color:var(--dsw-alias-label-status-error, var(--dsw-alias-label-primary))}
 .ppt-banner .ppt-btn{padding:1px 6px;font-size:11.5px}
+
+/* ── 页脚状态条（保存态 / toast 文本）──────────────────────── */
+/* 常驻固定高度：只换文字，不参与「有则出现」的高度变化——
+   保存横幅从顶栏挪到这里，画布才不再每编辑一次就被顶一下。 */
+.ppt-statusbar{
+  display:flex;align-items:center;gap:6px;flex:none;
+  height:22px;padding:0 10px;
+  font-size:11px;line-height:22px;
+  color:var(--dsw-alias-label-secondary);
+  border-top:1px solid var(--dsw-alias-border-l2);
+  background:var(--dsw-alias-bg-base);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.ppt-statusbar[data-kind="error"]{color:var(--dsw-alias-label-status-error, var(--dsw-alias-label-primary))}
 
 /* ── 载入中扫光（占位面板「正在打开…」用）──────────────────── */
 .ppt-sweep{
