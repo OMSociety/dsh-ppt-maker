@@ -67,16 +67,23 @@ export const CSS = `
 .ppt-rail-collapse-left{right:2px}
 .ppt-rail-right .ppt-inspector{position:relative}
 .ppt-inspector-collapse{position:absolute;top:2px;right:2px;width:18px;height:18px;padding:0;font-size:12px;line-height:1}
-/* 收起后的边缘把手（细条，点击展开） */
+/* 收起后的边缘把手（细条，点击展开）：自身一律透明，与宿主同底。
+   button 不写 background 会吃到 UA 的 ButtonFace，满高的灰条在深色下像多出一栏；
+   悬停也只给 glyph 一颗小药丸，不铺满整条。 */
 .ppt-rail-handle{
   flex:none;width:16px;border:none;padding:0;cursor:pointer;
-  /* 透明继承 .ppt-root，与宿主侧栏同底 */
+  background:transparent;
   color:var(--dsw-alias-label-secondary);
   display:flex;align-items:center;justify-content:center;font-size:12px;
   border-right:1px solid var(--dsw-alias-border-l2);
-  transition:background-color .15s ease,color .15s ease;
 }
-.ppt-rail-handle:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ppt-rail-handle-glyph{
+  display:flex;align-items:center;justify-content:center;
+  width:14px;height:40px;border-radius:7px;
+  transition:background-color .15s ease;
+}
+.ppt-rail-handle:hover{color:var(--dsw-alias-label-primary)}
+.ppt-rail-handle:hover .ppt-rail-handle-glyph{background:var(--dsw-alias-interactive-bg-hover)}
 .ppt-rail-handle-right{border-right:none;border-left:1px solid var(--dsw-alias-border-l2)}
 
 /* ── 空面板 / 载入中 / 错误 三态共用一张卡片 ────────────────── */

@@ -263,6 +263,31 @@ describe('PptStore（S6 骨架纪律）', () => {
     store.dispose()
   })
 
+  it('合并窗口：/edit 回应 revision 不变，也要重拉页内容（否则「保存一次之后就改不动了」）', async () => {
+    const store = seedStore()
+    await store.actions.init()
+    await store.actions.ensurePageLoaded()
+    expect(store.getSnapshot().currentPageRevision).toBe(1)
+    // history.ts 的 merge window：30s 内同 session 的连写并进同一份快照，revision 停在旧值
+    mockApi.edit.mockResolvedValueOnce({ ok: true, revision: 1, appliedOps: [], warnings: [] })
+    mockApi.page.mockResolvedValue({
+      ok: true,
+      path: 'pages/01.page',
+      page: { elements: [{ elementId: 'el-1', content: { text: '服务端已存' } }] },
+      revision: 1,
+    })
+    await store.actions.updateElement('el-1', { content: { text: '改了' } })
+    await vi.runAllTimersAsync()
+    // revision 没前进：旧实现据此认定「磁盘没变」，屏上永远停在旧 AST
+    expect(store.getSnapshot().lastSeenRevision).toBe(1)
+    await Promise.resolve()
+    await vi.runAllTimersAsync()
+    expect(store.getSnapshot().currentPageData).toEqual({
+      elements: [{ elementId: 'el-1', content: { text: '服务端已存' } }],
+    })
+    store.dispose()
+  })
+
   it('movePage / duplicatePage / removePage / addPage 各自走对应 op 的 stage', async () => {
     const store = seedStore()
     await store.actions.init()

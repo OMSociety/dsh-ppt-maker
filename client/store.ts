@@ -275,9 +275,13 @@ export function createPptStore(sessionId: string) {
       )
       if (structural) {
         patch({ currentPageData: null, currentPageRevision: -1, pagesAst: {} })
-        void actions.ensurePageLoaded()
+        void actions.ensurePageLoaded(true)
       } else {
-        void actions.ensurePageLoaded()
+        // 强制重拉：同 session 30s 内的连写会「并进」同一份快照（history.ts 的
+        // merge window），revision **不前进**——只比 revision 会让第二笔之后的
+        // 改动永远刷不到屏上（「保存一次之后就改不动了」）。
+        void actions.ensurePageLoaded(true)
+        void actions.ensurePageAst(state.currentPage, true)
         void actions.ensureAllPages()
       }
       void actions.syncProjectPages()
@@ -384,15 +388,18 @@ export function createPptStore(sessionId: string) {
     /**
      * Stage/ElementOverlay/TextEditor 落地都要页上的元素清单——
      * 走这里拉（已经有就复用，revision 过了就重拉）。
+     * `force`：保存成功后必须走这条——合并窗口里的连写不推进 revision，
+     * 光比 revision 会以为「磁盘没变」，把后续改动全压在旧 AST 上。
      */
-    async ensurePageLoaded(): Promise<void> {
+    async ensurePageLoaded(force = false): Promise<void> {
       if (!state.activeKey) return
       const page = state.currentPage
       if (page < 0 || page >= state.deckPages.length) {
         patch({ currentPageData: null, currentPageRevision: -1 })
         return
       }
-      if (state.currentPageData !== null && state.currentPageRevision === state.lastSeenRevision) return
+      // force=true：调用方（保存成功后）知道磁盘变了，但 revision 可能没动。
+      if (!force && state.currentPageData !== null && state.currentPageRevision === state.lastSeenRevision) return
       const key = state.activeKey
       const path = state.deckPages[page]
       try {
@@ -426,11 +433,12 @@ export function createPptStore(sessionId: string) {
      * 已有缓存且 revision 未变则复用；失败静默（缩略图退化为占位）。
      * 竞态守卫：捕获请求时的 activeKey，响应回来比对——切了工程就把旧响应丢掉。
      */
-    async ensurePageAst(pageIndex: number): Promise<void> {
+    async ensurePageAst(pageIndex: number, force = false): Promise<void> {
       if (!state.activeKey) return
       if (pageIndex < 0 || pageIndex >= state.deckPages.length) return
       const hit = state.pagesAst[pageIndex]
-      if (hit && hit.revision === state.lastSeenRevision) return
+      // force=true：刚保存过——合并窗口里 revision 可能没动，缓存不能当「没过期」。
+      if (!force && hit && hit.revision === state.lastSeenRevision) return
       const key = state.activeKey
       const path = state.deckPages[pageIndex]
       try {
@@ -445,9 +453,9 @@ export function createPptStore(sessionId: string) {
     },
 
     /** 并行拉齐所有页 AST（打开工程 / revision 变化后，ThumbStrip 一次性渲染整列）。 */
-    async ensureAllPages(): Promise<void> {
+    async ensureAllPages(force = false): Promise<void> {
       if (!state.activeKey) return
-      await Promise.all(state.deckPages.map((_, i) => actions.ensurePageAst(i)))
+      await Promise.all(state.deckPages.map((_, i) => actions.ensurePageAst(i, force)))
     },
 
     /**

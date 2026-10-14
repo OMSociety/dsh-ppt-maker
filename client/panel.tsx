@@ -171,7 +171,7 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
               title="展开页列表"
               aria-label="展开页列表"
             >
-              ›
+              <span className="ppt-rail-handle-glyph">›</span>
             </button>
           )}
 
@@ -193,7 +193,7 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
               title="展开属性面板"
               aria-label="展开属性面板"
             >
-              ‹
+              <span className="ppt-rail-handle-glyph">‹</span>
             </button>
           ) : null}
         </div>
