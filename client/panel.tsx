@@ -87,6 +87,25 @@ function BlankEmpty() {
   )
 }
 
+/**
+ * 页脚状态条（面板最后一行）：保存态与 store 的 toast 都落在这里。
+ *
+ * 用「常驻固定高度」而不是「有内容才出现的横幅」——保存是每次编辑都会发生的事，
+ * 从顶栏弹出一条横幅会把画布整体顶下去（用户报的「每编辑一次页面弹动」就是这个）。
+ * 常量高度 + 只换文字 = 出现/消失都不动布局。
+ */
+function StatusBar({ store }: { store: PptStore }) {
+  const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const toast = state.toast
+  const text = state.saving ? '正在保存…' : toast ? toast.text : ''
+  const kind = !state.saving && toast?.kind === 'error' ? 'error' : 'info'
+  return (
+    <div className="ppt-statusbar" data-kind={kind} role="status" aria-live="polite">
+      {text}
+    </div>
+  )
+}
+
 /** 骨架面板：按 store 快照挑视图。 */
 export function SkeletonPanel({ store }: { store: PptStore }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
@@ -179,6 +198,7 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
           ) : null}
         </div>
       )}
+      {state.status === 'ready' ? <StatusBar store={store} /> : null}
     </div>
   )
 }

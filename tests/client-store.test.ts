@@ -16,7 +16,7 @@ const mockApi = vi.hoisted(() => ({
   undo: vi.fn(),
   redo: vi.fn(),
   uploadMedia: vi.fn(),
-  exportPptx: vi.fn(),
+  exportPptxToProject: vi.fn(),
   mediaUrl: vi.fn(() => '/ppt-maker/api/media'),
 }))
 vi.mock('../client/api', async (importOriginal) => {

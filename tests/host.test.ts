@@ -7,13 +7,14 @@
  *  - /edit op 应用与 revision 推进
  *  - undo/redo 游标
  *  - /media/upload 白名单 + 5MB 上限
+ *  - /export 两种口径：默认回 pptx 二进制流；`save:true` 落到工程目录 export/ 并回相对路径
  *  - openRequest TTL 60s
  *
  * 用 vitest（沿用 tests/ 口径），不走真实 libreoffice-kit（get /thumb 时经
  * deps.createConverter 注入桩）。
  */
 import { createServer, type Server } from 'node:http'
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -345,6 +346,45 @@ describe('host 路由', () => {
     const uu = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, steps: 2 } })
     expect(uu.status).toBe(200)
     expect(uu.json!.revision).toBe(0)
+  })
+
+  it('/export：默认回 pptx 二进制流，save 模式落到工程目录 export/ 并回相对路径', async () => {
+    await startServer()
+    const { key } = await seedProject()
+    await apiJson(`${API_PREFIX}/edit`, {
+      method: 'POST',
+      body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] },
+    })
+
+    // 默认口径：二进制流 + attachment（客户端 exportPptx 依赖这个）
+    const bin = await api(`${API_PREFIX}/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: { sessionId: SESSION, key },
+    })
+    expect(bin.status).toBe(200)
+    expect(bin.contentType).toContain('presentationml.presentation')
+    expect(String(bin.headers['content-disposition'] || '')).toContain('attachment')
+    // pptx 是 zip：PK 魔数。顺带锁住「core.saveProjectPptx 返回 { bytes, fontEmbed }、
+    // 路由必须取 .bytes」——写成 Buffer.from({bytes,...}) 这里就红。
+    expect(bin.body.subarray(0, 2).toString('latin1')).toBe('PK')
+    expect(bin.body.length).toBeGreaterThan(1000)
+
+    // 面板口径：落盘 + 相对路径
+    const saved = await apiJson(`${API_PREFIX}/export`, { method: 'POST', body: { sessionId: SESSION, key, save: true } })
+    expect(saved.status).toBe(200)
+    const rel = String(saved.json!.relativePath || '')
+    expect(rel).toContain('export/')
+    expect(rel.endsWith('.pptx')).toBe(true)
+    expect(Number(saved.json!.revision)).toBe(1)
+    expect(Number(saved.json!.bytes)).toBe(bin.body.length)
+    const onDisk = await readFile(path.join(cwd, rel))
+    expect(onDisk.subarray(0, 2).toString('latin1')).toBe('PK')
+
+    // 落账到 manifest.exportReport（kind 区分面板导出与浏览器导出）
+    const proj = await apiJson(`${API_PREFIX}/project?sessionId=${SESSION}&key=${key}`)
+    const manifest = proj.json!.manifest as Record<string, unknown>
+    expect((manifest.exportReport as Record<string, unknown> | undefined)?.kind).toBe('panel-export')
   })
 
   it('/media/upload：白名单 + MAX_ASSET_BYTES 上限', async () => {

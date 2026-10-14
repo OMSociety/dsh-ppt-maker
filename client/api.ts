@@ -134,6 +134,25 @@ const q = (params: Record<string, string>) =>
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('&')
 
+/**
+ * 导出失败的统一口径：409 抛 `ConflictError`（面板要亮冲突条，别再让用户乱点导出），
+ * 其余抛带宿主 error 文案的 Error；返回 never，调用处写 `if (!res.ok) await failExport(res)`。
+ */
+async function failExport(res: Response): Promise<never> {
+  if (res.status === 409) {
+    const payload = (await res.json().catch(() => null)) as { conflict?: ConflictInfo; error?: string } | null
+    throw new ConflictError(Number(payload?.conflict?.revision ?? 0) || 0, payload?.error || '')
+  }
+  let message = `导出失败（HTTP ${res.status}）`
+  try {
+    const payload = (await res.json()) as { error?: string }
+    if (payload?.error) message = payload.error
+  } catch {
+    /* 无 JSON 用默认文案 */
+  }
+  throw new Error(message)
+}
+
 export const api = {
   state: (sessionId: string) => call<{ ok: true } & StatePayload>(`/state?${q({ sessionId })}`),
 
@@ -185,20 +204,35 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId, key }),
     })
-    if (res.status === 409) {
-      const payload = (await res.json().catch(() => null)) as { conflict?: ConflictInfo; error?: string } | null
-      throw new ConflictError(Number(payload?.conflict?.revision ?? 0) || 0, payload?.error || '')
-    }
-    if (!res.ok) {
-      let message = `导出失败（HTTP ${res.status}）`
-      try {
-        const payload = (await res.json()) as { error?: string }
-        if (payload?.error) message = payload.error
-      } catch {
-        /* 无 JSON 用默认文案 */
-      }
-      throw new Error(message)
-    }
+    if (!res.ok) await failExport(res)
     return { blob: await res.blob(), revision: res.headers.get('x-pt-revision') || res.headers.get('x-revision') }
+  },
+
+  /**
+   * 面板导出口径：宿主把 pptx 落到工程目录 `export/` 下，只回相对路径与字节数——
+   * 桌面外壳的下载没有可回读的落点，落盘 + 可见路径才是「点了就有反应」的确定性结果。
+   */
+  async exportPptxToProject(
+    sessionId: string,
+    key: string,
+  ): Promise<{ relativePath: string; filename: string; revision: number; bytes: number }> {
+    const res = await fetch(`${PREFIX}/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId, key, save: true }),
+    })
+    if (!res.ok) await failExport(res)
+    const payload = (await res.json().catch(() => ({}))) as {
+      relativePath?: string
+      filename?: string
+      revision?: number
+      bytes?: number
+    }
+    return {
+      relativePath: String(payload?.relativePath || ''),
+      filename: String(payload?.filename || 'deck.pptx'),
+      revision: Number(payload?.revision || 0),
+      bytes: Number(payload?.bytes || 0),
+    }
   },
 }
