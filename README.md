@@ -32,7 +32,7 @@
 | **转场与动画** | 页面级淡入淡出转场（`export.transition`）与元素入场动画（`export.animations`，95 种 preset 词表），本地链路原生写出 |
 | **修订与快照** | manifest.json 单一写者 + append-only 快照（游标模型，undo/redo 天然成立）+ baseRevision 乐观锁（409） |
 | **设计系统** | 内置学术 / 咨询 / 金融 / 促销 / 工作五族预设主题，选题后整套版式配色层级一致 |
-| **本地渲染预览** | 面板缩略图与「精确预览」都用 `@deepseek-ai/libreoffice-kit` 光栅化最终 pptx；每页（page, revision）磁盘缓存 |
+| **本地渲染预览** | 面板画布与缩略图直接渲染 PPTD 元素为 DOM（矢量、秒出、与选择框同源同坐标系）；`ppt_render` / 质检的 PNG 预览与 AI 截图仍走 `@deepseek-ai/libreoffice-kit` 光栅化最终 pptx，每页（page, revision）磁盘缓存 |
 
 ## 工具清单
 
@@ -52,9 +52,11 @@
 
 ## 工作台
 
-右侧栏「PPT 创客」是三栏编辑器：缩略图条 + 画布（GET /thumb 渲 PNG）+ 属性面板。
+右侧栏「PPT 创客」是三栏编辑器：缩略图条 + 画布 + 属性面板。
 
-- **编辑动作**：双击文字就地改 / 拖拽调页序 / 复制删除新增页 / 替换图片 / 「精确预览」整页重渲。
+- **底图即 DOM**：画布与缩略图把 PPTD 页 AST 直接渲染成 DOM（`client/components/PptdView.tsx`），打开即出、无需等 libreoffice 冷启动；元素、选择框、就地编辑器同一 pt 坐标系，恒对齐。table / chart / icon / SmartArt 等暂不支持渲染的元素显示灰底占位。
+- **左右栏可收缩**：左栏页列表默认展开、可收起（收起不渲染）；右栏属性面板选中元素才展开、可手动收起。收起态只留边缘把手。
+- **编辑动作**：双击文字就地改 / 拖拽调页序 / 复制删除新增页 / 替换图片 / 「导出 .pptx」整页核对。
 - **冲突保护**：所有写入都带 `baseRevision`，模型在另一个会话里改了同一工程会回 409——面板只亮冲突条，不覆盖人的手改；「外部已修改」提示同理。
 - **轮询**：每 3s 拉 `/ppt-maker/api/state` 看 manifest.revision；模型 ppt_open / ppt_import 完成后面板自动聚焦到对应工程。
 

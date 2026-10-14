@@ -188,7 +188,7 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
   if (!core || typeof core.editProject !== 'function' || typeof core.loadProject !== 'function') {
     throw new Error('createApiHandler 需要 deps.core（{ loadProject, editProject, undoProject, redoProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError }）')
   }
-  const { editProject, loadProject, undoProject, redoProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError } = core
+  const { editProject, loadProject, undoProject, redoProject, projectUndoState, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError } = core
   const ss = storeOverride || sessionStore
 
   function sessionOf(source, url) {
@@ -217,6 +217,9 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
     try {
       if (route === 'GET /state') {
         const { sessionId, cwd } = sessionOf({}, url)
+        // 「记住上次打开的工程」：/state 是重启后面板的首个触点，先惰性恢复磁盘状态
+        // （store.mjs 真模块恒有；测试桩注入了精简版时静默跳过）。
+        if (typeof ss.ensureSession === 'function') ss.ensureSession(sessionId)
         const projects = ss.listSessionProjects(sessionId)
         const activeKey = ss.activeKey(sessionId)
         let manifest = null
@@ -232,6 +235,13 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
                 theme: loaded.manifest.theme ?? null,
                 pageCount: loaded.deck.pages.length,
                 checksumMismatch: loaded.checksumMismatch,
+              }
+              // 撤销/重做可用性（工作台工具栏按钮的 disabled 态）——可选注入，
+              // 测试桩没给 projectUndoState 时静默退化为「都不可用」。
+              if (typeof projectUndoState === 'function') {
+                const undoState = await projectUndoState(cwd, hit.dir)
+                manifest.canUndo = undoState.canUndo
+                manifest.canRedo = undoState.canRedo
               }
             } catch {
               manifest = null

@@ -15,7 +15,9 @@ export const CSS = `
 .ppt-root{
   display:flex;flex-direction:column;height:100%;min-height:0;
   color:var(--dsw-alias-label-primary);
-  background:var(--dsw-alias-bg-layer-1);
+  /* 内容区底色对齐宿主面板（浏览器/日程等）的 --dsw-alias-bg-base：
+     深色 #151517 / 浅色 #fff，与别的面板内容区同底；标签栏仍由宿主负责。 */
+  background:var(--dsw-alias-bg-base);
   font-size:12px;line-height:1.6;
 }
 .ppt-root *{box-sizing:border-box}
@@ -24,23 +26,58 @@ export const CSS = `
 .ppt-toolbar{
   display:flex;align-items:center;gap:6px;
   padding:6px 8px;flex:none;border-bottom:1px solid var(--dsw-alias-border-l2);
+  /* toolbar 透明继承 root（bg-base），与浏览器面板的地址栏区域同底 */
 }
 .ppt-toolbar .ppt-spacer{flex:1 1 auto}
+/* 工程信息：标题主色加粗，元信息（页数/版次/草稿）弱化、大间隔分隔（对齐 DSH 状态栏风格）。
+   空间分配：标题先收缩（ellipsis），元信息保持完整；空间极端不足时 project 整体裁切，
+   绝不溢出盖住右侧按钮。 */
+.ppt-toolbar-project{display:inline-flex;align-items:baseline;gap:10px;min-width:0;flex:0 1 auto;overflow:hidden}
+.ppt-toolbar-project strong{font-weight:600;color:var(--dsw-alias-label-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;min-width:0}
+.ppt-toolbar-meta{color:var(--dsw-alias-label-secondary);white-space:nowrap;flex:none}
 
-/* ── 主区（ThumbStrip | Stage | Inspector）──────────────────── */
-.ppt-workbench{display:flex;flex:1 1 auto;min-height:0}
+/* ── 主区（ThumbStrip | Stage | Inspector，左右栏可收缩）───────── */
+.ppt-workbench{display:flex;flex:1 1 auto;min-height:0;position:relative}
 .ppt-thumbs{
   width:96px;flex:none;overflow-y:auto;
   border-right:1px solid var(--dsw-alias-border-l2);
-  background:var(--dsw-alias-bg-layer-2);
+  /* 透明继承 .ppt-root（sidebar-fill），与标签栏同底；分层交给边框线 */
   padding:6px;display:flex;flex-direction:column;gap:6px;
 }
-.ppt-stage{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:center;padding:10px}
+.ppt-stage{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:center;padding:10px;min-height:0}
 .ppt-inspector{
   width:180px;flex:none;overflow-y:auto;
   border-left:1px solid var(--dsw-alias-border-l2);
-  background:var(--dsw-alias-bg-layer-2);padding:8px;
+  padding:8px;
 }
+
+/* 左右栏容器（收起时不渲染内部组件，只留边缘把手） */
+.ppt-rail{display:flex;flex:none;min-height:0;position:relative}
+.ppt-rail-left{border-right:1px solid var(--dsw-alias-border-l2)}
+.ppt-rail-right{border-left:1px solid var(--dsw-alias-border-l2)}
+.ppt-rail .ppt-thumbs,.ppt-rail .ppt-inspector{border:none}
+/* 栏内收起小按钮（贴边） */
+.ppt-rail-collapse{
+  position:absolute;top:4px;z-index:5;width:16px;height:24px;padding:0;
+  border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);
+  color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:4px;
+  font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;
+}
+.ppt-rail-collapse:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
+.ppt-rail-collapse-left{right:2px}
+.ppt-rail-right .ppt-inspector{position:relative}
+.ppt-inspector-collapse{position:absolute;top:2px;right:2px;width:18px;height:18px;padding:0;font-size:12px;line-height:1}
+/* 收起后的边缘把手（细条，点击展开） */
+.ppt-rail-handle{
+  flex:none;width:16px;border:none;padding:0;cursor:pointer;
+  /* 透明继承 .ppt-root，与宿主侧栏同底 */
+  color:var(--dsw-alias-label-secondary);
+  display:flex;align-items:center;justify-content:center;font-size:12px;
+  border-right:1px solid var(--dsw-alias-border-l2);
+  transition:background-color .15s ease,color .15s ease;
+}
+.ppt-rail-handle:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ppt-rail-handle-right{border-right:none;border-left:1px solid var(--dsw-alias-border-l2)}
 
 /* ── 空面板 / 载入中 / 错误 三态共用一张卡片 ────────────────── */
 .ppt-blank{
@@ -142,7 +179,6 @@ export const CSS = `
   aspect-ratio:16/9;
 }
 .ppt-thumb:focus-visible{outline:none;border-color:var(--dsw-alias-border-l1);box-shadow:0 0 0 2px var(--dsw-alias-interactive-bg-hover)}
-.ppt-thumb-img{width:100%;height:100%;object-fit:cover;display:block}
 .ppt-thumb-preview-placeholder{
   width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   color:var(--dsw-alias-label-secondary);font-size:10px;
@@ -165,17 +201,38 @@ export const CSS = `
 .ppt-thumb-gap{height:3px;margin:0 -2px;border-radius:1px;transition:background-color .1s ease}
 .ppt-thumb-gap-over{background:var(--dsw-alias-interactive-bg-hover)}
 
-/* ── Stage（画布 + 透明选择框 + 就地编辑器）──────────────── */
-.ppt-stage-canvas{position:relative;box-shadow:var(--dsw-shadow-lv2);border:1px solid var(--dsw-alias-border-l2)}
-.ppt-stage-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
-.ppt-stage-loadthumb{
-  position:absolute;inset:0;width:100%;height:100%;
-  border:none;background:transparent;color:var(--dsw-alias-label-secondary);
-  font-size:11px;cursor:pointer;
+/* ── PptdView（DOM 直渲画布，取代光栅化 PNG）────────────────── */
+/* 外层容器：决定可用空间，内部 flex 居中 */
+.pptd-viewport{position:relative;width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
+/* 逻辑画布：固定 pt 尺寸，transform scale 缩放；transform 不改变布局占位，配合 flex 居中 */
+.pptd-canvas{
+  position:relative;flex:none;
+  box-sizing:border-box;
+  /* 描边用 outline 而非 border：border 在 border-box 下会往内挤内容盒（0.67px @dpr1.5），
+     全幅贴边元素（bottom-bar）四边被缩进 0.45px，露出画布米色页底，在深色界面下形成
+     一条「白条」。outline 不占用布局，内容盒保持完整 960pt，贴边元素真正顶到画布边缘。 */
+  box-shadow:var(--dsw-shadow-lv2);outline:1px solid var(--dsw-alias-border-l2);border-radius:2px;
+  /* 排版基线 reset：规格默认 18pt/MiSans/单倍行距。不 reset 会继承工作台 UI 的
+     12px/1.6/UI 字体族，未显式设字号的元素整体渲小。 */
+  font-size:18px;line-height:1.2;font-family:MiSans,sans-serif;color:#1A1A1A;
 }
-.ppt-stage-loadthumb:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
+/* Stage 里的 PptdView 占满并居中 */
+.ppt-stage-pptd{width:100%;height:100%}
+/* 缩略图里的 PptdView：小尺寸 contain，文字随 scale 自动缩小（矢量清晰） */
+.ppt-thumb-pptd{width:100%;height:100%;pointer-events:none}
+
+/* Stage 画布内元素（PptdView 渲染） */
+.pptd-text{overflow:hidden;box-sizing:border-box}
+.pptd-text p{margin:0}
+.pptd-shape{box-sizing:border-box}
+.pptd-image{box-sizing:border-box}
+.pptd-line{box-sizing:border-box}
+
+/* Stage 画布 + 透明选择框 + 就地编辑器（overlay 在逻辑坐标系内，随 canvas scale） */
 .ppt-stage-empty{width:100%;height:100%}
 .ppt-overlay{position:absolute;inset:0;pointer-events:none}
+/* 激活态（Stage 用）：overlay 容器接收「点空白取消选择」，元素框仍各自 pointer-events:auto */
+.ppt-overlay-active{pointer-events:auto;cursor:default}
 .ppt-element{
   position:absolute;pointer-events:auto;cursor:pointer;
   border:1px dashed transparent;transition:border-color .12s ease,background-color .12s ease;
@@ -208,6 +265,16 @@ export const CSS = `
 .ppt-inspector-empty{font-size:11px;color:var(--dsw-alias-label-secondary);margin:0 0 8px}
 .ppt-inspector-row{display:flex;flex-direction:column;gap:3px;margin:0 0 10px;font-size:11px}
 .ppt-inspector-row > span{color:var(--dsw-alias-label-secondary)}
+.ppt-inspector-labelrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ppt-inspector-modes{
+  display:inline-flex;gap:2px;padding:1px;border-radius:6px;
+  background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);
+}
+.ppt-btn-mode{padding:0 6px;font-size:10.5px;line-height:16px;border-radius:4px}
+.ppt-btn-on{
+  color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover);
+  border-color:var(--dsw-alias-border-l1);
+}
 .ppt-inspector-row textarea,
 .ppt-inspector-row input[type='number'],
 .ppt-inspector-row select{

@@ -9,7 +9,7 @@
  *      无草稿才允许静默重载（`refreshProjects`）；有草稿只亮「外部已修改」，绝不吞字。
  *   3. **per-session**：`index.tsx` 的 `Map<sessionId, PptStore>` 持有多个，互不干扰。
  *
- * S6 先空的字段（`selection` / `pageCache` / `draft`）也是**真字段**：S7–S9 的组件挂上来
+ * S6 先空的字段（`selection` / `pagesAst` / `draft`）也是**真字段**：S7–S9 的组件挂上来
  * 就不再动 store 的形状，只往里填值。
  */
 import { api, ConflictError, type StatePayload } from './api'
@@ -26,14 +26,6 @@ export interface Selection {
   page: number
   /** 元素 id（update_element 的 target）；同页多选时升序排列。 */
   ids: string[]
-}
-
-/** 页缩略图缓存：一图一条，按 (pageNumber, revision) 缓存击穿。 */
-export interface PageThumb {
-  page: number
-  revision: number
-  /** GET /thumb?rev=N 的 data URI。 */
-  dataUrl: string
 }
 
 export type { ProjectEntry } from './api'
@@ -59,8 +51,8 @@ export interface PptState {
   currentPageRevision: number
   /** 活动工程 revision：轮询看见它变了，就得决定静默重载 / 亮提示（见 applyPoll）。 */
   lastSeenRevision: number
-  /** 活动工程的页缩略图：page → ?rev=N。S6 不取，S7 ThumbStrip/hook 填。 */
-  pageCache: Record<number, PageThumb>
+  /** 每页 AST 缓存（DOM 直渲用）：pageIndex → {page, revision}。缩略图条也要逐页渲染。 */
+  pagesAst: Record<number, { page: unknown; revision: number }>
   /** 屏上正在看的那一页（ThumbStrip 点选后填）。 */
   currentPage: number
   /** 画布上选中的元素；null = 没选。 */
@@ -91,7 +83,7 @@ function initialState(sessionId: string): PptState {
     currentPageData: null,
     currentPageRevision: -1,
     lastSeenRevision: -1,
-    pageCache: {},
+    pagesAst: {},
     currentPage: 0,
     selection: null,
     draft: null,
@@ -109,6 +101,27 @@ export function createPptStore(sessionId: string) {
   const listeners = new Set<() => void>()
   let toastSeq = 0
   const toastTimers = new Set<ReturnType<typeof setTimeout>>()
+  // 输入防抖：stage 之后过这么久才 flush（继续打字顺延窗口）。
+  const STAGE_DEBOUNCE_MS = 400
+  // 会改 deck.pages 页序/数量的 op：pagesAst 按索引缓存，结构性变化后必须清缓存重拉；
+  // 属性级 op（update_element/update_page/add_element/remove_element）不清，原地静默重拉。
+  const STRUCTURAL_OPS = new Set(['add_page', 'remove_page', 'move_page', 'page_duplicate'])
+  let stageTimer: ReturnType<typeof setTimeout> | null = null
+  function scheduleFlush() {
+    if (stageTimer) clearTimeout(stageTimer)
+    stageTimer = setTimeout(() => {
+      stageTimer = null
+      void flush()
+    }, STAGE_DEBOUNCE_MS)
+  }
+  /** 立刻把挂起的草稿 flush 掉（撤销/重做/卸载前必须先把最后一笔送出去）。 */
+  async function flushNow(): Promise<boolean> {
+    if (stageTimer) {
+      clearTimeout(stageTimer)
+      stageTimer = null
+    }
+    return flush()
+  }
 
   const emit = () => {
     for (const fn of listeners) fn()
@@ -151,7 +164,7 @@ export function createPptStore(sessionId: string) {
         draft: null,
         conflict: null,
         externalChange: null,
-        pageCache: {},
+        pagesAst: {},
       })
       return true
     } catch (error) {
@@ -181,8 +194,9 @@ export function createPptStore(sessionId: string) {
       status: state.status === 'error' && state.error ? 'error' : projects.length || nextKey ? 'ready' : 'empty',
       error: null,
       projects,
-      canUndo: Boolean(st.canUndo),
-      canRedo: Boolean(st.canRedo),
+      // canUndo/canRedo 由宿主 /state 的 manifest 轮廓给出（activeKey 工程才有意义）。
+      canUndo: Boolean(st.manifest?.canUndo),
+      canRedo: Boolean(st.manifest?.canRedo),
     }
 
     if (nextKey === null) {
@@ -219,7 +233,7 @@ export function createPptStore(sessionId: string) {
         lastSeenRevision: nextRevision,
         currentPageData: null,
         currentPageRevision: -1,
-        pageCache: {},
+        pagesAst: {},
       })
       void actions.ensurePageLoaded()
       return
@@ -252,10 +266,21 @@ export function createPptStore(sessionId: string) {
         conflict: null,
         externalChange: null,
       })
-      // 编辑成功 => 磁盘变了：让已展示的页重拉（ThumbStrip 带 ?rev= 已经会破缓存，
-      // 这里只负责页 AST 那份）。
-      patch({ currentPageData: null, currentPageRevision: -1, pageCache: {} })
-      void actions.ensurePageLoaded()
+      // 编辑成功 => 磁盘变了。
+      // 结构性 op 改 deck.pages 的页序与数量，pagesAst 按索引缓存会直接错位 → 清缓存重拉。
+      // 属性级 op（update_element 等）：**不清缓存**——旧 AST 留在屏上继续渲染，后台静默
+      // 重拉、到位后原位替换。清空再拉会让画布闪一次空白（用户看到的「弹动」）。
+      const structural = ops.some(
+        (op) => op && typeof op === 'object' && STRUCTURAL_OPS.has(String((op as { op?: unknown }).op ?? '')),
+      )
+      if (structural) {
+        patch({ currentPageData: null, currentPageRevision: -1, pagesAst: {} })
+        void actions.ensurePageLoaded()
+      } else {
+        void actions.ensurePageLoaded()
+        void actions.ensureAllPages()
+      }
+      void actions.syncProjectPages()
       return true
     } catch (error) {
       if (error instanceof ConflictError) {
@@ -274,6 +299,10 @@ export function createPptStore(sessionId: string) {
      * 不然 .history 看到的是「draft 不在历史里」时的旧游标；操作然后就会变成把还没提交的东西撤回）。
      */
     async applyDraft() {
+      if (stageTimer) {
+        clearTimeout(stageTimer)
+        stageTimer = null
+      }
       if (!state.draft) return true
       return flush()
     },
@@ -291,41 +320,6 @@ export function createPptStore(sessionId: string) {
 
     /** 轮询入口（index.tsx 的定时器调它）。 */
     applyPoll,
-
-    cacheThumb: async (page: number, dataUrl: string, revision: number) => {
-      if (page < 1 || !Number.isInteger(page)) return
-      patch({
-        pageCache: {
-          ...state.pageCache,
-          [page]: { page, revision, dataUrl },
-        },
-      })
-    },
-
-    ensureThumb: async (page: number, revision: number): Promise<PageThumb | null> => {
-      if (!state.activeKey) return null
-      const hit = state.pageCache[page]
-      if (hit && hit.revision === revision) return hit
-      const url = api.thumbUrl(state.sessionId, state.activeKey, page, revision)
-      try {
-        const res = await fetch(url)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const blob = await res.blob()
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const Reader: any = (globalThis as any).FileReader
-          if (!Reader) return reject(new Error('这个浏览器不支持本地图预览'))
-          const reader = new Reader()
-          reader.onload = () => resolve(String(reader.result || ''))
-          reader.onerror = () => reject(new Error('缩略图读取失败'))
-          reader.readAsDataURL(blob)
-        })
-        const thumb: PageThumb = { page, revision, dataUrl }
-        patch({ pageCache: { ...state.pageCache, [page]: thumb } })
-        return thumb
-      } catch {
-        return null
-      }
-    },
 
     /**
      * Inspector 换图按钮：POST /media/upload（宿主给文件名与白名单），response 的 src 拿来
@@ -399,11 +393,12 @@ export function createPptStore(sessionId: string) {
         return
       }
       if (state.currentPageData !== null && state.currentPageRevision === state.lastSeenRevision) return
+      const key = state.activeKey
       const path = state.deckPages[page]
       try {
-        const res = await api.page(state.sessionId, state.activeKey, path)
-        // 期间可能又翻页了：只有当前页还是这个 page 才落数据
-        if (state.currentPage !== page) return
+        const res = await api.page(state.sessionId, key, path)
+        // 期间可能又翻页了或切了工程：只有当前页/当前工程还是这个才落数据
+        if (state.currentPage !== page || state.activeKey !== key) return
         patch({ currentPageData: res.page, currentPageRevision: res.revision })
       } catch (error) {
         patch({ currentPageData: null, currentPageRevision: -1 })
@@ -414,6 +409,66 @@ export function createPptStore(sessionId: string) {
     /** 画布上点了一个元素（S7 ElementOverlay）；空数组 = 取消选择。 */
     setSelection(ids: string[]) {
       patch({ selection: ids.length ? { page: state.currentPage, ids } : null })
+    },
+
+    /**
+     * PptdView 的媒体 src 解析：media/ 相对路径映射到宿主 /media 路由；
+     * http(s): 远端 URL（规格允许）原样透传，不进 /media。
+     */
+    mediaUrl(src: string): string {
+      if (!state.activeKey) return src
+      if (!src.startsWith('media/')) return src
+      return api.mediaUrl(state.sessionId, state.activeKey, src)
+    },
+
+    /**
+     * 拉某一页的 AST 进 pagesAst 缓存（ThumbStrip 的 DOM 缩略图按页渲染用）。
+     * 已有缓存且 revision 未变则复用；失败静默（缩略图退化为占位）。
+     * 竞态守卫：捕获请求时的 activeKey，响应回来比对——切了工程就把旧响应丢掉。
+     */
+    async ensurePageAst(pageIndex: number): Promise<void> {
+      if (!state.activeKey) return
+      if (pageIndex < 0 || pageIndex >= state.deckPages.length) return
+      const hit = state.pagesAst[pageIndex]
+      if (hit && hit.revision === state.lastSeenRevision) return
+      const key = state.activeKey
+      const path = state.deckPages[pageIndex]
+      try {
+        const res = await api.page(state.sessionId, key, path)
+        if (state.activeKey !== key) return // 期间切了工程：旧响应不落盘
+        patch({
+          pagesAst: { ...state.pagesAst, [pageIndex]: { page: res.page, revision: res.revision } },
+        })
+      } catch {
+        /* 单页失败不阻断整列缩略图 */
+      }
+    },
+
+    /** 并行拉齐所有页 AST（打开工程 / revision 变化后，ThumbStrip 一次性渲染整列）。 */
+    async ensureAllPages(): Promise<void> {
+      if (!state.activeKey) return
+      await Promise.all(state.deckPages.map((_, i) => actions.ensurePageAst(i)))
+    },
+
+    /**
+     * 重拉 /project 同步页清单：add/remove/move_page 之后 deck.pages 会变。
+     * 只刷新 deck/deckPages——lastSeenRevision 的权威是 /edit 响应（flush 已推进），
+     * 这里不覆盖（否则一个迟到的旧 project 响应会把 revision 拽回去）。
+     * 失败静默（下轮轮询还会再来）。
+     */
+    async syncProjectPages(): Promise<void> {
+      const key = state.activeKey
+      if (!key) return
+      try {
+        const res = await api.project(state.sessionId, key)
+        if (state.activeKey !== key) return
+        patch({
+          deck: res.deck,
+          deckPages: Array.isArray(res.deck?.pages) ? res.deck.pages : [],
+        })
+      } catch {
+        /* 同步失败不阻断：下轮轮询兜底 */
+      }
     },
 
     /**
@@ -437,8 +492,12 @@ export function createPptStore(sessionId: string) {
           ? { draft: { ...state.draft, ops: [...state.draft.ops, op] } }
           : { draft: { baseRevision: state.lastSeenRevision, ops: [op] } },
       )
-      // 骨架期就一杆一送：等 S8 TextEditor 落地，「继续打字再攒一杆」的合批生长在这里。
-      return flush()
+      // 不立即 flush：打字每次 onChange 都走 stage，若立即送就会「每敲一字整栏
+      // 闪一下」。攒 400ms 再送（见下面的 stageTimer）；期间用户继续打字会
+      // 顺延窗口。撤销/重做/切工程/关面板前会先 applyDraft 把草稿刷进 .history，
+      // 所以合批不会让撤销丢掉最后一笔。
+      scheduleFlush()
+      return true
     },
 
     /** 「撤回」：先刷 draft（撤回只追加，不清空），再调 POST /undo。 */
@@ -455,9 +514,13 @@ export function createPptStore(sessionId: string) {
           externalChange: null,
           currentPageData: null,
           currentPageRevision: -1,
-          pageCache: {},
+          pagesAst: {},
+          // 乐观更新按钮态：undo 成功后游标下降，前方必有快照可重做
+          canUndo: res.revision > 0,
+          canRedo: true,
         })
         void actions.ensurePageLoaded()
+        void actions.syncProjectPages()
         toast('已撤销', 'info')
       } catch (error) {
         toast(`撤销失败：${(error as Error).message}`, 'error')
@@ -477,9 +540,12 @@ export function createPptStore(sessionId: string) {
           externalChange: null,
           currentPageData: null,
           currentPageRevision: -1,
-          pageCache: {},
+          pagesAst: {},
+          // redo 成功后游标必 > 0；canRedo 是否还有余量交给下轮轮询校准
+          canUndo: true,
         })
         void actions.ensurePageLoaded()
+        void actions.syncProjectPages()
         toast('已重做', 'info')
       } catch (error) {
         toast(`重做失败：${(error as Error).message}`, 'error')
@@ -531,6 +597,10 @@ export function createPptStore(sessionId: string) {
     dispose() {
       for (const timer of toastTimers) clearTimeout(timer)
       toastTimers.clear()
+      if (stageTimer) {
+        clearTimeout(stageTimer)
+        stageTimer = null
+      }
       listeners.clear()
     },
   }

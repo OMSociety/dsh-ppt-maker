@@ -13,6 +13,7 @@
 import * as React from 'react'
 import type { PptStore } from '../store'
 import { ImportGlyph } from '../icons'
+import { hasRichMarkup, markupToPlain, plainToMarkup } from '../render/text-markup'
 
 interface PptElement {
   elementId?: string
@@ -45,10 +46,15 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary)
 }
 
-export function Inspector({ store }: { store: PptStore }) {
+export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?: () => void }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const selection = state.selection
   const page = (state.currentPageData ?? null) as PptPage | null
+  // 编辑模式与草稿必须挂在早退之前（hooks 顺序不能变）。
+  // 草稿按「工程#页#元素#模式」定键：键一变就回到磁盘上的最新值，键没变则
+  // 用户正在敲的字优先（避免 stage 回写把光标顶走）。
+  const [textMode, setTextMode] = React.useState<'plain' | 'markup'>('plain')
+  const [textDraft, setTextDraft] = React.useState<{ key: string; value: string } | null>(null)
 
   if (!selection || !selection.ids.length) {
     return (
@@ -77,21 +83,75 @@ export function Inspector({ store }: { store: PptStore }) {
     setField({ content: { ...content, ...kv } })
   }
 
+  const rawText = String(content.text ?? '')
+  const richText = hasRichMarkup(rawText)
+  const textKey = `${state.activeKey ?? ''}#${state.currentPage}#${elementId}#${textMode}`
+  const textValue =
+    textDraft && textDraft.key === textKey
+      ? textDraft.value
+      : textMode === 'plain'
+        ? markupToPlain(rawText)
+        : rawText
+  const commitText = (next: string) => {
+    setTextDraft({ key: textKey, value: next })
+    setContentField({ text: textMode === 'plain' ? plainToMarkup(next) : next })
+  }
+
   return (
     <div className="ppt-inspector">
       <div className="ppt-inspector-head">
         <strong>{target.elementId}</strong>
         <span className="ppt-inspector-tag">{target.elementType}</span>
+        {onCollapse ? (
+          <button
+            type="button"
+            className="ppt-btn ppt-inspector-collapse"
+            onClick={onCollapse}
+            title="收起属性面板"
+            aria-label="收起属性面板"
+          >
+            ›
+          </button>
+        ) : null}
       </div>
 
-      <label className="ppt-inspector-row">
-        <span>文字</span>
+      <div className="ppt-inspector-row">
+        <span className="ppt-inspector-labelrow">
+          文字
+          <span className="ppt-inspector-modes" role="group" aria-label="文字编辑模式">
+            <button
+              type="button"
+              className={`ppt-btn ppt-btn-mode${textMode === 'plain' ? ' ppt-btn-on' : ''}`}
+              aria-pressed={textMode === 'plain'}
+              onClick={() => setTextMode('plain')}
+              title="按纯文字编辑；保存时按行包回 <p>"
+            >
+              纯文字
+            </button>
+            <button
+              type="button"
+              className={`ppt-btn ppt-btn-mode${textMode === 'markup' ? ' ppt-btn-on' : ''}`}
+              aria-pressed={textMode === 'markup'}
+              onClick={() => setTextMode('markup')}
+              title="直接编辑原始标记（<p> = 段落）"
+            >
+              标记
+            </button>
+          </span>
+        </span>
         <textarea
           rows={3}
-          value={String(content.text ?? '')}
-          onChange={(e) => setContentField({ text: e.target.value })}
+          value={textValue}
+          onChange={(e) => commitText(e.target.value)}
+          // 失焦即丢弃草稿：撤销/重做或外部改动后，框里立刻回到磁盘上的真值。
+          onBlur={() => setTextDraft(null)}
         />
-      </label>
+        {richText && textMode === 'plain' ? (
+          <span className="ppt-inspector-hint">
+            原文含行内格式（&lt;strong&gt; 等），纯文字模式保存会丢弃；要保留请切「标记」。
+          </span>
+        ) : null}
+      </div>
 
       <div className="ppt-inspector-row">
         <span>字号</span>

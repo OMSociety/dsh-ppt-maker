@@ -5,7 +5,6 @@
  *   GET  /state       → {projects[{key,dir}], activeKey, openRequests[], manifest?, cwd, canUndo?, canRedo?}
  *   GET  /project     → {key, dir, revision, manifest, deck, pages[], issues, checksumMismatch}
  *   GET  /page        → {path, page, revision}
- *   GET  /thumb       → PNG bytes（?page=1&rev=N 缓存击穿）
  *   GET  /media       → image bytes（?src=media/xx.png）
  *   POST /edit        → {ok, revision, appliedOps, warnings, merged}；409 → ConflictError
  *   POST /undo|redo   → {ok, revision, undoneOps}
@@ -46,6 +45,9 @@ export interface ManifestOutline {
   theme?: string | null
   pageCount?: number
   checksumMismatch?: boolean
+  /** 撤销/重做可用性（工作台工具栏按钮态；宿主经 core.projectUndoState 给出）。 */
+  canUndo?: boolean
+  canRedo?: boolean
 }
 
 export interface StatePayload {
@@ -170,10 +172,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ sessionId, key, ...payload }),
     }),
-
-  /** `?rev=N` 是缓存击穿钥匙（宿主按 (page, revision) 落盘缓存）。页号从 1 起。 */
-  thumbUrl: (sessionId: string, key: string, page: number, revision: number) =>
-    `${PREFIX}/thumb?${q({ sessionId, key, page: String(page), rev: String(revision) })}`,
 
   mediaUrl: (sessionId: string, key: string, src: string) => `${PREFIX}/media?${q({ sessionId, key, src })}`,
 

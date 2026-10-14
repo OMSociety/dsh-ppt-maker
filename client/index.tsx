@@ -223,11 +223,12 @@ export function apply(ctx: any): void {
       try {
         const st = await api.state(sessionId)
         warned = false
-        // openRequest 一来就自动打开。tabOpened 是幂等的（宿主回包不依赖旧状态），
-        // 即便面板已经开着、或 openTab 本地还没到，也让它每轮把请求清掉——
-        // 否则那条 openRequest 会一直挂着，别的会话切过来又弹一次。
-        if (st.openRequest && st.openRequest.key) {
-          openIfRequested(sessionId, st.openRequest.key)
+        // openRequests（复数数组，宿主 pendingOpenRequests）一来就自动打开。tabOpened 是幂等的
+        // （宿主回包不依赖旧状态），即便面板已经开着、或 openTab 本地还没到，也让它每轮把
+        // 请求清掉——否则那条 openRequest 会一直挂着，别的会话切过来又弹一次。
+        const reqs = Array.isArray(st.openRequests) ? st.openRequests : []
+        for (const req of reqs) {
+          if (req && req.key) openIfRequested(sessionId, req.key)
         }
         // 面板自己的 init() 已拉过 /state；第一轮 tick 不重复 push 一遍，但第二轮起
         // 通通都进 store（skeleton 的 ProjectList / 空面板都靠 store.projects）。

@@ -13,7 +13,9 @@ export default defineConfig({
   platform: 'node',
   target: 'node18',
   outDir: 'lib',
-  clean: true,
+  // 产物是固定单文件 index.js，clean 没有收益；client.js 由 build-client.mjs
+  // 写入同一目录，clean: true 会让「只跑 tsup」把浏览器半侧产物一起抹掉。
+  clean: false,
   dts: false,
   sourcemap: false,
   // `yaml` is CJS: inlining it into ESM leaves esbuild's `__require` shim with

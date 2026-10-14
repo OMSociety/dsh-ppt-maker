@@ -20,6 +20,7 @@
  */
 import { createHash } from 'node:crypto'
 import path from 'node:path'
+import * as persisted from './state-store.mjs'
 
 /** 打开请求的有效期：面板的轮询节奏下 60s 足够，超时等于面板根本没开。 */
 export const OPEN_TTL_MS = 60_000
@@ -42,10 +43,45 @@ export function mimeFor(name) {
 
 const sessions = new Map()
 
+/**
+ * 把某会话的登记表 + 当前工程落盘（「记住上次打开的工程」）。
+ * 写盘失败只静默吞掉：状态记忆是锦上添花，绝不能影响主流程。
+ */
+function persistSession(sessionId) {
+  try {
+    const record = sessions.get(String(sessionId || ''))
+    if (!record) return
+    persisted.saveSession(sessionId, {
+      activeKey: record.activeKey,
+      projects: Object.fromEntries(record.projects)
+    })
+  } catch {
+    /* 磁盘问题（权限/满）不值得为一个记忆功能报警 */
+  }
+}
+
+/** 首次碰到某会话时，从磁盘惰性恢复「上次打开的工程」；内存已有记录则不覆盖。 */
+function restoreSessionIfAny(sessionId) {
+  if (sessions.has(String(sessionId || ''))) return
+  try {
+    const saved = persisted.loadSession(sessionId)
+    if (!saved) return
+    sessions.set(String(sessionId), {
+      projects: new Map(Object.entries(saved.projects)),
+      activeKey: saved.activeKey,
+      lastSeenRevision: new Map(),
+      openRequests: new Map()
+    })
+  } catch {
+    /* 同上，静默 */
+  }
+}
+
 /** 取（或建）一个会话的登记簿。 */
 export function ensureSession(sessionId) {
   const id = String(sessionId || '')
   if (!id) throw new Error('缺少 sessionId')
+  restoreSessionIfAny(id)
   let record = sessions.get(id)
   if (!record) {
     record = { projects: new Map(), activeKey: null, lastSeenRevision: new Map(), openRequests: new Map() }
@@ -72,6 +108,7 @@ export function registerProject(sessionId, cwd, dir) {
   const key = projectKey(cwd, dir)
   record.projects.set(key, String(dir))
   record.activeKey = key
+  persistSession(sessionId)
   return { key, dir: String(dir) }
 }
 
@@ -93,9 +130,15 @@ export function listSessionProjects(sessionId) {
   return [...record.projects.entries()].map(([key, dir]) => ({ key, dir }))
 }
 
+/** 测试专用：清掉全部内存会话（模拟宿主重启后进程内状态归零）。 */
+export function __clearAllSessionsForTest() {
+  sessions.clear()
+}
+
 export function setActive(sessionId, key) {
   const record = ensureSession(sessionId)
   record.activeKey = String(key || '') || null
+  persistSession(sessionId)
 }
 
 export function activeKey(sessionId) {

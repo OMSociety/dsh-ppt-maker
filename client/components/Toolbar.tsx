@@ -7,7 +7,7 @@
  */
 import * as React from 'react'
 import type { PptStore } from '../store'
-import { ExportGlyph, PptMark, RedoGlyph, UndoGlyph } from '../icons'
+import { ExportGlyph, RedoGlyph, UndoGlyph } from '../icons'
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -34,17 +34,12 @@ export function Toolbar({ store }: { store: PptStore }) {
   return (
     <>
       <div className="ppt-toolbar">
-        <span className="ppt-brand">
-          <PptMark size={14} />
-          <span>PPT 工作台</span>
-        </span>
         {state.activeKey ? (
           <span className="ppt-toolbar-project">
-            {state.activeKey}
-            {state.deckPages.length ? ` · ${state.deckPages.length} 页` : ''}
-            {' · rev '}
-            {state.lastSeenRevision}
-            {state.draft?.ops.length ? ` · 草稿 ${state.draft.ops.length}` : ''}
+            <strong>{(state.deck as { title?: string } | null)?.title ?? state.activeKey}</strong>
+            {state.deckPages.length ? <span className="ppt-toolbar-meta">{state.deckPages.length} 页</span> : null}
+            <span className="ppt-toolbar-meta">第 {state.lastSeenRevision} 版</span>
+            {state.draft?.ops.length ? <span className="ppt-toolbar-meta">草稿 {state.draft.ops.length}</span> : null}
           </span>
         ) : null}
         <span className="ppt-spacer" />
