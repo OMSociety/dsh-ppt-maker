@@ -59,11 +59,16 @@ export const CSS = `
 /* 栏内收起小按钮（与「新页」同处 .ppt-thumbs-head 一行，flex 居中对齐） */
 .ppt-rail-collapse{
   flex:none;width:16px;height:20px;padding:0;
-  border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);
+  border:1px solid var(--dsw-alias-border-l2);background-color:var(--dsw-alias-bg-layer-1);
   color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:4px;
   font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;
 }
-.ppt-rail-collapse:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
+/* 同 .ppt-thumb-action：不透明底 + 叠加高亮，别把底换成带 alpha 的色 */
+.ppt-rail-collapse:hover{
+  color:var(--dsw-alias-label-primary);
+  background-image:linear-gradient(var(--dsw-alias-interactive-bg-hover),var(--dsw-alias-interactive-bg-hover));
+  border-color:var(--dsw-alias-border-l1);
+}
 /* 缩略图条头部行：新页按钮 + 收起按钮；按钮让出右侧固定 16px，不再互相叠压 */
 .ppt-thumbs-head{display:flex;align-items:center;gap:4px}
 .ppt-thumbs-head>.ppt-btn{flex:1;min-width:0}
@@ -248,11 +253,17 @@ export const CSS = `
 .ppt-thumbrow:focus-within .ppt-thumb-actions{opacity:1}
 .ppt-thumb-action{
   padding:1px 4px;font-size:10px;
-  background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);
+  background-color:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);
   border-radius:3px;color:var(--dsw-alias-label-secondary);
   box-shadow:var(--dsw-shadow-lv1);
 }
-.ppt-thumb-action:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
+/* hover：底色必须保持不透明——直接换成 interactive-bg-hover（带 alpha）会让缩略图透上来，
+   视觉上像按钮被抠空。改用叠加层：不透明底 + 半透明高亮叠在一起。 */
+.ppt-thumb-action:hover{
+  color:var(--dsw-alias-label-primary);
+  background-image:linear-gradient(var(--dsw-alias-interactive-bg-hover),var(--dsw-alias-interactive-bg-hover));
+  border-color:var(--dsw-alias-border-l1);
+}
 .ppt-thumb-gap{height:3px;margin:0 -2px;border-radius:1px;transition:background-color .1s ease}
 .ppt-thumb-gap-over{background:var(--dsw-alias-interactive-bg-hover)}
 
