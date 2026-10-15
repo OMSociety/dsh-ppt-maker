@@ -82,6 +82,8 @@ export interface Manifest {
   theme: string | null
   checksum: string
   exportReport?: unknown
+  /** 最近一次规则质检的落账（ppt_check / ppt_export 都会刷新），见 writeQaReport。 */
+  qaReport?: unknown
 }
 
 const MANIFEST_FILE = 'manifest.json'
@@ -121,6 +123,23 @@ export async function writeExportReport(cwd: string, dir: string, report: unknow
   return withProjectLock(abs, async () => {
     const manifest = await readManifest(abs)
     await writeManifest(abs, { ...manifest, exportReport: report })
+  })
+}
+
+/**
+ * Stamp a QA summary into manifest.qaReport（质检落账契约）。
+ * `revision` / `checkedAt` 由本函数从 manifest 现场取——调用方只交业务字段，
+ * 保证落账的修订号永远是「质检跑的那一刻」的游标位置。
+ * 调用方（ppt_check / ppt_export）把它当 best-effort：落账失败不反噬质检结果。
+ */
+export async function writeQaReport(cwd: string, dir: string, report: Record<string, unknown>): Promise<void> {
+  const abs = resolveProjectDir(cwd, dir)
+  return withProjectLock(abs, async () => {
+    const manifest = await readManifest(abs)
+    await writeManifest(abs, {
+      ...manifest,
+      qaReport: { revision: manifest.revision, checkedAt: new Date().toISOString(), ...report }
+    })
   })
 }
 

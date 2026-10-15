@@ -291,6 +291,8 @@ interface ExportConfig {
 
 `export` 字段落账：每次导出把实际执行结果（嵌入 face 数、跳过原因、子集前后体积、写出的转场页数、写出的动画步骤数）写入 `manifest.json` 的 `exportReport`，随 `revision` 可追溯。
 
+`qaReport` 字段落账：`ppt_check` 与 `ppt_export`（含被质检阻断的路径）都把最近一次质检结果（pass、issue/blocker 计数、完整 issues 列表、检查页子集）写入 `manifest.json` 的 `qaReport`，`revision`/`checkedAt` 由账本现场盖戳——「当初为什么没过」永远可追溯。
+
 ### 3.3 Theme 与子结构
 
 承继条款（v3 不改）：

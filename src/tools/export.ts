@@ -9,7 +9,7 @@
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { buildProjectDeck, checkProject, saveProjectPptx } from '../core/export-pipeline.js'
-import { loadProject, ProjectError, writeExportReport } from '../core/project/store.js'
+import { loadProject, ProjectError, writeExportReport, writeQaReport } from '../core/project/store.js'
 import { renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined {
@@ -55,10 +55,32 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
         const out = args.out as string
         const skipCheck = args.skipCheck === true
 
+        /** 质检摘要（skipCheck 时为 null）；既进 exportReport 也进 qaReport。 */
+        let checkSummary: { pass: boolean; issueCount: number; blockerCount: number } | null = null
+
         if (skipCheck !== true) {
           const check = await checkProject(cwd, dir, { withMissingFonts: true })
+          checkSummary = {
+            pass: check.pass,
+            issueCount: check.issues.length,
+            blockerCount: check.issues.filter((i) => i.severity === 'blocker').length
+          }
           if (!check.pass) {
             const blockers = check.issues.filter((i) => i.severity === 'blocker')
+            // 被阻断也要落账——「当初为什么没过」本身值得可追溯。
+            try {
+              await writeQaReport(cwd, dir, {
+                tool: 'ppt_export',
+                pass: false,
+                issueCount: check.issues.length,
+                blockerCount: blockers.length,
+                issues: check.issues,
+                pages: null,
+                ai: null
+              })
+            } catch {
+              /* 落账是副产物 */
+            }
             return {
               ok: false,
               error: {
@@ -68,6 +90,12 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
               },
               check: { pass: false, blockerCount: blockers.length }
             }
+          }
+          // 质检通过：同样落账（tool 标 ppt_export，与 ppt_check 的落账区分开）。
+          try {
+            await writeQaReport(cwd, dir, { tool: 'ppt_export', ...checkSummary, issues: check.issues, pages: null, ai: null })
+          } catch {
+            /* 落账是副产物 */
           }
         }
 
@@ -103,7 +131,9 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
                 skippedDetail: saved.fontEmbed.skipped
               }
             : { mode: 'off' as const },
-          buildWarnings: pipeline.buildWarnings
+          buildWarnings: pipeline.buildWarnings,
+          /** 本次导出门禁的质检摘要（skipCheck 时为 null）。 */
+          check: checkSummary
         }
         await writeExportReport(cwd, dir, report)
 

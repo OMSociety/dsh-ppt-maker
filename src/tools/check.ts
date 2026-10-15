@@ -10,6 +10,7 @@
  * advisory only — they never block; rule-layer blockers do.
  */
 import { checkProject } from '../core/export-pipeline.js'
+import { writeQaReport } from '../core/project/store.js'
 import { sessionIdOf, renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined {
@@ -84,6 +85,22 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
               }
             : {})
         })
+
+        // 质检落账（best-effort）：报告随 revision 可追溯，落账失败不反噬质检结论。
+        try {
+          const blockers = result.issues.filter((i) => i.severity === 'blocker').length
+          await writeQaReport(cwd, dir, {
+            tool: 'ppt_check',
+            pass: result.pass,
+            issueCount: result.issues.length,
+            blockerCount: blockers,
+            issues: result.issues,
+            pages: (args.pages as number[] | undefined) ?? null,
+            ai: ai ? (result.ai ?? null) : null
+          })
+        } catch {
+          /* 落账是副产物：manifest 写不动时质检结果仍然有效 */
+        }
 
         return { ok: true, ...result }
       } catch (err) {
