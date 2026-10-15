@@ -75,8 +75,6 @@
 
 > **依赖**：工具链全 TS，主链无 Python。`ppt_render` 用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。Python 脚本（`skills/ppt-maker/scripts/`）仅作逃生舱，见 SKILL.md「六、Python 逃生舱」。
 
-> **提示**：桌面增强轨道（kimi.com 网页编辑器导出，`export_pptx.py` / `export_images.py`）**已弃用**——字体嵌入与淡入淡出转场已由本地 TS 导出链路原生提供，全程离线。这两个脚本将于下个次版本删除，仍在使用的用户直接升级即可获得等价产物。
-
 ## 质检体系
 
 **规则层**（阻断式，导出前默认跑）：文字溢出（`@office-kit/pptx-preview` 的 `auditTextLayout`）、出界、重叠、对比度（WCAG 相对亮度比 ≥3）、结构健全（`validatePresentation`）、缺字体（libreoffice-kit 的 `missingFonts` 诊断）。blocker 不修掉 `ppt_export` 不给出文件。

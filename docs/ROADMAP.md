@@ -25,7 +25,7 @@
 | 10 | 逆向 | 轻改走**外科手术模式**（loadPresentation 直接 patch 文本/图片/页序，L1 passthrough 契约保未建模部件）；全量逆向 PPTD 是 opt-in 高阶动作；不支持元素**插占位提示** |
 | 11 | 字体嵌入 | fflate 后处理注入 fntdata（库无 API，已实测）；字体解析用宿主已有 **fontkit**（不手写 TTC 重建）；子集化默认 subset；fsType=Preview&Print 嵌入+警告；预览加载嵌入字体 |
 | 12 | CJK 兜底字体 | **砍**。预子集化撞上未覆盖字即哑弹，且与字体嵌入功能重复；改为嵌入实际用到的字体 + missingFonts 警告。西文/等宽小子集（Inter/JetBrains Mono）可打包 |
-| 13 | 桌面轨道 | 限期删除：本版 deprecated + 入口提示，下个次版本删 export_pptx.py/export_images.py/export_host.html |
+| 13 | 桌面轨道 | **已执行**：export_pptx.py / export_images.py / export_host.html 及对应 pytest（test_export_pptx.py / test_export_images.py）已删除；逃生舱三件套（pptd_to_pptx / pptd_to_png / check_fonts）按决策 #5 保留 |
 | 14 | LibreOffice 精确预览 | 进 PR（用宿主已有 libreoffice-kit，渲染成品 pptx 页面 PNG） |
 
 ## 重排后的实施顺序
