@@ -1107,6 +1107,17 @@ function svgPathToCustomGeometry(
  * Animations & transitions
  * ------------------------------------------------------------------ */
 
+/**
+ * Spec §3.2 `export.transition: "auto"` 的策展词表：逐页轮换，避免 AI 生成
+ * 的 deck 页与页之间全是同一种淡入。页级 `Page.transition` 记录（逆向方言）
+ * 仍然以页级为准，不受此表影响。
+ */
+const AUTO_TRANSITION_CURATED: ReadonlyArray<{ effect: string; direction?: string }> = [
+  { effect: 'fade' },
+  { effect: 'push', direction: 'r' },
+  { effect: 'wipe', direction: 'r' }
+]
+
 function applyAnimations(
   slide: SlideData,
   page: Page,
@@ -1414,11 +1425,20 @@ export function createOfficeKitEngine(): DeckEngine {
           if (profile === 'reverse' && page.transition) {
             if (applyTransition(slide, page.transition, ctx, pageLabel)) stats.transitionPages++
           } else {
+            const curated =
+              transitionMode === 'auto'
+                ? AUTO_TRANSITION_CURATED[pageIndex % AUTO_TRANSITION_CURATED.length]
+                : { effect: 'fade' }
             try {
-              setSlideTransition(slide, { effect: 'fade', speed: 'fast', advanceOnClick: true })
+              setSlideTransition(slide, {
+                effect: curated.effect as never,
+                ...(curated.direction !== undefined ? { direction: curated.direction } : {}),
+                speed: 'fast',
+                advanceOnClick: true
+              })
               stats.transitionPages++
             } catch (err) {
-              warnings.push(`${pageLabel}：默认淡入转场写入失败：${(err as Error).message}`)
+              warnings.push(`${pageLabel}：deck 级转场 ${curated.effect} 写入失败：${(err as Error).message}`)
             }
           }
         }

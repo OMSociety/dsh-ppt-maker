@@ -273,7 +273,7 @@ deck 级新增字段，控制导出产物（`.pptx`）的三项全局行为。�
 ```ts
 interface ExportConfig {
   fontEmbed?: "subset" | "full" | "off";   // 默认 "subset"；字体嵌入档位，见 §9
-  transition?: "fade" | "none";            // 默认 "fade"；deck 级转场，见 §8.1
+  transition?: "fade" | "none" | "auto";    // 默认 "fade"；deck 级转场，见 §8.1
   animations?: "auto" | "off";             // 默认 "auto"；是否写出页级动画，见 §7.8
 }
 ```
@@ -285,6 +285,7 @@ interface ExportConfig {
 | | `off` | 不嵌入字体；目标机需自行安装，否则回落替代字体并触发 `missingFonts` 警告 |
 | `transition` | `fade`（默认） | 对没有页级转场记录的页写淡入淡出转场（`spd="fast"`、`advClick="1"`）；逆向方言里已有 `page.transition` 的页以页级为准 |
 | | `none` | 导出产物任何页根级都不写 `<p:transition>`（含逆向方言的页级记录） |
+| | `auto` | 对没有页级转场记录的页按策展词表逐页轮换 `fade → push(dir=r) → wipe(dir=r)`（`spd="fast"`、`advClick="1"`）；策展词表是引擎层的固定常量，目的是让 AI 生成的 deck 页间有节奏变化而非清一色淡入；逆向方言里已有 `page.transition` 的页仍以页级为准 |
 | `animations` | `auto`（默认） | 按各页 `animations` 数组写出 `<p:timing>`；逆向方言里 `effect: null` 的未建模步骤跳过并计入导出摘要 |
 | | `off` | 不写任何 `<p:timing>`，页级 `animations` 保留在 PPTD 里但不落到产物 |
 
@@ -687,10 +688,11 @@ animations:
 
 ### 8.1 deck 级：export.transition
 
-生成方言只有 deck 级转场，取值 `fade`（默认）或 `none`：
+生成方言只有 deck 级转场，取值 `fade`（默认）、`none` 或 `auto`（§3.2）：
 
 - `fade`：对每页写 `<p:transition spd="fast" advClick="1"><p:fade/></p:transition>`；
-- `none`：任何页都不写 `<p:transition>`。
+- `none`：任何页都不写 `<p:transition>`；
+- `auto`：对没有页级转场记录的页按固定策展词表逐页轮换 `fade → push(dir=r) → wipe(dir=r)`（同样 `spd="fast"`、`advClick="1"`）。
 
 速度固定 `fast`（0.5 s），不开放配置；`fade` 不启用 `thruBlack`（过黑）。页级差异化转场属逆向方言（§8.2）。
 

@@ -108,6 +108,19 @@ describe('officekit engine', () => {
     expect(getSlideTransition(getSlides(noneBack)[0])).toBeNull()
   })
 
+  it('rotates the curated transition table for export.transition=auto', async () => {
+    const engine = createOfficeKitEngine()
+    const page: Page = { elements: [] }
+    const built = await engine.buildDeck(
+      { deck: deck({ export: { fontEmbed: 'off', transition: 'auto', animations: 'off' } }), pages: [page, page, page, page] },
+      ctx()
+    )
+    const bytes = await engine.saveDeck(built.native)
+    const back = await loadPresentation(bytes)
+    const effects = getSlides(back).map((s) => getSlideTransition(s)?.effect)
+    expect(effects).toEqual(['fade', 'push', 'wipe', 'fade'])
+  })
+
   it('collects unsupported features as warnings instead of failing', async () => {
     const engine = createOfficeKitEngine()
     const page: Page = {

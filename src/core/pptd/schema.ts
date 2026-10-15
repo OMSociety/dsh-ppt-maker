@@ -383,7 +383,8 @@ export const SCHEME_REF_PREFIX = 'scheme:'
  * ------------------------------------------------------------------ */
 
 export type ExportFontEmbed = 'subset' | 'full' | 'off'
-export type ExportTransition = 'fade' | 'none'
+/** Spec §3.2 — `"auto"` 按策展词表逐页轮换（fade → push → wipe），其余语义见 §8.1。 */
+export type ExportTransition = 'fade' | 'none' | 'auto'
 export type ExportAnimations = 'auto' | 'off'
 
 /** Spec §3.2 — the export contract. Three independent fields, all optional. */
