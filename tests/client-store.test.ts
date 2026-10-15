@@ -15,6 +15,7 @@ const mockApi = vi.hoisted(() => ({
   edit: vi.fn(),
   undo: vi.fn(),
   redo: vi.fn(),
+  restoreHistory: vi.fn(),
   uploadMedia: vi.fn(),
   exportPptxToProject: vi.fn(),
   mediaUrl: vi.fn(() => '/ppt-maker/api/media'),
@@ -198,6 +199,25 @@ describe('PptStore（S6 骨架纪律）', () => {
     await store.actions.undo()
     expect(mockApi.undo).toHaveBeenCalledWith('s1', 'k1')
     expect(store.getSnapshot().lastSeenRevision).toBe(1)
+    store.dispose()
+  })
+
+  it('restoreRevision：成功推游标并清选择；409 挂 conflict 横幅', async () => {
+    const store = seedStore()
+    await store.actions.init()
+    mockApi.restoreHistory.mockResolvedValueOnce({ revision: 0, undoneOps: ['add_page'], warnings: [] })
+    const ok = await store.actions.restoreRevision(0)
+    expect(ok).toBe(true)
+    expect(mockApi.restoreHistory).toHaveBeenCalledWith('s1', 'k1', 0, 1)
+    const snap = store.getSnapshot()
+    expect(snap.lastSeenRevision).toBe(0)
+    expect(snap.selection).toBeNull()
+    expect(snap.conflict).toBeNull()
+
+    mockApi.restoreHistory.mockRejectedValueOnce(new ConflictError(7))
+    const ok2 = await store.actions.restoreRevision(1)
+    expect(ok2).toBe(false)
+    expect(store.getSnapshot().conflict).toEqual({ revision: 7 })
     store.dispose()
   })
 

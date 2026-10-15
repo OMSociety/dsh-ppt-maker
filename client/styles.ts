@@ -344,6 +344,63 @@ export const CSS = `
   display:flex;align-items:center;gap:4px;font-size:10px;
   color:var(--dsw-alias-label-secondary);
 }
+/* ── 版本历史抽屉（覆盖在画布上，右对齐；列表 + 直渲预览 + 恢复） ── */
+.ppt-history{
+  position:absolute;top:0;right:0;bottom:0;width:300px;z-index:20;
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--dsw-alias-bg-base);
+  border-left:1px solid var(--dsw-alias-border-l2);
+  box-shadow:-6px 0 16px rgba(0,0,0,0.12);
+}
+.ppt-history-head{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;flex:none;
+  border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;
+}
+.ppt-history-head-meta{font-size:10.5px;color:var(--dsw-alias-label-secondary)}
+.ppt-history-error{
+  flex:none;padding:6px 10px;font-size:11px;
+  color:var(--dsw-alias-label-primary);
+  background:var(--dsw-alias-interactive-bg-hover);
+}
+.ppt-history-hint{flex:none;padding:8px 10px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.ppt-history-preview{
+  flex:none;display:flex;flex-direction:column;gap:6px;padding:8px 10px;
+  border-bottom:1px solid var(--dsw-alias-border-l2);
+}
+.ppt-history-pptd{
+  width:100%;aspect-ratio:16/9;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:4px;overflow:hidden;background:#fff;
+}
+.ppt-history-pager{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:11px;color:var(--dsw-alias-label-secondary);
+}
+.ppt-history-warn,.ppt-history-loading{
+  font-size:10.5px;color:var(--dsw-alias-label-secondary);
+}
+.ppt-history-actions{display:flex;justify-content:center}
+.ppt-history-list{flex:1 1 auto;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:3px}
+.ppt-history-row{
+  display:flex;flex-direction:column;gap:2px;text-align:left;
+  padding:6px 8px;border-radius:5px;border:1px solid transparent;cursor:pointer;
+  font-size:11px;color:var(--dsw-alias-label-primary);
+  background:transparent;
+}
+.ppt-history-row:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ppt-history-row-on{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-interactive-bg-hover)}
+.ppt-history-rev{display:flex;align-items:center;gap:6px;font-weight:600}
+.ppt-history-tag{
+  font-style:normal;font-size:9.5px;font-weight:400;line-height:14px;padding:0 4px;
+  border-radius:3px;border:1px solid var(--dsw-alias-border-l2);
+  color:var(--dsw-alias-label-secondary);
+}
+.ppt-history-tag-on{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-border-l1)}
+.ppt-history-ops{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:10px;color:var(--dsw-alias-label-secondary);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ppt-history-time{font-size:10px;color:var(--dsw-alias-label-secondary)}
 `
 
 /** 幂等注入样式表（重复挂载只插一次；HMR 卸载由调用方决定是否移除）。 */

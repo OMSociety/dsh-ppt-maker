@@ -7,9 +7,9 @@
  */
 import * as React from 'react'
 import type { PptStore } from '../store'
-import { ExportGlyph, RedoGlyph, UndoGlyph } from '../icons'
+import { ExportGlyph, HistoryGlyph, RedoGlyph, UndoGlyph } from '../icons'
 
-export function Toolbar({ store }: { store: PptStore }) {
+export function Toolbar({ store, onShowHistory }: { store: PptStore; onShowHistory?: () => void }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const disabled = !state.activeKey || state.saving
   const inConflict = Boolean(state.conflict || state.externalChange)
@@ -55,6 +55,15 @@ export function Toolbar({ store }: { store: PptStore }) {
           title="导出 .pptx 到工程目录的 export/ 下"
         >
           <ExportGlyph size={13} /> 导出 .pptx
+        </button>
+        <button
+          type="button"
+          className="ppt-btn"
+          disabled={disabled}
+          onClick={() => onShowHistory?.()}
+          title="版本历史：预览并恢复到任意历史版本"
+        >
+          <HistoryGlyph size={13} /> 历史
         </button>
       </div>
       {state.conflict ? (

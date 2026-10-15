@@ -561,6 +561,40 @@ export function createPptStore(sessionId: string) {
     },
 
     /**
+     * 「恢复到历史版本」：与 undo/redo 同为游标移动，只是目标显式（版本历史抽屉用）。
+     * baseRevision 取 lastSeenRevision——和编辑同一条修订基线；409 时亮冲突横幅。
+     */
+    async restoreRevision(revision: number): Promise<boolean> {
+      if (!state.activeKey) return false
+      if (!(await actions.applyDraft())) return false
+      const key = state.activeKey
+      try {
+        const res = await api.restoreHistory(state.sessionId, key, revision, state.lastSeenRevision)
+        patch({
+          lastSeenRevision: res.revision,
+          conflict: null,
+          externalChange: null,
+          currentPageData: null,
+          currentPageRevision: -1,
+          pagesAst: {},
+          selection: null,
+          canUndo: res.revision > 0,
+          canRedo: true,
+        })
+        void actions.ensurePageLoaded()
+        void actions.syncProjectPages()
+        toast(`已恢复到 r${res.revision}`, 'info')
+        return true
+      } catch (error) {
+        if (error instanceof ConflictError) {
+          patch({ conflict: { revision: error.revision } })
+        }
+        toast(`恢复失败：${(error as Error).message}`, 'error')
+        return false
+      }
+    },
+
+    /**
      * 「导出 .pptx」：宿主把 pptx 落到工程目录 `export/` 下，回相对路径 + 字节数。
      * 不走浏览器下载——桌面外壳的下载没有可回读的落点，磁盘上的文件才是确定的结果，
      * 所以这里只报告落点（store 不碰 DOM）。

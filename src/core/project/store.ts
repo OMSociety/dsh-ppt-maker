@@ -35,8 +35,10 @@ import {
   materializeSnapshot,
   pruneAbove,
   readSnapshotState,
+  revisionLabel,
   sha1Of,
   verifyMedia,
+  type SnapshotMeta,
   type SnapshotState
 } from './history.js'
 
@@ -669,4 +671,72 @@ export async function projectUndoState(
   const snapshots = await listSnapshots(abs)
   const max = snapshots.length > 0 ? snapshots[snapshots.length - 1].revision : 0
   return { canUndo: loaded.manifest.revision > 0, canRedo: loaded.manifest.revision < max }
+}
+
+/* ------------------------------------------------------------------ *
+ * Version history（用户可见的版本列表 / 预览 / 恢复）
+ * ------------------------------------------------------------------ */
+
+/** 版本历史列表：游标当前位置 + 全部快照元数据（升序）。 */
+export interface HistoryListResult {
+  /** manifest.revision——游标当前位置。 */
+  revision: number
+  entries: SnapshotMeta[]
+}
+
+export async function listProjectHistory(cwd: string, dir: string): Promise<HistoryListResult> {
+  const abs = resolveProjectDir(cwd, dir)
+  const loaded = await loadProject(cwd, dir)
+  const entries = await listSnapshots(abs)
+  return { revision: loaded.manifest.revision, entries }
+}
+
+export interface HistorySnapshotResult {
+  revision: number
+  deck: Presentation | null
+  pages: Array<{ path: string; page: Page | null }>
+  warnings: string[]
+}
+
+function formatParseIssue(issue: Issue): string {
+  return `[${issue.level}/${issue.code}] ${issue.path ?? ''} ${issue.message}`.trim()
+}
+
+/** 读一份历史快照并按 PPTD 解析（供面板画布直渲预览；只读，绝不动工程文件）。 */
+export async function readHistorySnapshot(
+  cwd: string,
+  dir: string,
+  revision: number
+): Promise<HistorySnapshotResult | null> {
+  const abs = resolveProjectDir(cwd, dir)
+  const state = await readSnapshotState(abs, revision)
+  if (!state) return null
+  const label = revisionLabel(revision)
+  const warnings: string[] = []
+  const deckParsed = parseDeckText(state.deck, `.history/${label}/deck.pptd`)
+  warnings.push(...deckParsed.issues.map(formatParseIssue))
+  const pages: Array<{ path: string; page: Page | null }> = []
+  for (const [rel, text] of [...state.pages.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const parsed = parsePageText(text, `.history/${label}/${rel}`)
+    warnings.push(...parsed.issues.map(formatParseIssue))
+    pages.push({ path: rel, page: parsed.value })
+  }
+  return { revision, deck: deckParsed.value, pages, warnings }
+}
+
+/**
+ * 恢复到指定历史版本：游标移动到目标 revision——undo/redo 的同一件事换成
+ * 显式目标。复用 moveCursor 的快照物化与素材 hash 校验（历史 rule 3）；
+ * 目标就是当前版本时是安全的 no-op。
+ */
+export async function restoreProject(cwd: string, dir: string, targetRevision: number): Promise<UndoRedoResult> {
+  if (!Number.isInteger(targetRevision) || targetRevision < 0) {
+    throw new ProjectError('InvalidRevision', '目标 revision 必须是 ≥0 的整数', { status: 400 })
+  }
+  const loaded = await loadProject(cwd, dir)
+  const current = loaded.manifest.revision
+  if (targetRevision === current) {
+    return { revision: current, undoneOps: [], warnings: ['目标版本就是当前版本，无需恢复'] }
+  }
+  return moveCursor(cwd, dir, targetRevision, targetRevision < current ? 'undo' : 'redo')
 }

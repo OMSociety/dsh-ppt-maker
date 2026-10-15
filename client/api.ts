@@ -105,6 +105,31 @@ export interface MediaUploadResult {
   bytes: number
 }
 
+/** 版本历史条目（.history 快照元数据；与 src/core/project/history.ts 的 SnapshotMeta 对齐）。 */
+export interface HistoryEntry {
+  revision: number
+  parentRevision: number
+  createdAt: string
+  windowStartedAt: string
+  sessionId: string | null
+  ops: string[]
+  mergedCount: number
+  anchor: boolean
+}
+
+export interface HistoryListPayload {
+  /** manifest.revision——游标当前位置。 */
+  revision: number
+  entries: HistoryEntry[]
+}
+
+export interface HistorySnapshotPayload {
+  revision: number
+  deck: { size: [number, number]; title?: string } | null
+  pages: Array<{ path: string; page: unknown }>
+  warnings: string[]
+}
+
 const PREFIX = '/ppt-maker/api'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -234,5 +259,30 @@ export const api = {
       revision: Number(payload?.revision || 0),
       bytes: Number(payload?.bytes || 0),
     }
+  },
+
+  /** 版本历史列表：游标位置 + 全部快照元数据（升序）。 */
+  async listHistory(sessionId: string, key: string): Promise<HistoryListPayload> {
+    const params = `sessionId=${encodeURIComponent(sessionId)}&key=${encodeURIComponent(key)}`
+    return call<HistoryListPayload>(`/history?${params}`)
+  },
+
+  /** 读一份历史快照（已按 PPTD 解析，面板画布直渲预览用；只读，不动工程）。 */
+  async getHistoryPages(sessionId: string, key: string, revision: number): Promise<HistorySnapshotPayload> {
+    const params = `sessionId=${encodeURIComponent(sessionId)}&key=${encodeURIComponent(key)}&revision=${revision}`
+    return call<HistorySnapshotPayload>(`/history/pages?${params}`)
+  },
+
+  /** 恢复到指定历史版本；baseRevision 过期 → 409 ConflictError。 */
+  async restoreHistory(
+    sessionId: string,
+    key: string,
+    revision: number,
+    baseRevision: number,
+  ): Promise<{ revision: number; undoneOps: string[]; warnings: string[] }> {
+    return call(`/history/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, key, revision, baseRevision }),
+    })
   },
 }

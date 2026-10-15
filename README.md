@@ -26,10 +26,10 @@
 | **工具层直出** | 11 个 `ppt_*` 工具（raw JSON-Schema 注册）：创建/编辑/撤销/重做/渲染/质检/导出/导入/打开/外科手术，引擎 `@office-kit/pptx@0.24.0` 本地纯 TS 构建最终 .pptx，不依赖 Python 主链 |
 | **双向性** | 读取并改写既有 .pptx：`ppt_import` 全量逆向进 PPTD 工程（图表/SmartArt/OLE 自动落灰底占位），`ppt_patch` 外科手术（改字/换图/调页序）不走 PPTD 往返，库级 L1 passthrough 保住未建模部件 |
 | **PPTD v3** | 自主契约的 YAML DSL（`deck.pptd` + `pages/*.page`），单页自包含、可视即所得；双方言（generate 生成 / reverse 逆向超集） |
-| **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板），所见即所得：双击文字就地改、拖拽调页序、图片一键替换、撤销/重做、409 冲突提示与「外部已修改」banner |
-| **质检分层** | 规则层（文字溢出/出界/重叠/对比度/结构/缺字体）阻断式，blocker 拦导出；AI 层按需（`ppt_check ai:true`）把最终渲染页 PNG 送多模态模型看配色/层级/平衡，只出建议不阻断 |
+| **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板），所见即所得：双击文字就地改、拖拽调页序、图片一键替换、撤销/重做、版本历史（画布直渲预览任意快照并一键恢复）、409 冲突提示与「外部已修改」banner |
+| **质检分层** | 规则层（文字溢出/出界/重叠/对比度/结构/缺字体）阻断式，blocker 拦导出；AI 层按需（`ppt_check ai:true`）把最终渲染页 PNG 送多模态模型看配色/层级/平衡，只出建议不阻断；结果落账 `manifest.qaReport`（含被阻断的导出），随 revision 可追溯 |
 | **字体嵌入** | 导出自动嵌入实际用到的字体（EOT 封装 `fntdata` + `embeddedFontLst`），未装字体的机器渲染不回落；子集/整字体/关闭三档（`export.fontEmbed`），逐字体 fsType 许可闸，`ppt_check` 预检许可与替代建议 |
-| **转场与动画** | 页面级淡入淡出转场（`export.transition`）与元素入场动画（`export.animations`，95 种 preset 词表），本地链路原生写出 |
+| **转场与动画** | 页面级转场（`export.transition`：`fade` 默认 / `none` / `auto` 策展轮换 fade→push→wipe）与元素入场动画（`export.animations`，95 种 preset 词表），本地链路原生写出 |
 | **修订与快照** | manifest.json 单一写者 + append-only 快照（游标模型，undo/redo 天然成立）+ baseRevision 乐观锁（409） |
 | **设计系统** | 内置学术 / 咨询 / 金融 / 促销 / 工作五族预设主题，选题后整套版式配色层级一致 |
 | **本地渲染预览** | 面板画布与缩略图直接渲染 PPTD 元素为 DOM（矢量、秒出、与选择框同源同坐标系）；`ppt_render` / 质检的 PNG 预览与 AI 截图仍走 `@deepseek-ai/libreoffice-kit` 光栅化最终 pptx，每页（page, revision）磁盘缓存 |

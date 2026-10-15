@@ -45,6 +45,9 @@ export const MAX_ASSET_BYTES = 5 * 1024 * 1024
  * @property {(cwd: string, options: object) => Promise<object>} editProject
  * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} undoProject
  * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} redoProject
+ * @property {(cwd: string, dir: string) => Promise<object>} listProjectHistory
+ * @property {(cwd: string, dir: string, revision: number) => Promise<object | null>} readHistorySnapshot
+ * @property {(cwd: string, dir: string, targetRevision: number) => Promise<object>} restoreProject
  * @property {(cwd: string, dir: string) => Promise<object>} buildProjectDeck
  * @property {(pipeline: object) => Promise<{ bytes: Uint8Array, fontEmbed: object | null }>} saveProjectPptx
  * @property {(cwd: string, dir: string, report: unknown) => Promise<void>} writeExportReport
@@ -200,7 +203,7 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
   if (!core || typeof core.editProject !== 'function' || typeof core.loadProject !== 'function') {
     throw new Error('createApiHandler 需要 deps.core（{ loadProject, editProject, undoProject, redoProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError }）')
   }
-  const { editProject, loadProject, undoProject, redoProject, projectUndoState, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError } = core
+  const { editProject, loadProject, undoProject, redoProject, projectUndoState, listProjectHistory, readHistorySnapshot, restoreProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError } = core
   const ss = storeOverride || sessionStore
 
   function sessionOf(source, url) {
@@ -341,6 +344,25 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
         }
       }
 
+      /* ── 版本历史：列表 / 快照预览（只读） ─────────────────────────── */
+
+      if (route === 'GET /history') {
+        const { sessionId, cwd } = sessionOf({}, url)
+        const { dir } = projectOf(ss, sessionId, cwd, String(url.searchParams.get('key') || ''))
+        const result = await listProjectHistory(cwd, dir)
+        return json(res, 200, { ok: true, ...result })
+      }
+
+      if (route === 'GET /history/pages') {
+        const { sessionId, cwd } = sessionOf({}, url)
+        const { dir } = projectOf(ss, sessionId, cwd, String(url.searchParams.get('key') || ''))
+        const revision = Number(url.searchParams.get('revision'))
+        if (!Number.isInteger(revision) || revision < 0) return fail(res, 400, 'revision 必须是 ≥0 的整数')
+        const snapshot = await readHistorySnapshot(cwd, dir, revision)
+        if (!snapshot) return fail(res, 404, `快照 r${String(revision).padStart(4, '0')} 不存在`)
+        return json(res, 200, { ok: true, ...snapshot })
+      }
+
       if (route === 'GET /media') {
         const { sessionId, cwd } = sessionOf({}, url)
         const { abs } = projectOf(ss, sessionId, cwd, String(url.searchParams.get('key') || ''))
@@ -455,6 +477,32 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
           'cache-control': 'no-store',
         })
         return res.end(buffer)
+      }
+
+      if (route === 'POST /history/restore') {
+        const { sessionId, cwd } = sessionOf(body, url)
+        const key = String(body.key || '')
+        const { dir } = projectOf(ss, sessionId, cwd, key)
+        // 与 /edit 同口径：baseRevision 缺失是编程错误给 400；不匹配给 409 带最新 revision。
+        if (body.baseRevision === undefined || body.baseRevision === null) {
+          return fail(res, 400, '恢复必须带 baseRevision（面板版本过旧时刷新页面）')
+        }
+        if (typeof body.baseRevision !== 'number' || !Number.isFinite(body.baseRevision)) {
+          return fail(res, 400, 'baseRevision 必须是数字')
+        }
+        const revision = Number(body.revision)
+        if (!Number.isInteger(revision) || revision < 0) return fail(res, 400, 'revision 必须是 ≥0 的整数')
+        const loaded = await loadProject(cwd, dir)
+        if (loaded.manifest.revision !== body.baseRevision) {
+          return json(res, 409, {
+            ok: false,
+            error: 'revision 冲突：工程已被其它写入推进，刷新历史列表后重试',
+            conflict: { revision: loaded.manifest.revision },
+          })
+        }
+        const result = await restoreProject(cwd, dir, revision)
+        ss.markSeenRevision(sessionId, key, result.revision)
+        return json(res, 200, { ok: true, revision: result.revision, undoneOps: result.undoneOps, warnings: result.warnings })
       }
 
       if (route === 'POST /active') {

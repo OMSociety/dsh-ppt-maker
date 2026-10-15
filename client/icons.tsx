@@ -102,3 +102,14 @@ export function ImportGlyph(props: GlyphProps) {
     </GlyphSvg>
   )
 }
+
+/** 「版本历史」：两片叠放的版本卡片（后片虚一档，前片实）。 */
+export function HistoryGlyph(props: GlyphProps) {
+  return (
+    <GlyphSvg {...props}>
+      <path d="M4.5 2A1.5 1.5 0 0 0 3 3.5v8A1.5 1.5 0 0 0 4.5 13H5v-1h-.5a.5.5 0 0 1-.5-.5v-8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5V5h1V3.5A1.5 1.5 0 0 0 12 2H4.5Z" opacity="0.45" />
+      <path d="M6.5 4A1.5 1.5 0 0 0 5 5.5v7A1.5 1.5 0 0 0 6.5 14h7a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 13.5 4h-7ZM6 5.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5v-7Z" />
+      <path d="M7.6 8.6a.5.5 0 0 1 .7-.7l.7.7V6.5a.5.5 0 0 1 1 0v1.9l.7-.7a.5.5 0 0 1 .7.7l-1.5 1.5a.5.5 0 0 1-.7 0l-1.6-1.3Z" />
+    </GlyphSvg>
+  )
+}

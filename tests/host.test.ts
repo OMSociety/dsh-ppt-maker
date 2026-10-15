@@ -24,10 +24,13 @@ import { API_PREFIX, createApiHandler, MAX_ASSET_BYTES, sameOrigin } from '../pl
 import {
   createProject,
   editProject,
+  listProjectHistory,
   loadProject,
   ProjectError,
   projectUndoState,
+  readHistorySnapshot,
   redoProject,
+  restoreProject,
   undoProject,
   writeExportReport,
 } from '../src/core/project/store.js'
@@ -43,6 +46,9 @@ const core = {
   undoProject,
   redoProject,
   projectUndoState,
+  listProjectHistory,
+  readHistorySnapshot,
+  restoreProject,
   buildProjectDeck,
   saveProjectPptx,
   writeExportReport,
@@ -475,5 +481,98 @@ describe('host 路由', () => {
     await startServer()
     const r1 = await api(`${API_PREFIX}/project?sessionId=${SESSION}&key=nope`)
     expect(r1.status).toBe(404)
+  })
+})
+
+// ── 版本历史路由：列表 / 快照预览 / 恢复 ─────────────────────────────
+
+describe('版本历史路由', () => {
+  /** 造一个三 revision 的工程：r0 锚点 → r1 加页（text=v1）→ r2 改字（text=v2）。 */
+  async function seedHistoryProject() {
+    const { key, dir } = await seedProject('hist')
+    const e1 = await editProject(cwd, {
+      dir,
+      baseRevision: 0,
+      ops: [
+        { op: 'add_page', page: 'pages/01.page', content: { elements: [] } },
+        { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [10, 10, 200, 40], content: 'v1' } },
+      ],
+      sessionId: SESSION,
+    })
+    expect(e1.revision).toBe(1)
+    const e2 = await editProject(cwd, {
+      dir,
+      baseRevision: 1,
+      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: 'v2' } }],
+      sessionId: SESSION,
+    })
+    expect(e2.revision).toBe(2)
+    return { key, dir }
+  }
+
+  it('GET /history 列表带游标位置，GET /history/pages 回解析后的快照', async () => {
+    await startServer()
+    const { key } = await seedHistoryProject()
+
+    const list = await apiJson(`${API_PREFIX}/history?sessionId=${SESSION}&key=${key}`)
+    expect(list.status).toBe(200)
+    expect(list.json!.revision).toBe(2)
+    const entries = list.json!.entries as Array<{ revision: number; anchor: boolean; ops: string[] }>
+    expect(entries.map((e) => e.revision)).toEqual([0, 1, 2])
+    expect(entries[0].anchor).toBe(true)
+
+    const snap = await apiJson(`${API_PREFIX}/history/pages?sessionId=${SESSION}&key=${key}&revision=1`)
+    expect(snap.status).toBe(200)
+    expect(snap.json!.revision).toBe(1)
+    const deck = snap.json!.deck as { size: [number, number] }
+    expect(deck.size).toEqual([960, 540])
+    const pages = snap.json!.pages as Array<{ path: string; page: { elements: Array<{ content?: string }> } | null }>
+    expect(pages).toHaveLength(1)
+    expect(pages[0].page?.elements[0]?.content).toBe('v1')
+
+    const missing = await apiJson(`${API_PREFIX}/history/pages?sessionId=${SESSION}&key=${key}&revision=99`)
+    expect(missing.status).toBe(404)
+    const badRev = await apiJson(`${API_PREFIX}/history/pages?sessionId=${SESSION}&key=${key}&revision=-1`)
+    expect(badRev.status).toBe(400)
+  })
+
+  it('POST /history/restore 恢复旧版本，baseRevision 过期给 409', async () => {
+    await startServer()
+    const { key, dir } = await seedHistoryProject()
+
+    const conflict = await apiJson(`${API_PREFIX}/history/restore`, {
+      method: 'POST',
+      body: { sessionId: SESSION, key, revision: 1, baseRevision: 99 },
+    })
+    expect(conflict.status).toBe(409)
+    expect((conflict.json!.conflict as { revision: number }).revision).toBe(2)
+
+    const restored = await apiJson(`${API_PREFIX}/history/restore`, {
+      method: 'POST',
+      body: { sessionId: SESSION, key, revision: 1, baseRevision: 2 },
+    })
+    expect(restored.status).toBe(200)
+    expect(restored.json!.revision).toBe(1)
+    const loaded = await loadProject(cwd, dir)
+    expect(loaded.manifest.revision).toBe(1)
+    const page = loaded.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
+    expect(page.elements[0].content).toBe('v1')
+
+    // 前向恢复（undo 之后再 redo 到 r2）同样可用
+    const forward = await apiJson(`${API_PREFIX}/history/restore`, {
+      method: 'POST',
+      body: { sessionId: SESSION, key, revision: 2, baseRevision: 1 },
+    })
+    expect(forward.status).toBe(200)
+    const loaded2 = await loadProject(cwd, dir)
+    expect(loaded2.manifest.revision).toBe(2)
+    const page2 = loaded2.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
+    expect(page2.elements[0].content).toBe('v2')
+
+    const noBase = await apiJson(`${API_PREFIX}/history/restore`, {
+      method: 'POST',
+      body: { sessionId: SESSION, key, revision: 0 },
+    })
+    expect(noBase.status).toBe(400)
   })
 })
