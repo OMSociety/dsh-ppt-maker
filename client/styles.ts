@@ -56,15 +56,17 @@ export const CSS = `
 .ppt-rail-left{border-right:1px solid var(--dsw-alias-border-l2)}
 .ppt-rail-right{border-left:1px solid var(--dsw-alias-border-l2)}
 .ppt-rail .ppt-thumbs,.ppt-rail .ppt-inspector{border:none}
-/* 栏内收起小按钮（贴边） */
+/* 栏内收起小按钮（与「新页」同处 .ppt-thumbs-head 一行，flex 居中对齐） */
 .ppt-rail-collapse{
-  position:absolute;top:4px;z-index:5;width:16px;height:24px;padding:0;
+  flex:none;width:16px;height:20px;padding:0;
   border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);
   color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:4px;
   font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;
 }
 .ppt-rail-collapse:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
-.ppt-rail-collapse-left{right:2px}
+/* 缩略图条头部行：新页按钮 + 收起按钮；按钮让出右侧固定 16px，不再互相叠压 */
+.ppt-thumbs-head{display:flex;align-items:center;gap:4px}
+.ppt-thumbs-head>.ppt-btn{flex:1;min-width:0}
 .ppt-rail-right .ppt-inspector{position:relative}
 .ppt-inspector-collapse{position:absolute;top:2px;right:2px;width:18px;height:18px;padding:0;font-size:12px;line-height:1}
 /* 收起后的边缘把手（细条，点击展开）：自身一律透明，与宿主同底。

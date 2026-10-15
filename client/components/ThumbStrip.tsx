@@ -5,7 +5,8 @@
  *   1. 按 `deckPages` 排页；每页一张缩略图，用 PptdView 直接渲染该页 AST（DOM 直渲，
  *      不走光栅化 PNG——打开即出、与画布同渲染管线、无 px:pt 系数错位）。
  *   2. 点选 → store.actions.setPage（面板同步到 Stage 与 Inspector）。
- *   3. 悬停动作按钮：复制（page_duplicate）、删除（remove_page）；顶部「+ 新页」（add_page）。
+ *   3. 悬停动作按钮：复制（page_duplicate）、删除（remove_page）；顶部「+ 新页」（add_page），
+ *      与收起按钮同处一行（panel.tsx 经 headerAction 注入，flex 行内天然纵坐标对齐）。
  *
  * 拖拽排序（HTML5 drag & drop）→ move_page：拖一个缩略图到某条间隙，松开即落 op。
  * 拖拽过程 store 不动——只有松手才构造 op（不然每次 over 都发一次请求）。
@@ -21,7 +22,7 @@ interface DragState {
   overIndex: number | null
 }
 
-export function ThumbStrip({ store }: { store: PptStore }) {
+export function ThumbStrip({ store, headerAction }: { store: PptStore; headerAction?: React.ReactNode }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const [drag, setDrag] = React.useState<DragState>({ fromPath: null, overIndex: null })
 
@@ -32,14 +33,17 @@ export function ThumbStrip({ store }: { store: PptStore }) {
   if (!pages.length) {
     return (
       <div className="ppt-thumbs">
-        <button
-          type="button"
-          className="ppt-btn"
-          onClick={() => void store.actions.addPage()}
-          title="add_page"
-        >
-          <NewPageGlyph size={13} /> 新页
-        </button>
+        <div className="ppt-thumbs-head">
+          <button
+            type="button"
+            className="ppt-btn"
+            onClick={() => void store.actions.addPage()}
+            title="add_page"
+          >
+            <NewPageGlyph size={13} /> 新页
+          </button>
+          {headerAction}
+        </div>
         <p style={{ fontSize: 11, color: 'var(--dsw-alias-label-secondary)', padding: '4px 2px' }}>
           还没有页面；先点上面加一张。
         </p>
@@ -75,14 +79,17 @@ export function ThumbStrip({ store }: { store: PptStore }) {
 
   return (
     <div className="ppt-thumbs">
-      <button
-        type="button"
-        className="ppt-btn"
-        onClick={() => void store.actions.addPage()}
-        title="add_page（在末尾追加一页空白页）"
-      >
-        <NewPageGlyph size={13} /> 新页
-      </button>
+      <div className="ppt-thumbs-head">
+        <button
+          type="button"
+          className="ppt-btn"
+          onClick={() => void store.actions.addPage()}
+          title="add_page（在末尾追加一页空白页）"
+        >
+          <NewPageGlyph size={13} /> 新页
+        </button>
+        {headerAction}
+      </div>
       <div className="ppt-thumblist" role="list">
         {pages.map((pagePath, index) => {
           const ast = state.pagesAst[index]

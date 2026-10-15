@@ -156,16 +156,20 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
           {/* 左栏：缩略图条（默认展开，可收起，收起不渲染） */}
           {leftOpen ? (
             <div className="ppt-rail ppt-rail-left">
-              <ThumbStrip store={store} />
-              <button
-                type="button"
-                className="ppt-rail-collapse ppt-rail-collapse-left"
-                onClick={() => setLeftOpen(false)}
-                title="收起页列表"
-                aria-label="收起页列表"
-              >
-                ‹
-              </button>
+              <ThumbStrip
+                store={store}
+                headerAction={
+                  <button
+                    type="button"
+                    className="ppt-rail-collapse"
+                    onClick={() => setLeftOpen(false)}
+                    title="收起页列表"
+                    aria-label="收起页列表"
+                  >
+                    ‹
+                  </button>
+                }
+              />
             </div>
           ) : (
             <button

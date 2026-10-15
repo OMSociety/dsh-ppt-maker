@@ -33,6 +33,15 @@ export function Toolbar({ store, onShowHistory }: { store: PptStore; onShowHisto
         <button
           type="button"
           className="ppt-btn"
+          disabled={disabled}
+          onClick={() => onShowHistory?.()}
+          title="版本历史：预览并恢复到任意历史版本"
+        >
+          <HistoryGlyph size={13} /> 历史
+        </button>
+        <button
+          type="button"
+          className="ppt-btn"
           disabled={disabled || !state.canUndo}
           onClick={() => void store.actions.undo()}
           title="撤销（先提交草稿再撤）"
@@ -55,15 +64,6 @@ export function Toolbar({ store, onShowHistory }: { store: PptStore; onShowHisto
           title="导出 .pptx 到工程目录的 export/ 下"
         >
           <ExportGlyph size={13} /> 导出 .pptx
-        </button>
-        <button
-          type="button"
-          className="ppt-btn"
-          disabled={disabled}
-          onClick={() => onShowHistory?.()}
-          title="版本历史：预览并恢复到任意历史版本"
-        >
-          <HistoryGlyph size={13} /> 历史
         </button>
       </div>
       {state.conflict ? (
