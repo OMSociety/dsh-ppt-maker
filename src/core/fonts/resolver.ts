@@ -74,6 +74,63 @@ function fontkitNameStr(v: unknown): string {
   return ''
 }
 
+/**
+ * fontkit 2.x 的 name 字段全部语言变体：`{ en: 'Alimama ShuHeiTi', zh: '阿里妈妈数黑体' }`。
+ * 索引要收全（设计稿常按中文族名声明字体，只收 en 会搜不到），展示名仍由 fontkitNameStr 取 en。
+ */
+function fontkitNameStrs(v: unknown): string[] {
+  if (typeof v === 'string') return v ? [v] : []
+  if (v !== null && typeof v === 'object') {
+    const rec = v as Record<string, unknown>
+    const out: string[] = []
+    if (typeof rec.en === 'string' && rec.en) out.push(rec.en)
+    for (const [lang, vv] of Object.entries(rec)) {
+      if (lang === 'en') continue
+      if (typeof vv === 'string' && vv && !out.includes(vv)) out.push(vv)
+    }
+    return out
+  }
+  return []
+}
+
+/**
+ * 取 fontkit name 表里某个语义记事的全部语言变体。
+ * fontkit 2.x：`font.name.records.fontFamily = { en: 'Alimama ShuHeiTi', zh: '阿里妈妈数黑体' }`，
+ * 而 `font.familyName` getter 只给 en；1.x 的 records 是数组（按 nameID 区分）。
+ */
+function nameRecordVariants(font: FontkitFont, field: 'fontFamily' | 'fullName' | 'postscriptName'): unknown {
+  const rec = font.name?.records
+  if (Array.isArray(rec)) {
+    const id = field === 'fontFamily' ? 1 : field === 'fullName' ? 4 : 6
+    const vals: Record<string, string> = {}
+    for (const r of rec as Array<{ nameID?: number; language?: string; value?: unknown }>) {
+      if (r?.nameID !== id || typeof r.value !== 'string' || !r.value) continue
+      const lang = typeof r.language === 'string' && r.language ? r.language : 'en'
+      if (!(lang in vals)) vals[lang] = r.value
+    }
+    return Object.keys(vals).length > 0 ? vals : undefined
+  }
+  if (rec !== null && typeof rec === 'object') return (rec as Record<string, unknown>)[field]
+  return undefined
+}
+
+/** 把若干 name 变体（字符串 / {en,zh} 对象）拍平成去重字符串表 */
+function collectNameStrs(variants: unknown[]): string[] {
+  const out: string[] = []
+  for (const v of variants) {
+    for (const s of fontkitNameStrs(v)) if (!out.includes(s)) out.push(s)
+  }
+  return out
+}
+
+const CJK_RE = /[\u3400-\u9fff\uf900-\ufaff]/
+
+/** 取 name 变体里第一个含中日韩字符的（用于 familyNameZh 诊断字段） */
+function pickCjkName(variants: unknown[]): string | null {
+  for (const s of collectNameStrs(variants)) if (CJK_RE.test(s)) return s
+  return null
+}
+
 /** 族名归一化（与 check_fonts.py present() 同口径） */
 function normalizeName(s: unknown): string {
   if (typeof s !== 'string') return ''
@@ -106,6 +163,8 @@ type FontkitFont = {
   directory?: { tables?: Record<string, unknown> }
   'OS/2'?: { fsSelection?: number; sFamilyClass?: number }
   head?: { macStyle?: number }
+  /** fontkit 2.x 的 name 表：records 按语义键（fontFamily/fullName/…）分组 */
+  name?: { records?: unknown }
   getName?: (id: number, lang?: string) => string | null
 }
 
@@ -198,6 +257,8 @@ interface IndexedFont {
   path: string
   faceIndex: number
   familyName: string
+  /** 同一个 face 的 CJK 族名（name 表 zh 变体），无则 null */
+  familyNameZh: string | null
   subfamilyName: string
   postscriptName: string
   fullName: string
@@ -228,12 +289,16 @@ function outlineOf(font: FontkitFont): 'glyf' | 'CFF' | 'unknown' {
   return 'unknown'
 }
 
-async function indexOne(pathAbs: string, into: Map<string, IndexedFont[]>): Promise<void> {
+/**
+ * 索引一个字体文件里的全部 face；返回本次真正建好的条目
+ * （调用方拿它把注册表族名键也指向**带元数据**的条目，而不是造占位条目）。
+ */
+async function indexOne(pathAbs: string, into: Map<string, IndexedFont[]>): Promise<IndexedFont[]> {
   let bytes: Uint8Array
   try {
     bytes = new Uint8Array(await readFile(pathAbs))
   } catch {
-    return
+    return []
   }
   const fsTypes = readFsTypeAll(bytes)
 
@@ -242,7 +307,7 @@ async function indexOne(pathAbs: string, into: Map<string, IndexedFont[]>): Prom
   try {
     opened = kit.openSync(pathAbs) as FontkitFont | { fonts?: FontkitFont[] }
   } catch {
-    return
+    return []
   }
 
   // TTC：fonts 数组；单 face：直接是 font
@@ -254,6 +319,7 @@ async function indexOne(pathAbs: string, into: Map<string, IndexedFont[]>): Prom
     faces.push({ font: opened as FontkitFont, faceIndex: 0 })
   }
 
+  const created: IndexedFont[] = []
   for (const { font, faceIndex } of faces) {
     const fsSelection = font['OS/2']?.fsSelection ?? 0x40
     const macStyle = font.head?.macStyle ?? 0
@@ -263,11 +329,16 @@ async function indexOne(pathAbs: string, into: Map<string, IndexedFont[]>): Prom
     const family = fontkitNameStr(familyRaw) || path.basename(pathAbs, path.extname(pathAbs))
     const fullNameStr = fontkitNameStr(font.fullName)
     const postscriptNameStr = fontkitNameStr(font.postscriptName)
+    // name 表全语言变体：en 之外的 zh 记录才是设计稿常用的声明形态
+    const familyVariants = [familyRaw, nameRecordVariants(font, 'fontFamily')]
+    const fullNameVariants = [font.fullName, nameRecordVariants(font, 'fullName')]
+    const postscriptVariants = [font.postscriptName, nameRecordVariants(font, 'postscriptName')]
     const fsSel = typeof fsSelection === 'number' ? fsSelection : 0x40
     const entry: IndexedFont = {
       path: pathAbs,
       faceIndex,
       familyName: family,
+      familyNameZh: pickCjkName(familyVariants),
       subfamilyName: subfamily,
       postscriptName: postscriptNameStr,
       fullName: fullNameStr,
@@ -279,16 +350,19 @@ async function indexOne(pathAbs: string, into: Map<string, IndexedFont[]>): Prom
       ...(faces.length > 1 ? { containerBytes: bytes } : {})
     }
     const keys = new Set<string>()
-    if (family) keys.add(normalizeName(family))
-    if (fullNameStr) keys.add(normalizeName(fullNameStr))
-    if (postscriptNameStr) keys.add(normalizeName(postscriptNameStr))
+    // 全部语言变体都进索引：中文族名（name 表 zh 记录）是设计稿常见的声明形态
+    for (const v of collectNameStrs(familyVariants)) keys.add(normalizeName(v))
+    for (const v of collectNameStrs(fullNameVariants)) keys.add(normalizeName(v))
+    for (const v of collectNameStrs(postscriptVariants)) keys.add(normalizeName(v))
     for (const k of keys) {
       if (!k) continue
       const arr = into.get(k) ?? []
-      arr.push(entry)
+      if (!arr.some((f) => f.path === pathAbs && f.faceIndex === faceIndex)) arr.push(entry)
       into.set(k, arr)
     }
+    created.push(entry)
   }
+  return created
 }
 
 /** 建/取全局索引（懒加载，单进程一次） */
@@ -299,38 +373,40 @@ async function ensureIndex(): Promise<Map<string, IndexedFont[]>> {
   // Windows：注册表条目（已含 path/族名明文）
   if (process.platform === 'win32') {
     const reg = await readWinRegistryFontEntries()
-    const seen = new Set<string>()
+    const byFile = new Map<string, IndexedFont[]>()
     for (const entry of reg) {
       // 防非字符串（防御）
       if (!entry || typeof entry.file !== 'string' || typeof entry.name !== 'string') continue
-      if (!seen.has(entry.file)) {
-        seen.add(entry.file)
-        await indexOne(entry.file, byName)
-      }
-      // 注册表族名也直接进索引（fontkit 可能取不到某些 windows 注册字体）
+      if (!byFile.has(entry.file)) byFile.set(entry.file, await indexOne(entry.file, byName))
+      const made = byFile.get(entry.file) ?? []
       const key = normalizeName(entry.name)
-      if (key) {
-        const arr = byName.get(key) ?? []
-        // fontkit 已开过同一文件的话那条目已存在；此处不必重复 push
-        if (!arr.some((f) => f.path === entry.file)) {
-          // 占位条目——缺 fontkit 元数据（slot/outline 假定为 regular/unknown 由调用方再 resolve）
-          const placeholder: IndexedFont = {
-            path: entry.file,
-            faceIndex: 0,
-            familyName: entry.name,
-            subfamilyName: '',
-            postscriptName: '',
-            fullName: entry.name,
-            slot: 'regular',
-            outline: 'unknown',
-            fsSelection: 0x40,
-            macStyle: 0,
-            fsType: null
-          }
-          arr.push(placeholder)
-          byName.set(key, arr)
+      if (!key) continue
+      const arr = byName.get(key) ?? []
+      if (made.length > 0) {
+        // 注册表值名（如「阿里妈妈数黑体 Bold (TrueType)」）指向同一文件的**真实 face**：
+        // 不另造占位条目——占位条目 fsType 恒为 null，查到它等于「不可嵌入」，直接跳过嵌入。
+        for (const f of made) {
+          if (!arr.some((x) => x.path === f.path && x.faceIndex === f.faceIndex)) arr.push(f)
         }
+      } else if (!arr.some((f) => f.path === entry.file)) {
+        // fontkit 打不开这个文件（异常字体/权限）→ 退化成占位条目，只记「机器上装了」这一事实
+        const placeholder: IndexedFont = {
+          path: entry.file,
+          faceIndex: 0,
+          familyName: entry.name,
+          familyNameZh: pickCjkName([entry.name]),
+          subfamilyName: '',
+          postscriptName: '',
+          fullName: entry.name,
+          slot: 'regular',
+          outline: 'unknown',
+          fsSelection: 0x40,
+          macStyle: 0,
+          fsType: null
+        }
+        arr.push(placeholder)
       }
+      if (arr.length > 0) byName.set(key, arr)
     }
   } else {
     // POSIX：扫常用目录
@@ -411,8 +487,16 @@ export async function resolveTypeface(
 
 function findByPrefix(index: Map<string, IndexedFont[]>, typeface: string): IndexedFont[] {
   const out: IndexedFont[] = []
+  const seen = new Set<string>()
   for (const [key, arr] of index.entries()) {
-    if (matches(key, typeface)) out.push(...arr)
+    if (!matches(key, typeface)) continue
+    for (const f of arr) {
+      // 同一 face 可能同时挂在族名/全名/PostScript 名等多个键下 → 去重
+      const id = `${f.path}#${f.faceIndex}#${f.slot}`
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push(f)
+    }
   }
   return out
 }
@@ -425,7 +509,7 @@ async function toResolved(font: IndexedFont, requestedTypeface: string, bytes: U
     faceIndex: font.faceIndex,
     bytes,
     familyName: font.familyName,
-    familyNameZh: null, // fontkit 中文记录读法与数据形态待真实安装环境验证；先 null
+    familyNameZh: font.familyNameZh,
     postscriptName: font.postscriptName,
     outline: font.outline,
     license: licenseOf(font.fsType)
