@@ -780,7 +780,7 @@ interface PageTransition {
 - **typeface 按名全等匹配**：嵌入声明里的 typeface 与正文 run 的 fontFace 必须同源同串，不一致时 PowerPoint 静默忽略嵌入字体并回落系统字体，因此两者一律取 PPTD 里声明的目标机实装名；
 - 槽位（slot）判定：出现粗体即需 bold 槽，粗斜组合需 boldItalic 槽；缺对应 face 文件时只嵌 regular，由 PowerPoint 合成仿粗/仿斜，记 info 级日志；
 - TTC（TrueType Collection，如 `msyh.ttc` / `simsun.ttc`）按 face 枚举匹配族名后嵌入对应 face；
-- 许可口径：嵌入即随文件再分发，授权责任在用户侧；fsType 一律以运行时实测为准，不设白名单。
+- 许可口径：嵌入即随文件再分发，授权责任在用户侧；`fsType` 是必要条件、不是充分条件——**商用授权或厂商许可未授予再分发权的字体一律不嵌**（改用免费商用字体，或让目标机自行安装）。fsType 一律以运行时实测为准，不设白名单。
 
 ### 9.4 导出摘要字段
 
