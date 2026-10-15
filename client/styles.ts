@@ -298,6 +298,7 @@ export const CSS = `
 }
 .ppt-inspector-row textarea,
 .ppt-inspector-row input[type='number'],
+.ppt-inspector-row input[type='text'],
 .ppt-inspector-row select{
   font:inherit;font-size:12px;color:var(--dsw-alias-label-primary);
   background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);
@@ -329,6 +330,16 @@ export const CSS = `
 .ppt-inspector-bounds{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .ppt-inspector-bounds label{display:flex;align-items:center;gap:4px;font-size:11px}
 .ppt-inspector-bounds input{flex:1 1 auto;min-width:0;width:100%}
+.ppt-inspector-table{display:grid;gap:3px}
+.ppt-inspector-table input{
+  font:inherit;font-size:11px;color:var(--dsw-alias-label-primary);min-width:0;
+  background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);
+  border-radius:3px;padding:2px 4px;
+}
+.ppt-inspector-table input:focus-visible{
+  outline:none;border-color:var(--dsw-alias-border-l1);
+  box-shadow:0 0 0 2px var(--dsw-alias-interactive-bg-hover);
+}
 .ppt-inspector-hint{
   display:flex;align-items:center;gap:4px;font-size:10px;
   color:var(--dsw-alias-label-secondary);

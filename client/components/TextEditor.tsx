@@ -6,11 +6,13 @@
  *   - Ctrl+Enter 或失焦 提交 → store.actions.updateElement(elementId, {content: {text}})
  *   - Esc 取消（不 commit）。提交完毕后由 store 触发一次静默重载（revision 前进带动）。
  *
- * 只支持 text 元素；exact 直接读 PPTD 的 content.text。
- * 这里的文本是「单段」，无富文本（富文本提交走 text 包 markdown/inline 标记，那是 PR3 的活）。
+ * 只支持 text 元素；直接读写 PPTD 的 content.text。
+ * 显示/提交语义由 textEditorModel 定：含行内格式的文本原样摆 markup 源码（改标记即改格式），
+ * 简单 markup / 纯文本简写显示人话、提交时按行包回 <p>——多段文本来回不丢段、不剥格式。
  */
 import * as React from 'react'
 import type { PptStore } from '../store'
+import { textEditorModel } from '../render/text-markup'
 
 interface PptElement {
   elementId?: string
@@ -37,7 +39,9 @@ export function TextEditor({
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const page = (state.currentPageData ?? null) as PptPage | null
   const target = Array.isArray(page?.elements) ? page!.elements!.find((e) => e.elementId === elementId) : undefined
-  const initialText = String(target?.content?.text ?? '')
+  const rawText = String(target?.content?.text ?? '')
+  // rich：含行内格式 → 显示并提交原始 markup（不剥格式）；否则显示人话、提交包回 <p>。
+  const editor = textEditorModel(rawText)
 
   const ref = React.useRef<HTMLDivElement | null>(null)
   const [committed, setCommitted] = React.useState(false)
@@ -63,12 +67,18 @@ export function TextEditor({
 
   const commit = async (text: string) => {
     if (committed) return
-    setCommitted(true)
-    if (text === initialText) {
+    // 显示值原样交回 = 没动过：连归一化写入都免了（纯文本简写不会被打包成 <p>）。
+    if (text === editor.display) {
       onDone()
       return
     }
-    const ok = await store.actions.updateElement(elementId, { content: { ...(target.content ?? {}), text } })
+    setCommitted(true)
+    const nextValue = editor.commit(text)
+    if (nextValue === rawText) {
+      onDone()
+      return
+    }
+    const ok = await store.actions.updateElement(elementId, { content: { ...(target.content ?? {}), text: nextValue } })
     if (ok) onDone()
     else setCommitted(false) // 409 / 网络错误都要让人能再改改、再发
   }
@@ -100,7 +110,7 @@ export function TextEditor({
         }
       }}
     >
-      {initialText}
+      {editor.display}
     </div>
   )
 }

@@ -6,6 +6,8 @@
  *      以及 Inspector 颜色字段的 colorFieldModel / deckTheme 视图模型。
  *   2. sanitize.ts —— 富文本 HTML 白名单清洗（防 XSS；vitest 是 node 环境无 DOMParser，
  *      走 sanitizeHtmlString 回退路径）+ style 声明级清洗。
+ *   3. text-markup.ts / table-rows.ts —— 画布就地编辑的显示/提交模型（多段不丢、不剥格式）、
+ *      表格结构归一与比例回写。
  *
  * 这些都是纯函数，不挂 React、不碰 DOM。
  */
@@ -23,6 +25,8 @@ import {
 } from '../client/render/resolve'
 import { sanitizeHtml, sanitizeHtmlString, sanitizeStyle } from '../client/render/sanitize'
 import { pathFromPoints } from '../client/render/points'
+import { textEditorModel } from '../client/render/text-markup'
+import { equalRatios, normTableRows } from '../client/render/table-rows'
 
 const theme: ThemeLike = {
   colors: {
@@ -250,5 +254,49 @@ describe('deckTheme · 从 deck 快照安全取 theme 段', () => {
     expect(deckTheme(null)).toBeNull()
     expect(deckTheme({})).toBeNull()
     expect(deckTheme({ theme: 'paper' })).toBeNull()
+  })
+})
+
+describe('textEditorModel · 画布就地编辑的显示/提交', () => {
+  it('含行内格式（rich）：原样显示 markup，提交原样回写——不剥格式', () => {
+    const m = textEditorModel('<p><strong>加粗</strong>普通</p>')
+    expect(m.rich).toBe(true)
+    expect(m.display).toBe('<p><strong>加粗</strong>普通</p>')
+    expect(m.commit('<p><em>斜体</em></p>')).toBe('<p><em>斜体</em></p>')
+  })
+
+  it('简单 markup：显示人话（段变行），提交按行包回 <p>——多段不丢', () => {
+    const m = textEditorModel('<p>甲</p><p>乙</p>')
+    expect(m.rich).toBe(false)
+    expect(m.display).toBe('甲\n乙')
+    expect(m.commit('甲\n\n乙')).toBe('<p>甲</p><p></p><p>乙</p>')
+  })
+
+  it('纯文本简写：显示原样，提交包成 <p>', () => {
+    const m = textEditorModel('abc')
+    expect(m.rich).toBe(false)
+    expect(m.display).toBe('abc')
+    expect(m.commit('abc')).toBe('<p>abc</p>')
+  })
+})
+
+describe('table-rows · 表格结构归一与比例', () => {
+  it('normTableRows：简写单元格包成对象，对象单元格原样保留（bold/rowSpan 等）', () => {
+    expect(normTableRows([[{ text: '年份', bold: true }, '12'], ['28', 19]])).toEqual([
+      [{ text: '年份', bold: true }, { text: '12' }],
+      [{ text: '28' }, { text: 19 }],
+    ])
+  })
+
+  it('normTableRows：非数组给空；坏行给空行（稀疏合并行不被破坏）', () => {
+    expect(normTableRows(undefined)).toEqual([])
+    expect(normTableRows('x')).toEqual([])
+    expect(normTableRows([null, [1]])).toEqual([[], [{ text: 1 }]])
+  })
+
+  it('equalRatios：n 等分且和为 1；0 给空', () => {
+    expect(equalRatios(4)).toEqual([0.25, 0.25, 0.25, 0.25])
+    expect(equalRatios(4).reduce((a, b) => a + b, 0)).toBeCloseTo(1)
+    expect(equalRatios(0)).toEqual([])
   })
 })

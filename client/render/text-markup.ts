@@ -43,6 +43,22 @@ export function plainToMarkup(text: string): string {
   return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('')
 }
 
+/**
+ * 画布就地编辑器（TextEditor）的显示/提交模型：
+ *   - 含行内格式（rich）：原样显示原始 markup，用户直接改标记源码，提交原样回写——
+ *     绝不剥格式；
+ *   - 简单 markup / 纯文本简写：显示人话（段变行），提交时按行包回 `<p>`。
+ * display 与 raw 相等即「没动过」，调用方据此跳过提交。
+ */
+export function textEditorModel(raw: string): { display: string; rich: boolean; commit: (typed: string) => string } {
+  const rich = hasRichMarkup(raw)
+  return {
+    display: rich ? raw : markupToPlain(raw),
+    rich,
+    commit: (typed: string) => (rich ? typed : plainToMarkup(typed)),
+  }
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
