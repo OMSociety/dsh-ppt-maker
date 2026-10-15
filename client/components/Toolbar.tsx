@@ -9,7 +9,15 @@ import * as React from 'react'
 import type { PptStore } from '../store'
 import { ExportGlyph, HistoryGlyph, RedoGlyph, UndoGlyph } from '../icons'
 
-export function Toolbar({ store, onShowHistory }: { store: PptStore; onShowHistory?: () => void }) {
+export function Toolbar({
+  store,
+  historyOpen,
+  onShowHistory,
+}: {
+  store: PptStore
+  historyOpen?: boolean
+  onShowHistory?: () => void
+}) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const disabled = !state.activeKey || state.saving
   const inConflict = Boolean(state.conflict || state.externalChange)
@@ -32,10 +40,10 @@ export function Toolbar({ store, onShowHistory }: { store: PptStore; onShowHisto
         <span className="ppt-spacer" />
         <button
           type="button"
-          className="ppt-btn"
+          className={`ppt-btn${historyOpen ? ' ppt-btn-on' : ''}`}
           disabled={disabled}
           onClick={() => onShowHistory?.()}
-          title="版本历史：预览并恢复到任意历史版本"
+          title="版本历史：预览并恢复到任意历史版本（再点一次收起）"
         >
           <HistoryGlyph size={13} /> 历史
         </button>

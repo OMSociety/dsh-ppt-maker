@@ -109,6 +109,8 @@ export const CSS = `
   white-space:nowrap;display:inline-flex;align-items:center;gap:4px;
 }
 .ppt-btn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
+/* 开关型按钮的「开着」态（如历史抽屉） */
+.ppt-btn-on,.ppt-btn-on:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
 .ppt-btn:focus-visible{
   outline:none;color:var(--dsw-alias-label-primary);
   border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-interactive-bg-hover);
@@ -359,6 +361,14 @@ export const CSS = `
   border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;
 }
 .ppt-history-head-meta{font-size:10.5px;color:var(--dsw-alias-label-secondary)}
+.ppt-history-head .ppt-spacer{flex:1 1 auto}
+.ppt-history-close{
+  flex:none;width:20px;height:20px;padding:0;
+  border:1px solid transparent;border-radius:4px;background:transparent;
+  color:var(--dsw-alias-label-secondary);cursor:pointer;
+  font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
+}
+.ppt-history-close:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
 .ppt-history-error{
   flex:none;padding:6px 10px;font-size:11px;
   color:var(--dsw-alias-label-primary);

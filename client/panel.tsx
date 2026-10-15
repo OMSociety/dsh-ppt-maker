@@ -146,7 +146,7 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
 
   return (
     <div className="ppt-root">
-      <Toolbar store={store} onShowHistory={() => setHistoryOpen(true)} />
+      <Toolbar store={store} historyOpen={historyOpen} onShowHistory={() => setHistoryOpen((v) => !v)} />
       {state.status === 'loading' && <BlankLoading />}
       {state.status === 'error' && <BlankError error={state.error || '面板载入失败'} onRetry={() => void store.actions.init()} />}
       {state.status === 'empty' && <BlankEmpty />}

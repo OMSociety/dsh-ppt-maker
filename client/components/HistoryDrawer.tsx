@@ -98,8 +98,14 @@ export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: ()
         <strong>版本历史</strong>
         <span className="ppt-history-head-meta">当前 r{cursor}</span>
         <span className="ppt-spacer" />
-        <button type="button" className="ppt-btn" onClick={onClose} aria-label="关闭版本历史">
-          关闭
+        <button
+          type="button"
+          className="ppt-history-close"
+          onClick={onClose}
+          aria-label="关闭版本历史"
+          title="关闭"
+        >
+          ×
         </button>
       </div>
 
