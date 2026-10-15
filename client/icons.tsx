@@ -113,3 +113,12 @@ export function HistoryGlyph(props: GlyphProps) {
     </GlyphSvg>
   )
 }
+
+/** 「显示文件位置」：文件夹（与 DSH 文件菜单的定位项同款语义图标）。 */
+export function FolderGlyph(props: GlyphProps) {
+  return (
+    <GlyphSvg {...props}>
+      <path d="M1.75 3.5A1.75 1.75 0 0 1 3.5 1.75h2.2c.55 0 1.06.26 1.4.7l.9 1.2h4.25A1.75 1.75 0 0 1 14 5.42v5.83a1.75 1.75 0 0 1-1.75 1.75H3.5A1.75 1.75 0 0 1 1.75 11.25V3.5Zm1.75-.25a.25.25 0 0 0-.25.25v7.75c0 .14.11.25.25.25h8.75a.25.25 0 0 0 .25-.25V5.42a.25.25 0 0 0-.25-.25H7.94a.75.75 0 0 1-.6-.3l-.99-1.32a.25.25 0 0 0-.2-.1H3.5Z" />
+    </GlyphSvg>
+  )
+}

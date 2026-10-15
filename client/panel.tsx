@@ -21,7 +21,7 @@
 import * as React from 'react'
 import type { PptStore } from './store'
 import { api, type OpenApplication } from './api'
-import { PptMark } from './icons'
+import { PptMark, FolderGlyph } from './icons'
 import { ProjectList } from './components/ProjectList'
 import { ThumbStrip } from './components/ThumbStrip'
 import { Stage } from './components/Stage'
@@ -222,7 +222,9 @@ function ExportOpenMenu({
             disabled={busy}
             onClick={() => void fire({ action: 'reveal' })}
           >
-            <span className="ppt-openwith-icon" />
+            <span className="ppt-openwith-icon">
+              <FolderGlyph size={16} />
+            </span>
             <span className="ppt-openwith-name">显示文件位置</span>
           </button>
         </div>
