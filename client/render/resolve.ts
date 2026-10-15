@@ -34,6 +34,49 @@ export function resolveColor(value: unknown, theme?: ThemeLike | null): string |
   return value
 }
 
+/** <input type=color> 只认 #rrggbb；值不是 hex（rgb()/未知 $ref/空）时用它兜底显示。 */
+export const COLOR_PICKER_FALLBACK = '#1f2937'
+
+/** '#RGB' / '#RRGGBB'（大小写不敏感）归一成小写 #rrggbb；其余形态返回 null。 */
+export function normalizeHex(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(value.trim())
+  if (!m) return null
+  let h = m[1].toLowerCase()
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('')
+  return `#${h}`
+}
+
+/**
+ * Inspector 颜色字段的视图模型（纯函数，可单测）：
+ *   - ref：'$paper' 形态的主题引用名；字面量/空为 null。
+ *   - swatch：可显示的色样（$ref 经 theme 解析后归一；rgb() 等非 hex 形态为 null）。
+ *   - picker：<input type=color> 的 value（仅 #rrggbb，否则回退 COLOR_PICKER_FALLBACK）。
+ */
+export interface ColorFieldModel {
+  ref: string | null
+  swatch: string | null
+  picker: string
+}
+
+export function colorFieldModel(value: unknown, theme?: ThemeLike | null): ColorFieldModel {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) return { ref: null, swatch: null, picker: COLOR_PICKER_FALLBACK }
+  if (raw.startsWith('$')) {
+    const resolved = theme?.colors?.[raw.slice(1)]
+    const hex = normalizeHex(resolved)
+    return { ref: raw, swatch: hex, picker: hex ?? COLOR_PICKER_FALLBACK }
+  }
+  const hex = normalizeHex(raw)
+  return { ref: null, swatch: hex, picker: hex ?? COLOR_PICKER_FALLBACK }
+}
+
+/** 从 store 的 deck 快照（宿主 /project 响应）安全地取 theme 段；缺席给 null。 */
+export function deckTheme(deck: unknown): ThemeLike | null {
+  const theme = (deck as { theme?: unknown } | null)?.theme
+  return theme && typeof theme === 'object' ? (theme as ThemeLike) : null
+}
+
 /**
  * 解析元素的文本样式：把 `style: $body` 与内联字段合并成一份「最终生效」的样式表。
  * 内联字段优先于 $style 引用（与 richtext/导出端的覆盖语义一致）。

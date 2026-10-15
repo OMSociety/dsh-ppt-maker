@@ -17,6 +17,7 @@ import * as React from 'react'
 import type { PptStore } from '../store'
 import { PptdView, type PptdElement, type PptdPage } from './PptdView'
 import { TextEditor } from './TextEditor'
+import { deckTheme } from '../render/resolve'
 
 export function Stage({ store }: { store: PptStore }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
@@ -35,7 +36,7 @@ export function Stage({ store }: { store: PptStore }) {
   if (!state.activeKey) return <div className="ppt-stage ppt-stage-empty" />
 
   const size = (state.deck?.size ?? [960, 540]) as [number, number]
-  const theme = (state.deck as { theme?: unknown } | null)?.theme as Parameters<typeof PptdView>[0]['theme']
+  const theme = deckTheme(state.deck)
   const page = (state.currentPageData ?? null) as PptdPage | null
   const elements = Array.isArray(page?.elements) ? (page!.elements as PptdElement[]) : []
 

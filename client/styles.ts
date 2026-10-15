@@ -312,6 +312,17 @@ export const CSS = `
   width:32px;height:22px;padding:0;border:1px solid var(--dsw-alias-border-l2);
   border-radius:3px;background:var(--dsw-alias-bg-layer-1);cursor:pointer;
 }
+.ppt-inspector-ref{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:10px;color:var(--dsw-alias-label-secondary);
+}
+.ppt-inspector-swatches{display:flex;flex-wrap:wrap;gap:4px}
+.ppt-inspector-swatch{
+  width:20px;height:20px;padding:0;border-radius:4px;
+  border:1px solid var(--dsw-alias-border-l2);cursor:pointer;
+}
+.ppt-inspector-swatch:hover{border-color:var(--dsw-alias-border-l1)}
+.ppt-inspector-swatch-on{border-color:var(--dsw-alias-label-primary);box-shadow:0 0 0 2px var(--dsw-alias-border-l1)}
 .ppt-inspector-row input[type='file']{font-size:11px;color:var(--dsw-alias-label-secondary)}
 .ppt-inspector-pair{display:flex;gap:4px}
 .ppt-inspector-pair select{flex:1 1 0;min-width:0}

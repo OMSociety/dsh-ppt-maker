@@ -5,7 +5,7 @@
  * 提供的字段（Inspector 不是万能的；占位、图标、表格留到 PR3）：
  *   - 文字（textarea）
  *   - 字号（number input）
- *   - 颜色（color picker；只能给「字面量」，主题色字符串 PR3 再支持）
+ *   - 颜色（主题色板一键写回 $引用 + 显示解析色与 $ref 徽标；原生拾色器只写字面量）
  *   - 对齐（两段 select：[horizontal, vertical]）
  *   - bounds（x/y/w/h 四个数字框）
  *   - 替换图片（仅 elementType === 'image'：file input → POST /media/upload → updateElement set:{src}）
@@ -14,6 +14,7 @@ import * as React from 'react'
 import type { PptStore } from '../store'
 import { ImportGlyph } from '../icons'
 import { hasRichMarkup, markupToPlain, plainToMarkup } from '../render/text-markup'
+import { colorFieldModel, deckTheme, normalizeHex } from '../render/resolve'
 
 interface PptElement {
   elementId?: string
@@ -85,6 +86,16 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
 
   const rawText = String(content.text ?? '')
   const richText = hasRichMarkup(rawText)
+
+  // 颜色字段的视图模型：$引用保留引用名（写回也是 $key），色样/拾色器用 theme 解析后的值。
+  const theme = deckTheme(state.deck)
+  const colorModel = colorFieldModel(content.color, theme)
+  const themeColors = Object.entries(theme?.colors ?? {}).map(([key, raw]) => ({
+    key,
+    ref: `$${key}`,
+    hex: normalizeHex(raw),
+  }))
+
   const textKey = `${state.activeKey ?? ''}#${state.currentPage}#${elementId}#${textMode}`
   const textValue =
     textDraft && textDraft.key === textKey
@@ -167,14 +178,34 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
         />
       </div>
 
-      <label className="ppt-inspector-row">
-        <span>颜色（仅字面量；主题色留 PR3）</span>
+      <div className="ppt-inspector-row">
+        <div className="ppt-inspector-labelrow">
+          <span>颜色</span>
+          {colorModel.ref ? <code className="ppt-inspector-ref">{colorModel.ref}</code> : null}
+        </div>
+        {themeColors.length ? (
+          <div className="ppt-inspector-swatches" role="group" aria-label="主题色">
+            {themeColors.map(({ key, ref, hex }) => (
+              <button
+                key={key}
+                type="button"
+                className={`ppt-inspector-swatch${colorModel.ref === ref ? ' ppt-inspector-swatch-on' : ''}`}
+                style={hex ? { background: hex } : undefined}
+                title={`${ref}${hex ? `（${hex}）` : ''}`}
+                aria-label={`主题色 ${ref}`}
+                aria-pressed={colorModel.ref === ref}
+                onClick={() => setContentField({ color: ref })}
+              />
+            ))}
+          </div>
+        ) : null}
         <input
           type="color"
-          value={/^#[0-9a-fA-F]{6}$/.test(String(content.color ?? '')) ? String(content.color) : '#1F2937'}
+          aria-label="自定义颜色（字面量）"
+          value={colorModel.picker}
           onChange={(e) => setContentField({ color: e.target.value })}
         />
-      </label>
+      </div>
 
       <div className="ppt-inspector-row">
         <span>对齐（横向 / 纵向）</span>

@@ -14,6 +14,7 @@ import * as React from 'react'
 import type { PptStore } from '../store'
 import { NewPageGlyph } from '../icons'
 import { PptdView, type PptdPage } from './PptdView'
+import { deckTheme } from '../render/resolve'
 
 interface DragState {
   fromPath: string | null
@@ -26,7 +27,7 @@ export function ThumbStrip({ store }: { store: PptStore }) {
 
   const pages = state.deckPages
   const size = (state.deck?.size ?? [960, 540]) as [number, number]
-  const theme = (state.deck as { theme?: unknown } | null)?.theme as Parameters<typeof PptdView>[0]['theme']
+  const theme = deckTheme(state.deck)
 
   if (!pages.length) {
     return (

@@ -2,7 +2,8 @@
  * client/render 纯函数单测（方案 B：工作台 DOM 直渲的渲染映射与安全清洗）。
  *
  * 覆盖两条命脉：
- *   1. resolve.ts —— $变量解析、fill/border/background → CSS、文本样式合并。
+ *   1. resolve.ts —— $变量解析、fill/border/background → CSS、文本样式合并，
+ *      以及 Inspector 颜色字段的 colorFieldModel / deckTheme 视图模型。
  *   2. sanitize.ts —— 富文本 HTML 白名单清洗（防 XSS；vitest 是 node 环境无 DOMParser，
  *      走 sanitizeHtmlString 回退路径）+ style 声明级清洗。
  *
@@ -12,6 +13,9 @@ import { describe, expect, it } from 'vitest'
 import {
   backgroundToCss,
   borderToCss,
+  COLOR_PICKER_FALLBACK,
+  colorFieldModel,
+  deckTheme,
   fillToCss,
   resolveColor,
   resolveTextStyle,
@@ -196,5 +200,55 @@ describe('points.ts · Line 路径生成', () => {
 
   it('smooth 三点：单控制点走二次贝塞尔', () => {
     expect(pathFromPoints([[0, 0], [50, 100], [100, 0]], 'smooth')).toBe('M0,0 Q50,100 100,0')
+  })
+})
+
+describe('colorFieldModel · Inspector 颜色字段视图模型', () => {
+  const modelTheme: ThemeLike = {
+    colors: { paper: '#F2EDE3', weird: 'rgb(1,2,3)' },
+  }
+
+  it('空值 / 非字符串：ref、swatch 皆空，picker 走兜底', () => {
+    const want = { ref: null, swatch: null, picker: COLOR_PICKER_FALLBACK }
+    expect(colorFieldModel('', modelTheme)).toEqual(want)
+    expect(colorFieldModel(undefined, modelTheme)).toEqual(want)
+    expect(colorFieldModel(42, modelTheme)).toEqual(want)
+  })
+
+  it('$引用：保留引用名，swatch/picker 用 theme 解析值（归一小写）', () => {
+    expect(colorFieldModel('$paper', modelTheme)).toEqual({ ref: '$paper', swatch: '#f2ede3', picker: '#f2ede3' })
+  })
+
+  it('#RGB 字面量归一成 #rrggbb', () => {
+    expect(colorFieldModel('#ABC', modelTheme)).toEqual({ ref: null, swatch: '#aabbcc', picker: '#aabbcc' })
+  })
+
+  it('未知 $引用：ref 照显、无色样、picker 兜底', () => {
+    expect(colorFieldModel('$ghost', modelTheme)).toEqual({ ref: '$ghost', swatch: null, picker: COLOR_PICKER_FALLBACK })
+  })
+
+  it('theme.colors 值为非 hex 时 $引用同样兜底（不改写原值）', () => {
+    expect(colorFieldModel('$weird', modelTheme)).toEqual({ ref: '$weird', swatch: null, picker: COLOR_PICKER_FALLBACK })
+  })
+
+  it('rgb() 等字面量：picker 兜底（原生拾色器不认），ref 为空', () => {
+    expect(colorFieldModel('rgb(216,35,42)', modelTheme)).toEqual({
+      ref: null,
+      swatch: null,
+      picker: COLOR_PICKER_FALLBACK,
+    })
+  })
+})
+
+describe('deckTheme · 从 deck 快照安全取 theme 段', () => {
+  it('取到 theme 对象', () => {
+    const themePart = { colors: { paper: '#fff' } }
+    expect(deckTheme({ theme: themePart })).toBe(themePart)
+  })
+
+  it('deck 为空 / 无 theme / theme 非对象：一律 null', () => {
+    expect(deckTheme(null)).toBeNull()
+    expect(deckTheme({})).toBeNull()
+    expect(deckTheme({ theme: 'paper' })).toBeNull()
   })
 })
