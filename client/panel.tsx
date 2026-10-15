@@ -9,10 +9,11 @@
  *   - Stage.tsx        画布：PptdView DOM 直渲 + ElementOverlay 透明选择框 + TextEditor 就地编辑
  *   - Inspector.tsx    属性面板（右栏，可收缩）：选中元素才展开
  *
- * 左右栏都是「完全收起 + 边缘把手」，且收起时不渲染对应组件（不占渲染开销）：
- *   - 左栏默认展开，点把手收起；
- *   - 右栏跟随 selection——选中元素自动展开，取消选择（点空白）自动收起，也可手动收起
- *     （手动收起后本次选中不再自动弹开，直到改选别的元素）。
+ * 两栏收起策略不同，且收起时都不渲染对应组件（不占渲染开销）：
+ *   - 左栏「收起留把手」（16px 细条），默认展开，点把手收起/展开；
+ *   - 右栏「收起即完全消失，不留把手」——只有选中元素才渲染属性面板；取消选择（点空白）
+ *     或点面板头的收起钮即消失。再展开的唯一入口是点选元素：改选别的元素自动弹开，
+ *     手动收起后本次选中不再弹开，直到改选。
  *
  * 「精确预览」即「导出 .pptx」（Toolbar 按钮）——宿主一次性走完 buildProjectDeck →
  * libreoffice-kit 渲页，不在面板里另起炉灶。
@@ -177,24 +178,11 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
 
           <Stage store={store} />
 
-          {/* 右栏：属性面板（选中元素才展开，可收起，收起不渲染） */}
+          {/* 右栏：属性面板（选中元素才渲染；收起即完全消失，不留把手） */}
           {rightOpen ? (
             <div className="ppt-rail ppt-rail-right">
               <Inspector store={store} onCollapse={closeRight} />
             </div>
-          ) : selectedId ? (
-            <button
-              type="button"
-              className="ppt-rail-handle ppt-rail-handle-right"
-              onClick={() => {
-                rightDismissed.current = false
-                setRightOpen(true)
-              }}
-              title="展开属性面板"
-              aria-label="展开属性面板"
-            >
-              <span className="ppt-rail-handle-glyph">‹</span>
-            </button>
           ) : null}
         </div>
       )}

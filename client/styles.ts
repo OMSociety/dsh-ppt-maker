@@ -69,7 +69,8 @@ export const CSS = `
 .ppt-inspector-collapse{position:absolute;top:2px;right:2px;width:18px;height:18px;padding:0;font-size:12px;line-height:1}
 /* 收起后的边缘把手（细条，点击展开）：自身一律透明，与宿主同底。
    button 不写 background 会吃到 UA 的 ButtonFace，满高的灰条在深色下像多出一栏；
-   悬停也只给 glyph 一颗小药丸，不铺满整条。 */
+   悬停也只给 glyph 一颗小药丸，不铺满整条。
+   仅左栏使用——右栏收起即完全消失，不留把手（展开的唯一入口是点选元素）。 */
 .ppt-rail-handle{
   flex:none;width:16px;border:none;padding:0;cursor:pointer;
   background:transparent;
@@ -84,7 +85,6 @@ export const CSS = `
 }
 .ppt-rail-handle:hover{color:var(--dsw-alias-label-primary)}
 .ppt-rail-handle:hover .ppt-rail-handle-glyph{background:var(--dsw-alias-interactive-bg-hover)}
-.ppt-rail-handle-right{border-right:none;border-left:1px solid var(--dsw-alias-border-l2)}
 
 /* ── 空面板 / 载入中 / 错误 三态共用一张卡片 ────────────────── */
 .ppt-blank{

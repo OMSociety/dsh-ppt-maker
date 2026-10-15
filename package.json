@@ -63,6 +63,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@types/react": "^18.3.31",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
@@ -80,7 +81,7 @@
     "check:build": "node scripts/check-build.mjs",
     "check:mounts": "node scripts/check-mounts.mjs",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json",
     "prepack": "node scripts/clean-pycache.mjs"
   },
   "engines": {

@@ -16,6 +16,8 @@ import * as React from 'react'
 export interface GlyphProps {
   size?: number
   className?: string
+  /** 调用方偶尔要微调排版（如 ProjectList 的 verticalAlign），透传到 <svg>。 */
+  style?: React.CSSProperties
 }
 
 /**
@@ -24,9 +26,9 @@ export interface GlyphProps {
  * 所以界面里的三处落点（右侧栏标签页、引导列表、空面板品牌行）都由这里内联渲染；
  * 同 `icon.svg` 一样在 36 画板上放大 1.3 倍取景，贴合侧边栏的视觉重量。
  */
-export function PptMark({ size = 16, className }: GlyphProps) {
+export function PptMark({ size = 16, className, style }: GlyphProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 36 36" fill="none" aria-hidden="true" className={className}>
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none" aria-hidden="true" className={className} style={style}>
       <defs>
         <linearGradient id="ppt-mark-back" x1="13" y1="8" x2="28" y2="20" gradientUnits="userSpaceOnUse">
           <stop stopColor="#FF9E66" />
@@ -47,9 +49,9 @@ export function PptMark({ size = 16, className }: GlyphProps) {
   )
 }
 
-function GlyphSvg({ size = 14, className, children, viewBox = '0 0 16 16' }: GlyphProps & { children: React.ReactNode; viewBox?: string }) {
+function GlyphSvg({ size = 14, className, style, children, viewBox = '0 0 16 16' }: GlyphProps & { children: React.ReactNode; viewBox?: string }) {
   return (
-    <svg width={size} height={size} viewBox={viewBox} fill="currentColor" aria-hidden="true" className={className}>
+    <svg width={size} height={size} viewBox={viewBox} fill="currentColor" aria-hidden="true" className={className} style={style}>
       {children}
     </svg>
   )

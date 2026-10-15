@@ -1,0 +1,12 @@
+{
+  // client/ 是浏览器侧（DSH webview），单独一档类型检查：
+  // 带 DOM lib + JSX；不把 client 混进根 tsconfig 的 include——
+  // 那里是 node 侧（src/tests）的门，两端的 lib 需求相反。
+  // 这次「右栏把手点不开」（panel.tsx 引用了不存在的 rightDismissed）就是
+  // client 从未被 tsc 覆盖、esbuild 又不做类型检查而漏网的，补上这档防回归。
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  },
+  "include": ["client/**/*.ts", "client/**/*.tsx", "client/**/*.d.ts"]
+}
