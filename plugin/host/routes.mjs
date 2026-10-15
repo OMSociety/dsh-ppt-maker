@@ -67,6 +67,41 @@ async function libreofficeKit() {
 }
 
 /* ------------------------------------------------------------------ *
+ * @deepseek-ai/dsh-native-command：导出产物的「打开方式 / 默认打开 / 显示文件位置」。
+ * 与 DSH「已编辑」文件菜单同一套主机侧原语（shell-free、argv 不走 shell）。
+ * 测试里可经 deps.nativeCommand 整体换桩。
+ * ------------------------------------------------------------------ */
+
+let lazyNativeCommand = null
+
+async function nativeCommand() {
+  if (!lazyNativeCommand) lazyNativeCommand = await import('@deepseek-ai/dsh-native-command')
+  return lazyNativeCommand
+}
+
+/**
+ * file 参数守卫：只允许工程目录内的绝对路径（导出产物恒落在 <abs>/export/ 下）。
+ * @param {string} abs 工程目录绝对路径
+ * @param {string} file 客户端传来的文件路径
+ * @returns {string} 规范化后的绝对路径
+ */
+function resolveInsideProject(abs, file) {
+  if (!file) {
+    const err = new Error('缺少 file')
+    err.status = 400
+    throw err
+  }
+  const resolved = path.resolve(String(file))
+  const rel = path.relative(abs, resolved)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    const err = new Error('file 必须位于工程目录内')
+    err.status = 400
+    throw err
+  }
+  return resolved
+}
+
+/* ------------------------------------------------------------------ *
  * 通用响应帮手
  * ------------------------------------------------------------------ */
 
@@ -196,10 +231,11 @@ function projectOf(ss, sessionId, cwd, key) {
  *   log?: (msg: string) => void,
  *   core: CoreSurface,
  *   createConverter?: () => Promise<{ renderImages(req: object): Promise<object>, dispose(): Promise<void> }>,
+ *   nativeCommand?: { canOpenNativePath(): boolean, nativeFileApplications(p: string, s?: AbortSignal): Promise<Array<{ id: string, name: string, default: boolean, icon: string | null }>>, openNativeAssociatedPath(p: string, s?: AbortSignal): Promise<unknown>, openNativeFileApplication(p: string, app: string, s?: AbortSignal): Promise<unknown>, revealNativePath(p: string, s?: AbortSignal): Promise<unknown> },
  *   sessionStore?: typeof sessionStore,
  * }} deps
  */
-export function createApiHandler({ resolveCwd, log = () => {}, core, createConverter, sessionStore: storeOverride } = {}) {
+export function createApiHandler({ resolveCwd, log = () => {}, core, createConverter, nativeCommand: nativeOverride, sessionStore: storeOverride } = {}) {
   if (!core || typeof core.editProject !== 'function' || typeof core.loadProject !== 'function') {
     throw new Error('createApiHandler 需要 deps.core（{ loadProject, editProject, undoProject, redoProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError }）')
   }
@@ -388,6 +424,27 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
         return res.end(bytes)
       }
 
+      if (route === 'GET /export/open-menu') {
+        const { sessionId, cwd } = sessionOf({}, url)
+        const { abs } = projectOf(ss, sessionId, cwd, String(url.searchParams.get('key') || ''))
+        const absFile = resolveInsideProject(abs, String(url.searchParams.get('file') || ''))
+        try {
+          await fsp.stat(absFile)
+        } catch {
+          return fail(res, 404, `文件不存在：${absFile}`)
+        }
+        const native = nativeOverride || (await nativeCommand())
+        if (!native.canOpenNativePath()) return json(res, 200, { ok: true, canOpen: false, applications: [] })
+        try {
+          const applications = await native.nativeFileApplications(absFile, AbortSignal.timeout(15000))
+          return json(res, 200, { ok: true, canOpen: true, applications })
+        } catch (err) {
+          // 与 DSH 文件菜单同口径：关联查询失败不阻塞「显示文件位置」。
+          log(`[ppt-maker] 打开方式查询失败：${err instanceof Error ? err.message : String(err)}`)
+          return json(res, 200, { ok: true, canOpen: true, applications: [] })
+        }
+      }
+
       /* ── 写方法：先卡内容类型 ─────────────────────────────── */
       const type = String(req.headers['content-type'] || '')
       if (!type.includes('application/json')) return fail(res, 415, '写操作必须使用 application/json')
@@ -462,11 +519,13 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
           const filename = `${safeFileStem(key)}-r${pipeline.revision}.pptx`
           const outDir = path.join(abs, 'export')
           await fsp.mkdir(outDir, { recursive: true })
-          await fsp.writeFile(path.join(outDir, filename), buffer)
+          const absolutePath = path.join(outDir, filename)
+          await fsp.writeFile(absolutePath, buffer)
           return json(res, 200, {
             ok: true,
             filename,
             relativePath: path.posix.join(String(dir).replace(/\\/g, '/'), 'export', filename),
+            absolutePath,
             revision: pipeline.revision,
             bytes: buffer.length,
           })
@@ -477,6 +536,31 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
           'cache-control': 'no-store',
         })
         return res.end(buffer)
+      }
+
+      if (route === 'POST /export/open') {
+        const { sessionId, cwd } = sessionOf(body, url)
+        const key = String(body.key || '')
+        const { abs } = projectOf(ss, sessionId, cwd, key)
+        const absFile = resolveInsideProject(abs, String(body.file || ''))
+        try {
+          await fsp.stat(absFile)
+        } catch {
+          return fail(res, 404, `文件不存在：${absFile}`)
+        }
+        const native = nativeOverride || (await nativeCommand())
+        const signal = AbortSignal.timeout(20000)
+        const action = String(body.action || '')
+        const application = typeof body.application === 'string' ? body.application : undefined
+        try {
+          if (action === 'reveal') await native.revealNativePath(absFile, signal)
+          else if (application) await native.openNativeFileApplication(absFile, application, signal)
+          else await native.openNativeAssociatedPath(absFile, signal)
+          return json(res, 200, { ok: true })
+        } catch (err) {
+          log(`[ppt-maker] 打开导出文件失败：${err instanceof Error ? err.message : String(err)}`)
+          return fail(res, 500, '打开失败：没有可用的桌面打开能力')
+        }
       }
 
       if (route === 'POST /history/restore') {

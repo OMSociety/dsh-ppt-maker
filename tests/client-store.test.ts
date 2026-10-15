@@ -91,6 +91,30 @@ describe('PptStore（S6 骨架纪律）', () => {
     store.dispose()
   })
 
+  it('exportDeck：toast 挂导出文件路径（打开方式菜单的数据源），并视觉残留 10 秒', async () => {
+    const store = seedStore()
+    await store.actions.init()
+    mockApi.exportPptxToProject.mockResolvedValue({
+      relativePath: 'a/export/x-r1.pptx',
+      absolutePath: 'C:/ws/a/export/x-r1.pptx',
+      filename: 'x-r1.pptx',
+      revision: 1,
+      bytes: 2048,
+    })
+    const res = await store.actions.exportDeck()
+    expect(res).not.toBeNull()
+    const snap = store.getSnapshot()
+    expect(snap.toast?.text).toContain('已导出 a/export/x-r1.pptx')
+    expect(snap.toast?.file).toBe('C:/ws/a/export/x-r1.pptx')
+
+    // 普通 info 2.6s 就消；导出 toast 要留够点开「打开方式」的时间
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(store.getSnapshot().toast?.text).toContain('已导出')
+    await vi.advanceTimersByTimeAsync(6000)
+    expect(store.getSnapshot().toast).toBeNull()
+    store.dispose()
+  })
+
   it('applyPoll 安静重载：无草稿时 revision 前进就推进 lastSeenRevision，不亮横幅', async () => {
     const store = seedStore()
     await store.actions.init()

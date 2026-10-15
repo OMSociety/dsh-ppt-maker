@@ -52,6 +52,7 @@
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.2 <0.3.0-0"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-native-command": "0.2.0-rc.2",
     "@deepseek-ai/libreoffice-kit": "0.1.2",
     "@office-kit/pptx": "0.24.0",
     "@office-kit/pptx-preview": "0.15.0",

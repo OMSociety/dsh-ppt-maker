@@ -18,6 +18,8 @@ export interface Toast {
   id: number
   text: string
   kind: 'info' | 'error'
+  /** 主机侧可打开的导出产物绝对路径（「打开方式」菜单的数据源；其它 toast 无此字段）。 */
+  file?: string
 }
 
 /** 选中一扇图形元素（S7 Stage/ElementOverlay 落地后往里写）。 */
@@ -130,14 +132,22 @@ export function createPptStore(sessionId: string) {
     state = { ...state, ...next }
     emit()
   }
-  const toast = (text: string, kind: Toast['kind'] = 'info') => {
+  /**
+   * 状态条提示。普通 info 2.6s / error 5s 自动消；opts.lingerMs 可定制
+   * （导出成功要给人留出点开「打开方式」的时间，10s）。
+   * opts.file 挂上主机侧可打开的导出产物路径。
+   */
+  const toast = (text: string, kind: Toast['kind'] = 'info', opts?: { file?: string; lingerMs?: number }) => {
     toastSeq += 1
     const id = toastSeq
-    patch({ toast: { id, text, kind } })
-    const timer = setTimeout(() => {
-      toastTimers.delete(timer)
-      if (state.toast && state.toast.id === id) patch({ toast: null })
-    }, kind === 'error' ? 5000 : 2600)
+    patch({ toast: { id, text, kind, file: opts?.file } })
+    const timer = setTimeout(
+      () => {
+        toastTimers.delete(timer)
+        if (state.toast && state.toast.id === id) patch({ toast: null })
+      },
+      opts?.lingerMs ?? (kind === 'error' ? 5000 : 2600),
+    )
     toastTimers.add(timer)
   }
 
@@ -605,7 +615,10 @@ export function createPptStore(sessionId: string) {
         const saved = await api.exportPptxToProject(state.sessionId, state.activeKey)
         if (saved.revision) patch({ lastSeenRevision: saved.revision })
         const kb = Math.max(1, Math.round(saved.bytes / 1024))
-        toast(`已导出 ${saved.relativePath || saved.filename}（${kb} KB）`, 'info')
+        toast(`已导出 ${saved.relativePath || saved.filename}（${kb} KB）`, 'info', {
+          file: saved.absolutePath || undefined,
+          lingerMs: 10000,
+        })
         return saved
       } catch (error) {
         toast(`导出失败：${(error as Error).message}`, 'error')

@@ -393,6 +393,122 @@ describe('host 路由', () => {
     expect((manifest.exportReport as Record<string, unknown> | undefined)?.kind).toBe('panel-export')
   })
 
+  describe('/export/open-menu 与 /export/open（打开方式 / 显示文件位置）', () => {
+    function nativeStub(over: Record<string, unknown> = {}) {
+      const calls: Array<{ fn: string; path: string; app?: string }> = []
+      const stub = {
+        canOpenNativePath: () => true,
+        nativeFileApplications: async (p: string) => {
+          calls.push({ fn: 'apps', path: p })
+          return [{ id: 'app-a', name: 'App A', default: true, icon: null }]
+        },
+        openNativeAssociatedPath: async (p: string) => {
+          calls.push({ fn: 'open', path: p })
+        },
+        openNativeFileApplication: async (p: string, app: string) => {
+          calls.push({ fn: 'openApp', path: p, app })
+        },
+        revealNativePath: async (p: string) => {
+          calls.push({ fn: 'reveal', path: p })
+        },
+        ...over,
+      }
+      return { stub, calls }
+    }
+
+    async function exportOne(): Promise<{ key: string; abs: string }> {
+      const { key } = await seedProject()
+      await apiJson(`${API_PREFIX}/edit`, {
+        method: 'POST',
+        body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] },
+      })
+      const saved = await apiJson(`${API_PREFIX}/export`, { method: 'POST', body: { sessionId: SESSION, key, save: true } })
+      expect(saved.status).toBe(200)
+      const abs = String(saved.json!.absolutePath || '')
+      expect(abs.length).toBeGreaterThan(0)
+      return { key, abs }
+    }
+
+    it('open-menu：枚举关联应用；open：reveal / 指定应用 / 默认打开三路分发', async () => {
+      const { stub, calls } = nativeStub()
+      await startServer({ nativeCommand: stub })
+      const { key, abs } = await exportOne()
+
+      const menu = await apiJson(
+        `${API_PREFIX}/export/open-menu?sessionId=${SESSION}&key=${key}&file=${encodeURIComponent(abs)}`,
+      )
+      expect(menu.status).toBe(200)
+      expect(menu.json!.canOpen).toBe(true)
+      expect((menu.json!.applications as unknown[]).length).toBe(1)
+      // 传给 native 层的是工程目录内的规范化绝对路径
+      expect(calls[0]).toEqual({ fn: 'apps', path: abs })
+
+      const reveal = await apiJson(`${API_PREFIX}/export/open`, {
+        method: 'POST', body: { sessionId: SESSION, key, file: abs, action: 'reveal' },
+      })
+      expect(reveal.status).toBe(200)
+
+      const withApp = await apiJson(`${API_PREFIX}/export/open`, {
+        method: 'POST', body: { sessionId: SESSION, key, file: abs, application: 'app-a' },
+      })
+      expect(withApp.status).toBe(200)
+
+      const dft = await apiJson(`${API_PREFIX}/export/open`, { method: 'POST', body: { sessionId: SESSION, key, file: abs } })
+      expect(dft.status).toBe(200)
+
+      expect(calls.slice(1)).toEqual([
+        { fn: 'reveal', path: abs },
+        { fn: 'openApp', path: abs, app: 'app-a' },
+        { fn: 'open', path: abs },
+      ])
+    })
+
+    it('open-menu：无桌面打开能力 → canOpen=false；查询失败 → 降级空列表', async () => {
+      const none = nativeStub({ canOpenNativePath: () => false })
+      await startServer({ nativeCommand: none.stub })
+      const { key, abs } = await exportOne()
+      const menu = await apiJson(
+        `${API_PREFIX}/export/open-menu?sessionId=${SESSION}&key=${key}&file=${encodeURIComponent(abs)}`,
+      )
+      expect(menu.json!.canOpen).toBe(false)
+      expect(menu.json!.applications).toEqual([])
+
+      const boom = nativeStub({
+        nativeFileApplications: async () => {
+          throw new Error('registry gone')
+        },
+      })
+      await startServer({ nativeCommand: boom.stub })
+      const menu2 = await apiJson(
+        `${API_PREFIX}/export/open-menu?sessionId=${SESSION}&key=${key}&file=${encodeURIComponent(abs)}`,
+      )
+      expect(menu2.json!.canOpen).toBe(true)
+      expect(menu2.json!.applications).toEqual([])
+    })
+
+    it('file 参数守卫：工程目录外 400、不存在 404', async () => {
+      const { stub } = nativeStub()
+      await startServer({ nativeCommand: stub })
+      const { key, abs } = await exportOne()
+
+      const outside = await apiJson(
+        `${API_PREFIX}/export/open-menu?sessionId=${SESSION}&key=${key}&file=${encodeURIComponent(path.join(cwd, '..', 'evil.pptx'))}`,
+      )
+      expect(outside.status).toBe(400)
+
+      // 不存在的文件：给工程目录内、但磁盘上没有的路径
+      const missing = await apiJson(
+        `${API_PREFIX}/export/open-menu?sessionId=${SESSION}&key=${key}&file=${encodeURIComponent(path.join(path.dirname(abs), 'nope.pptx'))}`,
+      )
+      expect(missing.status).toBe(404)
+
+      const openOutside = await apiJson(`${API_PREFIX}/export/open`, {
+        method: 'POST', body: { sessionId: SESSION, key, file: 'C:/Windows/evil.pptx' },
+      })
+      expect(openOutside.status).toBe(400)
+    })
+  })
+
   it('/media/upload：白名单 + MAX_ASSET_BYTES 上限', async () => {
     await startServer()
     const { key } = await seedProject()

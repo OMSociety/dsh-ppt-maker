@@ -163,15 +163,45 @@ export const CSS = `
 /* 常驻固定高度：只换文字，不参与「有则出现」的高度变化——
    保存横幅从顶栏挪到这里，画布才不再每编辑一次就被顶一下。 */
 .ppt-statusbar{
+  position:relative;
   display:flex;align-items:center;gap:6px;flex:none;
   height:22px;padding:0 10px;
   font-size:11px;line-height:22px;
   color:var(--dsw-alias-label-secondary);
   border-top:1px solid var(--dsw-alias-border-l2);
   background:var(--dsw-alias-bg-base);
-  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
 }
+.ppt-statusbar-text{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .ppt-statusbar[data-kind="error"]{color:var(--dsw-alias-label-status-error, var(--dsw-alias-label-primary))}
+
+/* ── 导出 toast 的「打开方式」菜单（结构与 DSH 文件菜单同：应用列表 + 固定底部的定位项）── */
+.ppt-openwith{position:relative;flex:none;display:inline-flex}
+.ppt-openwith-btn{
+  font:inherit;font-size:11px;line-height:1;padding:1px 6px;
+  color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover);
+  border:1px solid var(--dsw-alias-border-l2);border-radius:4px;cursor:pointer;
+}
+.ppt-openwith-btn:hover{background:var(--dsw-alias-interactive-bg-active, var(--dsw-alias-interactive-bg-hover))}
+.ppt-openwith-btn:disabled{opacity:.6;cursor:default}
+.ppt-openwith-menu{
+  position:absolute;right:0;bottom:calc(100% + 4px);z-index:40;
+  min-width:220px;max-height:320px;overflow-y:auto;
+  display:flex;flex-direction:column;
+  background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;
+  box-shadow:0 -4px 16px rgba(0,0,0,0.18);padding:4px;
+}
+.ppt-openwith-item{
+  display:flex;align-items:center;gap:8px;padding:5px 8px;
+  font:inherit;font-size:11.5px;color:var(--dsw-alias-label-primary);
+  background:transparent;border:none;border-radius:5px;cursor:pointer;text-align:left;
+}
+.ppt-openwith-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ppt-openwith-item:disabled{opacity:.6;cursor:default}
+.ppt-openwith-icon{width:16px;height:16px;flex:none;object-fit:contain}
+.ppt-openwith-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ppt-openwith-default{font-style:normal;color:var(--dsw-alias-label-secondary)}
+.ppt-openwith-sep{height:1px;margin:4px 6px;background:var(--dsw-alias-border-l2)}
+.ppt-openwith-note{padding:5px 8px;font-size:11px;color:var(--dsw-alias-label-secondary)}
 
 /* ── 载入中扫光（占位面板「正在打开…」用）──────────────────── */
 .ppt-sweep{

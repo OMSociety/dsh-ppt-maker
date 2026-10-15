@@ -20,6 +20,7 @@
  */
 import * as React from 'react'
 import type { PptStore } from './store'
+import { api, type OpenApplication } from './api'
 import { PptMark } from './icons'
 import { ProjectList } from './components/ProjectList'
 import { ThumbStrip } from './components/ThumbStrip'
@@ -95,16 +96,138 @@ function BlankEmpty() {
  * 用「常驻固定高度」而不是「有内容才出现的横幅」——保存是每次编辑都会发生的事，
  * 从顶栏弹出一条横幅会把画布整体顶下去（用户报的「每编辑一次页面弹动」就是这个）。
  * 常量高度 + 只换文字 = 出现/消失都不动布局。
+ * toast 带 file（导出产物）时右侧出「打开 ▾」——与 DSH「已编辑」文件菜单同款的
+ * 打开方式选择（关联应用 + 「显示文件位置」固定在底部）。
  */
 function StatusBar({ store }: { store: PptStore }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const toast = state.toast
   const text = state.saving ? '正在保存…' : toast ? toast.text : ''
   const kind = !state.saving && toast?.kind === 'error' ? 'error' : 'info'
+  const file = !state.saving && toast?.kind !== 'error' ? toast?.file : undefined
   return (
     <div className="ppt-statusbar" data-kind={kind} role="status" aria-live="polite">
-      {text}
+      <span className="ppt-statusbar-text">{text}</span>
+      {file && state.activeKey ? (
+        <ExportOpenMenu file={file} sessionId={state.sessionId} sessionKey={state.activeKey} />
+      ) : null}
     </div>
+  )
+}
+
+/**
+ * 导出产物的「打开方式」分体按钮：主按钮用默认关联应用打开，▾ 出菜单——
+ * 关联应用列表（icon + （默认） 标注，来自 dsh-native-command，与 DSH 文件菜单同原语）、
+ * 分隔线、「显示文件位置」固定底部。查询在首次点开时惰性发起并缓存。
+ */
+function ExportOpenMenu({
+  file,
+  sessionId,
+  sessionKey,
+}: {
+  file: string
+  sessionId: string
+  sessionKey: string
+}) {
+  const [open, setOpen] = React.useState(false)
+  const [apps, setApps] = React.useState<OpenApplication[] | null>(null)
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const rootRef = React.useRef<HTMLSpanElement | null>(null)
+
+  const load = React.useCallback(() => {
+    setError(null)
+    api
+      .exportOpenMenu(sessionId, sessionKey, file)
+      .then((res) => setApps(res.applications))
+      .catch((err: unknown) => setError((err as Error).message))
+  }, [sessionId, sessionKey, file])
+
+  // 打开菜单 = 查询关联应用（同 DSH：点开才查，结果缓存）。
+  React.useEffect(() => {
+    if (open && apps === null && !error) load()
+  }, [open, apps, error, load])
+
+  // 菜单外点 / Escape 收起。
+  React.useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && e.target instanceof Node && !rootRef.current.contains(e.target)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const fire = async (opts?: { application?: string; action?: 'reveal' }) => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.exportOpen(sessionId, sessionKey, file, opts)
+      setOpen(false)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fallback = apps !== null && apps.length === 0 && !error
+  return (
+    <span className="ppt-openwith" ref={rootRef}>
+      <button
+        type="button"
+        className="ppt-openwith-btn"
+        disabled={busy}
+        onClick={() => setOpen((v) => !v)}
+        title={fallback ? '显示文件位置' : '打开导出的 .pptx'}
+      >
+        打开 {open ? '▴' : '▾'}
+      </button>
+      {open ? (
+        <div className="ppt-openwith-menu" role="menu">
+          {error ? <div className="ppt-openwith-note">{error}</div> : null}
+          {!error && apps === null ? <div className="ppt-openwith-note">正在读取关联应用…</div> : null}
+          {!error && apps
+            ? apps.map((app) => (
+                <button
+                  key={app.id}
+                  type="button"
+                  role="menuitem"
+                  className="ppt-openwith-item"
+                  disabled={busy}
+                  onClick={() => void fire({ application: app.id })}
+                >
+                  {app.icon ? <img className="ppt-openwith-icon" src={app.icon} alt="" /> : <span className="ppt-openwith-icon" />}
+                  <span className="ppt-openwith-name">
+                    {app.name}
+                    {app.default ? <em className="ppt-openwith-default">（默认）</em> : null}
+                  </span>
+                </button>
+              ))
+            : null}
+          {/* 一个关联应用都没有时主按钮退化为「显示文件位置」（DSH 同口径）。 */}
+          <div className="ppt-openwith-sep" />
+          <button
+            type="button"
+            role="menuitem"
+            className="ppt-openwith-item"
+            disabled={busy}
+            onClick={() => void fire({ action: 'reveal' })}
+          >
+            <span className="ppt-openwith-icon" />
+            <span className="ppt-openwith-name">显示文件位置</span>
+          </button>
+        </div>
+      ) : null}
+    </span>
   )
 }
 

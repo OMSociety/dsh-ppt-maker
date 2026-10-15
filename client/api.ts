@@ -130,6 +130,14 @@ export interface HistorySnapshotPayload {
   warnings: string[]
 }
 
+/** 系统关联应用（dsh-native-command 查询结果；icon 为 data URI 或 null）。 */
+export interface OpenApplication {
+  id: string
+  name: string
+  default: boolean
+  icon: string | null
+}
+
 const PREFIX = '/ppt-maker/api'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -240,7 +248,7 @@ export const api = {
   async exportPptxToProject(
     sessionId: string,
     key: string,
-  ): Promise<{ relativePath: string; filename: string; revision: number; bytes: number }> {
+  ): Promise<{ relativePath: string; absolutePath: string; filename: string; revision: number; bytes: number }> {
     const res = await fetch(`${PREFIX}/export`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -249,16 +257,46 @@ export const api = {
     if (!res.ok) await failExport(res)
     const payload = (await res.json().catch(() => ({}))) as {
       relativePath?: string
+      absolutePath?: string
       filename?: string
       revision?: number
       bytes?: number
     }
     return {
       relativePath: String(payload?.relativePath || ''),
+      absolutePath: String(payload?.absolutePath || ''),
       filename: String(payload?.filename || 'deck.pptx'),
       revision: Number(payload?.revision || 0),
       bytes: Number(payload?.bytes || 0),
     }
+  },
+
+  /**
+   * 导出产物的主机侧「打开方式」：枚举系统关联应用（与 DSH「已编辑」文件菜单同一套
+   * dsh-native-command 原语）。canOpen=false 或查询失败时 applications 为空数组——
+   * 菜单降级为只剩「显示文件位置」。
+   */
+  async exportOpenMenu(
+    sessionId: string,
+    key: string,
+    file: string,
+  ): Promise<{ canOpen: boolean; applications: OpenApplication[] }> {
+    const params = `sessionId=${encodeURIComponent(sessionId)}&key=${encodeURIComponent(key)}&file=${encodeURIComponent(file)}`
+    const payload = await call<{ canOpen?: boolean; applications?: OpenApplication[] }>(`/export/open-menu?${params}`)
+    return { canOpen: Boolean(payload?.canOpen), applications: Array.isArray(payload?.applications) ? payload.applications : [] }
+  },
+
+  /** 打开导出文件：默认关联应用 / 指定 application(id) / action:'reveal' 显示文件位置。 */
+  async exportOpen(
+    sessionId: string,
+    key: string,
+    file: string,
+    opts?: { application?: string; action?: 'reveal' },
+  ): Promise<void> {
+    await call(`/export/open`, {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, key, file, application: opts?.application, action: opts?.action }),
+    })
   },
 
   /** 版本历史列表：游标位置 + 全部快照元数据（升序）。 */
