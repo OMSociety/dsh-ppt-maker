@@ -330,7 +330,6 @@ export async function createProject(cwd: string, options: CreateProjectOptions):
     await mkdir(path.join(abs, 'media'), { recursive: true })
 
     const deck: Presentation = {
-      version: '1.0',
       profile: 'generate',
       ...(options.title !== undefined ? { title: options.title } : {}),
       size: options.size ?? DEFAULT_SIZE,

@@ -41,7 +41,6 @@ describe('PR3 e2e：导出管线完整跑通字体嵌入 + headless 裁决', () 
 
         // 塞一页内容 + theme 引用 MiSans
         const deckText = [
-          'version: "1.0"',
           'profile: generate',
           'title: PR3 端到端字体嵌入',
           'size: [960, 540]',

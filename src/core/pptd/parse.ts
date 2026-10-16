@@ -186,15 +186,6 @@ export function exportConfigOf(deck: Presentation): Required<Presentation['expor
 export function validateDeckShape(deck: Record<string, unknown>, path: string): Issue[] {
   const issues: Issue[] = []
 
-  if (deck.version !== '1.0') {
-    issues.push(
-      blocker(ERROR_CODES.VersionError, `version 缺失或不为 "1.0"（实际：${JSON.stringify(deck.version)}）`, `${path}#version`, {
-        expected: '1.0',
-        actual: deck.version ?? null
-      })
-    )
-  }
-
   if (deck.profile !== undefined && deck.profile !== 'generate' && deck.profile !== 'reverse') {
     issues.push(
       blocker(ERROR_CODES.UnknownProfileError, `profile 取值必须是 generate / reverse（实际：${JSON.stringify(deck.profile)}）`, `${path}#profile`)

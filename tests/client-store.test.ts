@@ -38,7 +38,6 @@ const STATE_R1 = {
 }
 
 const DECK = {
-  version: '1.0',
   title: 'T',
   size: [960, 540] as [number, number],
   pages: ['pages/01.page', 'pages/02.page'],

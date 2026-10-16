@@ -44,7 +44,7 @@ export interface PptState {
   /** 活动工程的 manifest（GET /project 拉起；占位面板显示品牌，真 Stage 用 deck）。 */
   manifest: unknown | null
   /** 活动工程 GET /project 的整棵 deck（size / source / …都在里面）。 */
-  deck: { version: string; profile?: string; title?: string; size: [number, number]; pages: string[]; source?: unknown } | null
+  deck: { profile?: string; title?: string; size: [number, number]; pages: string[]; source?: unknown } | null
   /** 活动工程 deck 的页文件清单（GET /project 的 deck.pages，顺序即页序）。 */
   deckPages: string[]
   /** 当前页的文件内容（GET /page 拉起来的单页 AST；Store 只存「已经请求过」的那一份）。 */

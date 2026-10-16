@@ -424,7 +424,6 @@ export interface CustomFont {
 
 /** Spec §3.1 — deck.pptd. */
 export interface Presentation {
-  version: '1.0'
   profile?: Profile
   title?: string
   size: [number, number]
@@ -559,7 +558,6 @@ export interface Issue {
  * (spec §2.5 "generate 档 … $key 引用必须在 theme 中存在"; §3.1 required fields).
  */
 export const ERROR_CODES = {
-  VersionError: 'VersionError',
   UnknownProfileError: 'UnknownProfileError',
   ProfileViolationError: 'ProfileViolationError',
   PlaceholderNotAllowedError: 'PlaceholderNotAllowedError',

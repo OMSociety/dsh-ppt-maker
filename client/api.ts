@@ -67,7 +67,6 @@ export interface ProjectPayload {
   manifest: unknown
   /** 整棵 deck；细节由 PPTD 规格兜底（面板只用其中的 size 与 pages[]）。 */
   deck: {
-    version: string
     profile?: string
     title?: string
     size: [number, number]

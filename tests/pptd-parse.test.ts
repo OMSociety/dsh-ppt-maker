@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseProject, type Issue } from '../src/core/pptd/parse.js'
 
-const DECK_BASIC = `version: "1.0"
-size: [960, 540]
+const DECK_BASIC = `size: [960, 540]
 pages:
   - pages/01.page
 `
@@ -29,19 +28,13 @@ describe('parseProject（PPTD）', () => {
     expect(r.issues.filter((i) => i.level === 'blocker')).toEqual([])
   })
 
-  it('version 不是 1.0 → VersionError blocker（解析结果保留，供调用方诊断）', () => {
-    const r = parseProject('version: v2\npages: []\n', [])
-    expect(codes(r.issues)).toContain('VersionError')
-    expect(r.issues.find((i) => i.code === 'VersionError')?.level).toBe('blocker')
-  })
-
   it('未知 profile → UnknownProfileError', () => {
-    const r = parseProject('version: "1.0"\nprofile: sideways\npages: []\n', [])
+    const r = parseProject('profile: sideways\npages: []\n', [])
     expect(codes(r.issues)).toContain('UnknownProfileError')
   })
 
   it('export.fontEmbed 越值 → ExportFieldValueError', () => {
-    const r = parseProject('version: "1.0"\nexport: { fontEmbed: bogus }\npages: []\n', [])
+    const r = parseProject('export: { fontEmbed: bogus }\npages: []\n', [])
     expect(codes(r.issues)).toContain('ExportFieldValueError')
   })
 
@@ -94,8 +87,7 @@ elements: []
   })
 
   it('引用未定义 theme key → UnknownThemeKeyError', () => {
-    const deck = `version: "1.0"
-size: [960, 540]
+    const deck = `size: [960, 540]
 theme:
   colors:
     brand: '#112233'

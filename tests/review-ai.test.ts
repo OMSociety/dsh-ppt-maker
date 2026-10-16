@@ -52,7 +52,6 @@ async function fakeImage(page: number): Promise<{ page: number; absPath: string 
 async function fakePres(): Promise<PresentationData> {
   const engine = createOfficeKitEngine()
   const deck: Presentation = {
-    version: '1.0',
     profile: 'generate',
     size: [960, 540],
     export: { fontEmbed: 'off', transition: 'none', animations: 'off' },

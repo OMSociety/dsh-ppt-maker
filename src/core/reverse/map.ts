@@ -1049,7 +1049,6 @@ export function mapReverseModel(
   const pages: Page[] = []
   const media: ReverseMediaAsset[] = []
   const report: ImportReport = {
-    version: '1.0',
     profile: 'reverse',
     source: {
       path: options.sourcePath,
@@ -1079,7 +1078,6 @@ export function mapReverseModel(
   const themeColors = getPresentationTheme(pres)
 
   const deck: Presentation = {
-    version: '1.0',
     profile: 'reverse',
     size: sizePx,
     // R3：母版 txStyles 不可完整还原；主题字体落到 title/body 两个

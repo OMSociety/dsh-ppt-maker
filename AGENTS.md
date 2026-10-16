@@ -150,5 +150,5 @@ PowerShell 下最后一条改成分两句：先 `$env:NODE_OPTIONS='--max-old-sp
 
 ## 维护
 
-本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与依赖版本、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。改 PPTD 的 `version` 取值要一次改全：[docs/pptd-spec.md](docs/pptd-spec.md)、`src/core/pptd/schema.ts`、`src/core/pptd/parse.ts`（校验与报错文案）、`src/core/project/store.ts`、`src/core/reverse/` 与全部测试 fixture。
+本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与依赖版本、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。[skills/ppt-maker/reference/pptd.md](skills/ppt-maker/reference/pptd.md) 是上游快照，行号被 `docs/pptd-spec.md` 的承继条款点名，只读不改；本仓格式以 `docs/pptd-spec.md` 为准。
 本文件写的是约定与边界，发现与代码不符时先判断哪边过时：约定过时改本文件，代码违规改代码。`docs/DECISIONS.md` 记的是决策依据，与现状冲突时以代码和测试为准。

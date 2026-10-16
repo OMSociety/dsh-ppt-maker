@@ -2,7 +2,7 @@
 
 PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 YAML 抽象层：用 Agent 友好、单页自包含、人可肉眼审查的方式描述、生成与编辑幻灯片，并与 `.pptx` 双向转换。
 
-本文件是 PPTD 的规范性文档（normative document）：`version: "1.0"` 的工程以本文件为准。本文件采用**增量规格**（incremental specification）写法——本版新增与改动的部分在此写全文，上游快照沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/ppt-maker/reference/pptd.md`（上游 PPTD v2 快照，2029 行）的具体章节与行号；被点名的 v2 章节与本文件同等 normative。两者冲突时以本文件为准。
+本文件是 PPTD 的规范性文档（normative document）：以本文件描述的工程结构为准。本文件采用**增量规格**（incremental specification）写法——本版新增与改动的部分在此写全文，上游快照沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/ppt-maker/reference/pptd.md`（上游 PPTD v2 快照，2029 行）的具体章节与行号；被点名的 v2 章节与本文件同等 normative。两者冲突时以本文件为准。
 
 ---
 
@@ -187,7 +187,6 @@ interface Presentation {
 
 ```ts
 interface Presentation {
-  version: "1.0";               // 必填，固定 "1.0"
   profile?: Profile;           // 默认 "generate"；见 §2
   title?: string;              // 默认无标题
   size: [number, number];      // 必填，[宽, 高]；推荐值见 §1.2
@@ -214,7 +213,6 @@ interface DeckSource {
 **生成方言示例**：
 
 ```yaml
-version: "1.0"
 profile: generate
 title: 年度工作总结
 size: [960, 540]
@@ -247,7 +245,6 @@ pages:
 **逆向方言示例**：
 
 ```yaml
-version: "1.0"
 profile: reverse
 title: 第三章 研究方法（导入）
 size: [960, 540]
@@ -912,7 +909,6 @@ interface Placeholder extends ElementBase {
 ### 10.3 import.report.yml
 
 ```yaml
-version: "1.0"
 profile: reverse
 source:
   path: "D:/inbox/thesis-defense.pptx"
@@ -967,7 +963,6 @@ degraded:
 | `ExplicitGeometryRequiredError` | 逆向方言元素缺 `bounds`，或缺少源文件里存在的 `rotation` / `opacity` / `flip` 显式值 | reverse 档 | blocker |
 | `SourceRequiredError` | `profile: reverse` 而 `deck.source` 缺失，或 `source.slideCount` / `source.size` 缺失 | reverse 档 | blocker |
 | `UnknownProfileError` | `profile` 取值不在 `generate` / `reverse` 内 | 两档 | blocker |
-| `VersionError` | `version` 缺失或不为 `"1.0"` | 两档 | blocker |
 
 ### 11.2 export
 
@@ -1121,7 +1116,6 @@ degraded:
 
 | 位置 | 字段 | 取值 | 方言 |
 |---|---|---|---|
-| deck | `version` | 固定 `"1.0"` | 通用 |
 | deck | `profile` | `generate`（默认）/ `reverse` | 通用 |
 | deck | `export.fontEmbed` | `subset`（默认）/ `full` / `off` | 通用 |
 | deck | `export.transition` | `fade`（默认）/ `none` | 通用 |
@@ -1146,7 +1140,6 @@ degraded:
 `deck.pptd`：
 
 ```yaml
-version: "1.0"
 profile: generate
 title: 论文答辩：明清之际的经学转向
 size: [960, 540]
@@ -1248,7 +1241,6 @@ animations:
 `deck.pptd`：
 
 ```yaml
-version: "1.0"
 profile: reverse
 title: thesis-defense（导入）
 size: [960, 540]
