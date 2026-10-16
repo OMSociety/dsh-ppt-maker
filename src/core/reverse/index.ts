@@ -1,5 +1,5 @@
 /**
- * Reverse engine — PPTX → PPTD v3 (PR 2 plan §1).
+ * Reverse engine — PPTX → PPTD (PR 2 plan §1).
  *
  * This directory is the **second** sanctioned `@office-kit/pptx` import point
  * in the repo (`core/engine/officekit.ts` is the first). The two halves never

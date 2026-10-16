@@ -1,15 +1,15 @@
 ---
 name: ppt-maker
-description: 生成/编辑/导出 PPT 与演示文稿。工具优先：用插件注册的八个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx）；Python 脚本（pptd_to_pptx.py 等）是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作等设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
+description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：用插件注册的十一个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出，以及把既有 .pptx 逆向成 PPTD 工程或外科手术式轻改（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx）；Python 脚本（pptd_to_pptx.py 等）是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作等设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
 ---
 
 # ppt-maker：PPT 生成与本地导出
 
-用 PPTD v3（YAML 中间格式，单页自包含）写 deck，**工具层直接产出最终 .pptx**。
+用 PPTD（YAML 中间格式，单页自包含）写 deck，**工具层直接产出最终 .pptx**。
 
 ## 工具优先
 
-做 PPT 一律先走工具，不要手写脚本调库。八个工具（全部 raw JSON-Schema 注册，参数里有 `dir` 的都是工程目录，相对会话 cwd）：
+做 PPT 一律先走工具，不要手写脚本调库。十一个工具（全部 raw JSON-Schema 注册，参数里有 `dir` 的都是工程目录，相对会话 cwd）：
 
 | 工具 | 干什么 | 关键返回 |
 |---|---|---|
@@ -20,6 +20,9 @@ description: 生成/编辑/导出 PPT 与演示文稿。工具优先：用插件
 | `ppt_render` | 渲染每页 PNG 预览（libreoffice-kit 光栅化最终 pptx） | `{ok, images:[{page,path}]}` |
 | `ppt_check` | 质检（规则层默认跑；`ai:true` 追加 AI 视觉质检） | `{ok, pass, issues:[...]}` |
 | `ppt_export` | 导出 .pptx（规则质检 blocker 会拦住，`skipCheck:true` 绕过） | `{ok, path, revision, check}` |
+| `ppt_import` | 把既有 .pptx 逆向成 PPTD 工程（`mode:'full'`；`surgical` 只回提示不建工程） | `{ok, dir, report}` |
+| `ppt_patch` | 对 .pptx 外科手术式轻改（改字/换图/调页序），库不建模的部件原样保留 | `{ok, path, lostParts}` |
+| `ppt_open` | 用右侧栏工作台打开一个工程（只登记打开请求，不改工程） | `{ok}` |
 
 **质检分两层**：规则层（文字溢出/出界/重叠/对比度/结构/缺字体）是阻断式，blocker 不修掉就不给导出；AI 层（`ppt_check` 传 `ai: true`）只出建议不阻断——把最终渲染页 PNG 送当前路由的多模态模型看配色/层级/平衡。路由不支持图像输入时，AI 层降级为返回 PNG 路径清单 + 版式指标摘要，由你（主模型）自行 `read_image` 复核。
 
@@ -39,7 +42,7 @@ description: 生成/编辑/导出 PPT 与演示文稿。工具优先：用插件
 | 输入 | 仅主题 / 完整文档 / 逐页大纲 |
 | 页数 | 用户指定优先；只给文档时先给页数估算并确认 |
 
-- 先读完用户上传的全部文件与 URL。PPTD v3 的格式约束读 `docs/pptd-v3-spec.md`（仓库内）；v2 继承字段的细则读 `reference/pptd.md`。
+- 先读完用户上传的全部文件与 URL。PPTD 的格式约束读 `docs/pptd-spec.md`（仓库内）；v2 继承字段的细则读 `reference/pptd.md`。
 - 内容不足以撑满演示时，先用检索补充材料（除非用户明确说不扩展）。
 - 需求冲突或无法判定时**先问用户**：调用 `ask_user_question` 把冲突项摆成选项（推荐项放首位并加 `(Recommended)`），一次一问；不要自行脑补。
 
@@ -54,7 +57,7 @@ description: 生成/编辑/导出 PPT 与演示文稿。工具优先：用插件
 
 - **新建**：按场景读 `reference/slides_categories.md` 对应场景的规范；指定设计系统时只读该主题（`reference/design_system/<族>/<子风格>/design.md`），**严禁混搭**。
 - **复刻**（图片/PDF → PPTD）：尽量 1:1。看不清的位置用网格线、放大观察；照片/头像这类无法用图形近似的，存 `media/` 后作为图片元素插入。
-- **编辑现有 PPT**：PR2 才给 `ppt_import`（逆向）；当前版本请用户对既有 deck 的 PPTD 工程操作。
+- **编辑现有 PPT**：既有 .pptx 走 `ppt_import`（全量逆向成 PPTD 工程，改完再 `ppt_export`）或 `ppt_patch`（只改字/换图/调页序，不逆向你没动的东西）；已在 PPTD 工程里的直接 `ppt_edit`。
 - **版式纪律**：多页 deck 避免版式雷同——同一套「三张等宽卡片」不要页页复用，按内容换用非对称两栏、Zig-Zag 交错、整幅图配文字条、时间轴等；层级用字重与色彩对比控制，不靠超大字号撑场面。
 - **语体纪律**：少用抽象套话与 AI 腔（"闭环/赋能/解构/主战场/看似…实则…/不是 A 而是 B"），以事实和证据说话。
 
@@ -95,4 +98,4 @@ description: 生成/编辑/导出 PPT 与演示文稿。工具优先：用插件
 
 ## 动画与备注
 
-默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的完整清单见 `docs/pptd-v3-spec.md` 附录 A/B。
+默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的完整清单见 `docs/pptd-spec.md` 附录 A/B。

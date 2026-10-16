@@ -9,7 +9,7 @@
  * Frozen contract (PR 2 plan §4/§7):
  *  - cwd resolution: `sessions.get(sessionId).header.cwd`; missing is an
  *    error, no process.cwd() fallback.
- *  - `path` must resolve inside cwd to an existing PPTD v3 project
+ *  - `path` must resolve inside cwd to an existing PPTD project
  *    (manifest.json present, unreadable → ProjectNotFound 404).
  */
 import path from 'node:path'
@@ -39,7 +39,7 @@ async function ensureProjectDir(cwd: string, dir: string): Promise<string> {
     const parsed = JSON.parse(raw) as { revision?: unknown }
     if (typeof parsed?.revision !== 'number') throw new Error('revision 缺失')
   } catch (err) {
-    throw new ProjectError('ProjectNotFound', `目标不是可打开的 PPTD v3 工程（manifest.json 读不出来）：${abs}`, {
+    throw new ProjectError('ProjectNotFound', `目标不是可打开的 PPTD 工程（manifest.json 读不出来）：${abs}`, {
       status: 404,
       detail: err instanceof Error ? err.message : String(err)
     })
@@ -51,7 +51,7 @@ export function registerOpenTool(ctx: PluginToolCtxWithOpen): (() => void) | und
   const off = ctx.tools.register({
     name: 'ppt_open',
     description:
-      '把工作台（右侧栏）打开到指定的 PPTD v3 工程目录。' +
+      '把工作台（右侧栏）打开到指定的 PPTD 工程目录。' +
       '只在面板活跃的会话里通过轮询生效；不修改工程文件。',
     parameters: {
       type: 'object',

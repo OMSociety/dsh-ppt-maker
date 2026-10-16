@@ -18,7 +18,7 @@ import {
 
 function state(label: string, media: SnapshotState['media'] = []): SnapshotState {
   return {
-    deck: `version: v3\n# ${label}\npages:\n  - pages/01.page\n`,
+    deck: `version: "1.0"\n# ${label}\npages:\n  - pages/01.page\n`,
     pages: new Map([['pages/01.page', `elements: [] # ${label}\n`]]),
     media
   }

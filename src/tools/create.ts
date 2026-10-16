@@ -1,5 +1,5 @@
 /**
- * ppt_create — create an empty PPTD v3 project under the session cwd.
+ * ppt_create — create an empty PPTD project under the session cwd.
  *
  * Frozen result shape (plan §2): `{ ok, manifest }` with
  * `manifest.revision === 0`.
@@ -11,7 +11,7 @@ export function registerCreateTool(ctx: PluginToolCtx): (() => void) | undefined
   const off = ctx.tools.register({
     name: 'ppt_create',
     description:
-      '创建 PPTD v3 演示文稿工程：在会话工作目录下生成 <dir>/deck.pptd、manifest.json（revision: 0）、pages/、media/ 与 .history/ 锚点快照。' +
+      '创建 PPTD 演示文稿工程：在会话工作目录下生成 <dir>/deck.pptd、manifest.json（revision: 0）、pages/、media/ 与 .history/ 锚点快照。' +
       '返回 { ok, manifest }；后续编辑把 manifest.revision 作为 ppt_edit 的 baseRevision。',
     parameters: {
       type: 'object',

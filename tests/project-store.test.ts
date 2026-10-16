@@ -42,7 +42,7 @@ describe('project store（工程层）', () => {
     expect(await exists('proj/manifest.json')).toBe(true)
     expect(await exists('proj/.history/r0000/meta.json')).toBe(true)
     const deck = await readFile(path.join(cwd, 'proj', 'deck.pptd'), 'utf8')
-    expect(deck).toContain('version: v3')
+    expect(deck).toContain('version: "1.0"')
     expect(deck).toContain('title: 测试')
   })
 

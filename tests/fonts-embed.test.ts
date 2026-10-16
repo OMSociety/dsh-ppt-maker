@@ -104,7 +104,7 @@ describe('PR3 字体子系统 · fsType 位判定', () => {
 
 describe('PR3 字体子系统 · usage 收集', () => {
   const deck: Presentation = {
-    version: 'v3',
+    version: '1.0',
     size: [960, 540],
     theme: {
       textStyles: {
@@ -233,7 +233,7 @@ describe('PR3 字体子系统 · 整链 smoke（空工程走通）', () => {
     const { embedFontsForPptx } = await import('../src/core/fonts/embed-pipeline.js')
     const bare = await barePptxBytes()
     const deckEmpty: Presentation = {
-      version: 'v3',
+      version: '1.0',
       size: [960, 540],
       export: { fontEmbed: 'off', transition: 'none', animations: 'off' },
       pages: []

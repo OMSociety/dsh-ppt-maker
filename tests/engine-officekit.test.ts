@@ -24,7 +24,7 @@ function ctx(overrides: Partial<BuildContext> = {}): BuildContext {
 
 function deck(overrides: Partial<Presentation> = {}): Presentation {
   return {
-    version: 'v3',
+    version: '1.0',
     profile: 'generate',
     size: [960, 540],
     theme: {

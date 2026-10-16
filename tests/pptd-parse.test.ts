@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseProject, type Issue } from '../src/core/pptd/parse.js'
 
-const DECK_BASIC = `version: v3
+const DECK_BASIC = `version: "1.0"
 size: [960, 540]
 pages:
   - pages/01.page
@@ -19,7 +19,7 @@ function codes(issues: Issue[]): string[] {
   return issues.map((i) => i.code)
 }
 
-describe('parseProject（PPTD v3）', () => {
+describe('parseProject（PPTD）', () => {
   it('解析合法 generate 工程：无 blocker，尺寸与页表正确', () => {
     const r = parseProject(DECK_BASIC, [{ path: 'pages/01.page', text: PAGE_BASIC }])
     expect(r.deck).not.toBeNull()
@@ -29,19 +29,19 @@ describe('parseProject（PPTD v3）', () => {
     expect(r.issues.filter((i) => i.level === 'blocker')).toEqual([])
   })
 
-  it('version 不是 v3 → VersionError blocker（解析结果保留，供调用方诊断）', () => {
+  it('version 不是 1.0 → VersionError blocker（解析结果保留，供调用方诊断）', () => {
     const r = parseProject('version: v2\npages: []\n', [])
     expect(codes(r.issues)).toContain('VersionError')
     expect(r.issues.find((i) => i.code === 'VersionError')?.level).toBe('blocker')
   })
 
   it('未知 profile → UnknownProfileError', () => {
-    const r = parseProject('version: v3\nprofile: sideways\npages: []\n', [])
+    const r = parseProject('version: "1.0"\nprofile: sideways\npages: []\n', [])
     expect(codes(r.issues)).toContain('UnknownProfileError')
   })
 
   it('export.fontEmbed 越值 → ExportFieldValueError', () => {
-    const r = parseProject('version: v3\nexport: { fontEmbed: bogus }\npages: []\n', [])
+    const r = parseProject('version: "1.0"\nexport: { fontEmbed: bogus }\npages: []\n', [])
     expect(codes(r.issues)).toContain('ExportFieldValueError')
   })
 
@@ -94,7 +94,7 @@ elements: []
   })
 
   it('引用未定义 theme key → UnknownThemeKeyError', () => {
-    const deck = `version: v3
+    const deck = `version: "1.0"
 size: [960, 540]
 theme:
   colors:

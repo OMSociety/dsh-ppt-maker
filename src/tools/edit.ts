@@ -16,7 +16,7 @@ export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
     name: 'ppt_edit',
     description:
-      '对 PPTD v3 工程应用一组编辑 op（原子批量：任一 op 失败整批不落盘）。' +
+      '对 PPTD 工程应用一组编辑 op（原子批量：任一 op 失败整批不落盘）。' +
       'op 词表（冻结）：add_page / remove_page / move_page / update_page / page_duplicate / add_element / update_element / remove_element' +
       '（别名 page_add=add_page、page_delete=remove_page）。' +
       '带 baseRevision 做乐观锁：与 manifest.revision 不一致返回 409 RevisionMismatch。' +

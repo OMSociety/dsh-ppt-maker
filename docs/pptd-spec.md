@@ -1,8 +1,8 @@
-# PPTD v3 方言规格
+# PPTD 方言规格
 
 PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 YAML 抽象层：用 Agent 友好、单页自包含、人可肉眼审查的方式描述、生成与编辑幻灯片，并与 `.pptx` 双向转换。
 
-本文件是 PPTD **v3** 的规范性文档（normative document）：`version: "v3"` 的工程以本文件为准。本文件采用**增量规格**（incremental specification）写法——v3 新增与改动的部分在此写全文，v2 沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/ppt-maker/reference/pptd.md`（PPTD v2 快照，2029 行）的具体章节与行号；被点名的 v2 章节与本文件同等 normative。两者冲突时以本文件为准。
+本文件是 PPTD 的规范性文档（normative document）：`version: "1.0"` 的工程以本文件为准。本文件采用**增量规格**（incremental specification）写法——本版新增与改动的部分在此写全文，上游快照沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/ppt-maker/reference/pptd.md`（上游 PPTD v2 快照，2029 行）的具体章节与行号；被点名的 v2 章节与本文件同等 normative。两者冲突时以本文件为准。
 
 ---
 
@@ -33,11 +33,11 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 - 演示文稿默认尺寸 16:9 → `[960, 540]`，4:3 → `[720, 540]`；海报默认尺寸 16:9 → `[1280, 720]`、9:16 → `[720, 1280]`、4:3 → `[1280, 960]`、3:4 → `[960, 1280]`、1:1 → `[1080, 1080]`；
 - 元素层叠顺序由 `Page.elements` 数组顺序决定，越靠后层级越高。
 
-v3 补充（逆向方言精度口径）：`bounds`、`rotation`、`opacity` 等由 OOXML 单位（EMU / 60000 分之一度）换算而来的值，**保留到小数点后两位**，不做整数取整；换算式 `px = EMU / 12700`（1px = 1pt = 12700 EMU）。
+本版补充（逆向方言精度口径）：`bounds`、`rotation`、`opacity` 等由 OOXML 单位（EMU / 60000 分之一度）换算而来的值，**保留到小数点后两位**，不做整数取整；换算式 `px = EMU / 12700`（1px = 1pt = 12700 EMU）。
 
 ### 1.3 样式优先级与默认值
 
-三条优先级链全部承继 v2，v3 不改：
+三条优先级链全部承继上游，本版不改：
 
 | 链 | 承继条款 |
 |---|---|
@@ -47,13 +47,13 @@ v3 补充（逆向方言精度口径）：`bounds`、`rotation`、`opacity` 等�
 
 `lineHeight`（倍数）与 `lineHeightPx`（固定 px）互斥、同设时 `lineHeightPx` 优先——承继 v2（reference/pptd.md:30）。
 
-v3 补充：**逆向方言不参与优先级链回落**。逆向方言要求样式值在导入时解析为字面量（见 §2.3 R2/R4），因此每个样式位置都有显式值；优先级链只在生成方言（以及逆向工程被改写为生成方言后）发挥回落作用。
+本版补充：**逆向方言不参与优先级链回落**。逆向方言要求样式值在导入时解析为字面量（见 §2.3 R2/R4），因此每个样式位置都有显式值；优先级链只在生成方言（以及逆向工程被改写为生成方言后）发挥回落作用。
 
 ### 1.4 工程结构
 
 ```
 <工程目录>/
-  deck.pptd            # 主入口（必需；v3 固定此文件名）
+  deck.pptd            # 主入口（必需；固定此文件名）
   manifest.json        # 工程账本：revision / designSystem / theme / checksum / exportReport（工具层独占写）
   pages/               # 页文件目录，每页一个 .page
     01_cover.page
@@ -70,13 +70,13 @@ v3 补充：**逆向方言不参与优先级链回落**。逆向方言要求样�
 3. **素材支持 URL**：`Image.src`、`ImageFill.src` 可为 `https://...`（jpg/jpeg/png/gif）；
 4. **主入口必需**：一切加载必须经 `deck.pptd`，单个 `.page` 不能直接交给转换/校验命令。
 
-v3 与 v2 的差别只有一处：主入口文件名固定为 `deck.pptd`（v2 允许任意 `<name>.pptd`），因为 `manifest.json` 与 `.history/` 需要稳定的工程根锚点。
+与上游快照的差别只有一处：主入口文件名固定为 `deck.pptd`（v2 允许任意 `<name>.pptd`），因为 `manifest.json` 与 `.history/` 需要稳定的工程根锚点。
 
 ---
 
 ## 2. 双方言（two profiles）
 
-PPTD v3 显式区分两个**方言**（dialect）：同一套 schema 的两个子集/超集约束档，由 deck 级 `profile` 字段声明。
+PPTD 显式区分两个**方言**（dialect）：同一套 schema 的两个子集/超集约束档，由 deck 级 `profile` 字段声明。
 
 | 方言 | 面向 | 核心特征 |
 |---|---|---|
@@ -187,7 +187,7 @@ interface Presentation {
 
 ```ts
 interface Presentation {
-  version: "v3";               // 必填，固定 "v3"
+  version: "1.0";               // 必填，固定 "1.0"
   profile?: Profile;           // 默认 "generate"；见 §2
   title?: string;              // 默认无标题
   size: [number, number];      // 必填，[宽, 高]；推荐值见 §1.2
@@ -214,7 +214,7 @@ interface DeckSource {
 **生成方言示例**：
 
 ```yaml
-version: v3
+version: "1.0"
 profile: generate
 title: 年度工作总结
 size: [960, 540]
@@ -247,7 +247,7 @@ pages:
 **逆向方言示例**：
 
 ```yaml
-version: v3
+version: "1.0"
 profile: reverse
 title: 第三章 研究方法（导入）
 size: [960, 540]
@@ -295,7 +295,7 @@ interface ExportConfig {
 
 ### 3.3 Theme 与子结构
 
-承继条款（v3 不改）：
+承继条款（本版不改）：
 
 | 结构 | 承继条款 |
 |---|---|
@@ -333,7 +333,7 @@ interface LayoutRef {
 }
 ```
 
-承继条款：`Page` 的五个基础字段（`pageType` / `background` / `notes` / `elements` / `animations`）连同默认值承继 v2 §4 › Page（reference/pptd.md:473-503）不变；v3 仅新增 `transition` / `hidden` / `layoutRef` / `sectionName` 四个逆向方言专属字段。
+承继条款：`Page` 的五个基础字段（`pageType` / `background` / `notes` / `elements` / `animations`）连同默认值承继 v2 §4 › Page（reference/pptd.md:473-503）不变；本版仅新增 `transition` / `hidden` / `layoutRef` / `sectionName` 四个逆向方言专属字段。
 
 `Fill` 承继 v2 §2 › Fill（reference/pptd.md:270-325）。逆向方言的页面背景若为图案填充（pattern fill），按 §10.1 记 `background.patternFill` 降级并落到最接近的 solid/gradient 字面量。
 
@@ -394,7 +394,7 @@ elements:
 
 ## 5. 共享类型
 
-全部承继 v2 §2，v3 不改定义（逆向方言对 `Color` 的取值域收窄见 §2.3 R2）：
+全部承继 v2 §2，本版不改定义（逆向方言对 `Color` 的取值域收窄见 §2.3 R2）：
 
 | 类型 | 承继条款 |
 |---|---|
@@ -408,7 +408,7 @@ elements:
 | `ImageFit` / `ImageCrop` | v2 §2 › ImageFit / ImageCrop（reference/pptd.md:247-268） |
 | `Fill`（solid / gradient / image） | v2 §2 › Fill（reference/pptd.md:270-325） |
 
-v3 新增两个共享类型，供 §7 动画与 §2.3 R2 逆向颜色复用：
+本版新增两个共享类型，供 §7 动画与 §2.3 R2 逆向颜色复用：
 
 ```ts
 /** DrawingML 色彩变换（color transforms）链：百分比类取小数，色相类取角度 */
@@ -446,12 +446,12 @@ type SchemeRef = `scheme:${SchemeColorToken}`;
 | `Table` + `Cell`（`columnWidths`/`rowHeights` 比例约束、合并单元格省略规则） | v2 §5 › Table、Cell（reference/pptd.md:930-1023） |
 | `Chart` 全族（13 种 series、`ChartData`、General Rules、`TextStyle` / `LineStyleConfig` / `TitleConfig` / `LegendConfig` / `DataLabelConfig` / `MarkerConfig` / `AxisConfig` / `SeriesDefaults` / `SpokeAxisConfig` / `LinearSeriesBase`、字段速查 5.1–5.5） | v2 §5 › Chart 及其全部子节（reference/pptd.md:1025-1904） |
 
-`Element` 联合类型在 v3 扩展为：
+`Element` 联合类型扩展为：
 
 ```ts
 type Element =
   | Text | Shape | Line | Image | Icon | Table | Chart   // 承继 v2
-  | Placeholder;                                          // v3 新增，仅逆向方言（§10.2）
+  | Placeholder;                                          // 本版新增，仅逆向方言（§10.2）
 ```
 
 元素类型与方言的可用性：
@@ -533,7 +533,7 @@ interface Table extends ElementBase {
 
 页级可选数组 `Page.animations`，通过 `elementId` 引用本页 `elements` 中的元素；数组顺序决定动画之间的先后关系，`trigger` 决定每条动画何时开始。
 
-v3 的 `effect` 取值域 = 附录 A 的 **95 个 preset**（预设效果），逐字取自 `@office-kit/pptx@0.24.0` 的 `AnimationEffect` 声明（dist/index-WCK8v0WT.d.ts:1403）。preset 编号与行为与桌面参考应用的「进入 / 强调 / 退出」三个效果库一致，因此 PPTD 声明与 OOXML `<p:timing>` 之间不存在翻译层。
+本版的 `effect` 取值域 = 附录 A 的 **95 个 preset**（预设效果），逐字取自 `@office-kit/pptx@0.24.0` 的 `AnimationEffect` 声明（dist/index-WCK8v0WT.d.ts:1403）。preset 编号与行为与桌面参考应用的「进入 / 强调 / 退出」三个效果库一致，因此 PPTD 声明与 OOXML `<p:timing>` 之间不存在翻译层。
 
 ### 7.1 Animation
 
@@ -627,7 +627,7 @@ interface Animation {
 
 ### 7.5 时长默认与例外
 
-- `durationMs` 省略时由引擎按 preset 给出默认时长（桌面参考应用效果库自己的默认值）。v3 不枚举各 preset 的默认时长：它是引擎随 preset 模板算出的量，写进规格会与 pin 版本漂移。需要确定时长的场景显式写值。
+- `durationMs` 省略时由引擎按 preset 给出默认时长（桌面参考应用效果库自己的默认值）。本版不枚举各 preset 的默认时长：它是引擎随 preset 模板算出的量，写进规格会与 pin 版本漂移。需要确定时长的场景显式写值。
 - 多行为合成的效果（如 `bounceIn`、`teeter`）按整体缩放时长。
 - **例外一**：`appear` / `disappear` 是瞬时的，不写计时行为，不接受 `durationMs`；
 - **例外二**：`transparency` / `boldReveal` 的效果保持到本页结束，同样不接受 `durationMs`；
@@ -912,7 +912,7 @@ interface Placeholder extends ElementBase {
 ### 10.3 import.report.yml
 
 ```yaml
-version: v3
+version: "1.0"
 profile: reverse
 source:
   path: "D:/inbox/thesis-defense.pptx"
@@ -946,7 +946,7 @@ degraded:
   - page: 9
     elementId: null
     feature: "animation.preset"
-    detail: "路径动画不在 v3 动画词表内"
+    detail: "路径动画不在动画词表内"
     originalValue: "presetId=101;presetClass=path"
 ```
 
@@ -967,7 +967,7 @@ degraded:
 | `ExplicitGeometryRequiredError` | 逆向方言元素缺 `bounds`，或缺少源文件里存在的 `rotation` / `opacity` / `flip` 显式值 | reverse 档 | blocker |
 | `SourceRequiredError` | `profile: reverse` 而 `deck.source` 缺失，或 `source.slideCount` / `source.size` 缺失 | reverse 档 | blocker |
 | `UnknownProfileError` | `profile` 取值不在 `generate` / `reverse` 内 | 两档 | blocker |
-| `VersionError` | `version` 缺失或不为 `"v3"` | 两档 | blocker |
+| `VersionError` | `version` 缺失或不为 `"1.0"` | 两档 | blocker |
 
 ### 11.2 export
 
@@ -1011,7 +1011,7 @@ degraded:
 
 ### 11.6 承继的错误码
 
-图表数据完整性错误码全部承继 v2（reference/pptd.md:1084-1092、1309、1598），v3 不改：`DuplicateColumnError`、`EmptyColumnError`、`RowLengthError`、`UnknownColumnError`、`NonNumericValueError`、`StackModeMismatchError`、`InvalidValueError`。
+图表数据完整性错误码全部承继 v2（reference/pptd.md:1084-1092、1309、1598），本版不改：`DuplicateColumnError`、`EmptyColumnError`、`RowLengthError`、`UnknownColumnError`、`NonNumericValueError`、`StackModeMismatchError`、`InvalidValueError`。
 
 ---
 
@@ -1117,11 +1117,11 @@ degraded:
 
 `fast` = 0.5 s（默认）、`med` = 0.75 s、`slow` = 1 s。
 
-### 附录 C：v3 新增字段速查
+### 附录 C：本版新增字段速查
 
 | 位置 | 字段 | 取值 | 方言 |
 |---|---|---|---|
-| deck | `version` | 固定 `"v3"` | 通用 |
+| deck | `version` | 固定 `"1.0"` | 通用 |
 | deck | `profile` | `generate`（默认）/ `reverse` | 通用 |
 | deck | `export.fontEmbed` | `subset`（默认）/ `full` / `off` | 通用 |
 | deck | `export.transition` | `fade`（默认）/ `none` | 通用 |
@@ -1146,7 +1146,7 @@ degraded:
 `deck.pptd`：
 
 ```yaml
-version: v3
+version: "1.0"
 profile: generate
 title: 论文答辩：明清之际的经学转向
 size: [960, 540]
@@ -1248,7 +1248,7 @@ animations:
 `deck.pptd`：
 
 ```yaml
-version: v3
+version: "1.0"
 profile: reverse
 title: thesis-defense（导入）
 size: [960, 540]
@@ -1384,6 +1384,6 @@ degraded:
   - page: 3
     elementId: null
     feature: "animation.preset"
-    detail: "路径动画不在 v3 动画词表内，步骤保留为 effect: null"
+    detail: "路径动画不在动画词表内，步骤保留为 effect: null"
     originalValue: "presetId=101;presetClass=path"
 ```

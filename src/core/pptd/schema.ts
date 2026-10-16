@@ -1,16 +1,16 @@
 /**
- * PPTD v3 schema — the self-owned contract.
+ * PPTD schema — the self-owned contract.
  *
- * Normative source: `docs/pptd-v3-spec.md`. v3 is an incremental spec: the
+ * Normative source: `docs/pptd-spec.md`. The format is an incremental spec: the
  * fields defined there are written out in full, everything else is inherited
  * from the v2 snapshot at `skills/ppt-maker/reference/pptd.md` by named
  * inheritance clauses. Those inherited parts are deliberately *not* re-typed in
  * detail here — a loose index signature keeps such fields flowing through the
  * tool layer unchanged, which is what "PPTD is an agent-friendly, human
- * reviewable DSL" requires. The types below cover every v3 decision point that
+ * reviewable DSL" requires. The types below cover every decision point that
  * the tool layer reads, writes or validates.
  *
- * The two dialects (profiles) are the core v3 idea:
+ * The two dialects (profiles) are the core idea:
  *  - `generate`: design-system slots (`$key`) + generation semantics, what an
  *    agent writes from scratch.
  *  - `reverse`: absolute-geometry superset, what an importer produces; explicit
@@ -424,7 +424,7 @@ export interface CustomFont {
 
 /** Spec §3.1 — deck.pptd. */
 export interface Presentation {
-  version: 'v3'
+  version: '1.0'
   profile?: Profile
   title?: string
   size: [number, number]

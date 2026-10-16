@@ -59,7 +59,7 @@ export interface ReportDegradedEntry {
 }
 
 export interface ImportReport {
-  version: 'v3'
+  version: '1.0'
   profile: 'reverse'
   source: {
     path: string

@@ -1,6 +1,6 @@
 /**
  * Reverse write-back layer (PR 2 plan §1 step 3 / §3 tool plumbing):
- * materialise a { deck, pages, media, report } tuple into a real PPTD v3
+ * materialise a { deck, pages, media, report } tuple into a real PPTD
  * project directory, reusing the PR 1 store/history contracts so the project
  * the user sees afterwards is exactly the project the tool layer sees.
  *

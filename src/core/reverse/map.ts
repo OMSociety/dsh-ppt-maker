@@ -1,5 +1,5 @@
 /**
- * Reverse map layer (PR 2 plan §1 step 2): turn the read model into PPTD v3
+ * Reverse map layer (PR 2 plan §1 step 2): turn the read model into PPTD
  * AST nodes in the *reverse* dialect, plus the two-level degradation report
  * and the media asset pool.
  *
@@ -1049,7 +1049,7 @@ export function mapReverseModel(
   const pages: Page[] = []
   const media: ReverseMediaAsset[] = []
   const report: ImportReport = {
-    version: 'v3',
+    version: '1.0',
     profile: 'reverse',
     source: {
       path: options.sourcePath,
@@ -1079,7 +1079,7 @@ export function mapReverseModel(
   const themeColors = getPresentationTheme(pres)
 
   const deck: Presentation = {
-    version: 'v3',
+    version: '1.0',
     profile: 'reverse',
     size: sizePx,
     // R3：母版 txStyles 不可完整还原；主题字体落到 title/body 两个

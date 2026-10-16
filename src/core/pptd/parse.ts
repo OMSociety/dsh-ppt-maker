@@ -1,11 +1,11 @@
 /**
- * PPTD v3 parser + validator.
+ * PPTD parser + validator.
  *
  * Two layers, deliberately separable:
  *  1. `parseDeckText` / `parsePageText` — YAML text to AST, plus structural
  *     (dialect-independent) validation of the required shape.
- *  2. `validateDeck` / `validatePage` — the v3 rule set of
- *     `docs/pptd-v3-spec.md`, selected by dialect: the `generate` profile gets
+ *  2. `validateDeck` / `validatePage` — the rule set of
+ *     `docs/pptd-spec.md`, selected by dialect: the `generate` profile gets
  *     v2-inherited requirements + `$key` resolution + export domains; the
  *     `reverse` profile gets the R1–R7 hard rules.
  *
@@ -186,10 +186,10 @@ export function exportConfigOf(deck: Presentation): Required<Presentation['expor
 export function validateDeckShape(deck: Record<string, unknown>, path: string): Issue[] {
   const issues: Issue[] = []
 
-  if (deck.version !== 'v3') {
+  if (deck.version !== '1.0') {
     issues.push(
-      blocker(ERROR_CODES.VersionError, `version 缺失或不为 "v3"（实际：${JSON.stringify(deck.version)}）`, `${path}#version`, {
-        expected: 'v3',
+      blocker(ERROR_CODES.VersionError, `version 缺失或不为 "1.0"（实际：${JSON.stringify(deck.version)}）`, `${path}#version`, {
+        expected: '1.0',
         actual: deck.version ?? null
       })
     )

@@ -1,5 +1,5 @@
 /**
- * Project store: the only code that reads/writes a PPTD v3 project on disk.
+ * Project store: the only code that reads/writes a PPTD project on disk.
  *
  * Ownership rules (PR 1 plan §3, §4, §7):
  *  - `manifest.json` has exactly ONE writer: this module. Tools and future PR
@@ -97,7 +97,7 @@ async function readManifest(projectDir: string): Promise<Manifest> {
   try {
     raw = await readFile(path.join(projectDir, MANIFEST_FILE), 'utf8')
   } catch {
-    throw new ProjectError('ManifestMissing', `工程账本缺失：${MANIFEST_FILE}（该目录不是完整的 PPTD v3 工程）`, { status: 404 })
+    throw new ProjectError('ManifestMissing', `工程账本缺失：${MANIFEST_FILE}（该目录不是完整的 PPTD 工程）`, { status: 404 })
   }
   try {
     const manifest = JSON.parse(raw) as Manifest
@@ -330,7 +330,7 @@ export async function createProject(cwd: string, options: CreateProjectOptions):
     await mkdir(path.join(abs, 'media'), { recursive: true })
 
     const deck: Presentation = {
-      version: 'v3',
+      version: '1.0',
       profile: 'generate',
       ...(options.title !== undefined ? { title: options.title } : {}),
       size: options.size ?? DEFAULT_SIZE,

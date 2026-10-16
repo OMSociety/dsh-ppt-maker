@@ -1,5 +1,5 @@
 /**
- * ppt_import — PPTX → PPTD v3 全量逆向（opt-in）。
+ * ppt_import — PPTX → PPTD 全量逆向（opt-in）。
  *
  * This is the only tool that touches the reverse engine. Surgical mode
  * （对导入 deck 的轻改——改字/换图/调页序）does NOT go through here; that
@@ -30,7 +30,7 @@ export function registerImportTool(ctx: PluginToolCtxWithOpen): (() => void) | u
   const off = ctx.tools.register({
     name: 'ppt_import',
     description:
-      '把一个 .pptx 全量逆向成 PPTD v3 工程（opt-in 高阶动作；对导入 deck 的轻改请用 ppt_patch）。' +
+      '把一个 .pptx 全量逆向成 PPTD 工程（opt-in 高阶动作；对导入 deck 的轻改请用 ppt_patch）。' +
       '产出 deck.pptd + pages/*.page + media/（sha1 去重）+ import.report.yml；' +
       '不支持元素（chart/smartart/ole/media/3d/group）在原位置插灰底占位形状并记 dropped。',
     parameters: {

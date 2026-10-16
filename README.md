@@ -4,7 +4,7 @@
 
 # DSH PPT Maker（PPT 创客）
 
-**DeepSeek Harness 插件 —— 内含 ppt-maker 技能与八个 ppt_* 工具：创建 / 编辑 / 质检 / 导出 PPT，本地纯 TS 引擎直出最终 .pptx**
+**DeepSeek Harness 插件 —— 内含 ppt-maker 技能与十一个 ppt_* 工具：创建 / 编辑 / 逆向 / 质检 / 导出 PPT，本地纯 TS 引擎直出最终 .pptx**
 
   <p>
     <a href="https://www.npmjs.com/package/dsh-ppt-maker"><img src="https://img.shields.io/npm/v/dsh-ppt-maker?color=4f6ef7&label=version" alt="Version"></a>
@@ -17,7 +17,7 @@
 **目录**：• [核心特性](#核心特性) • [工具清单](#工具清单) • [安装方式](#安装方式) • [质检体系](#质检体系) • [设计系统](#设计系统) • [常见问题](#常见问题) • [更新日志](#更新日志)
 </div>
 
-> **免责声明**：本插件为非官方项目，与 Moonshot AI 无关。PPTD 格式为自主维护的 v3 契约（不跟踪上游）。
+> **免责声明**：本插件为非官方项目，与 Moonshot AI 无关。PPTD 格式为自主维护的契约（不跟踪上游）。
 
 ## 核心特性
 
@@ -25,7 +25,7 @@
 |---|---|
 | **工具层直出** | 11 个 `ppt_*` 工具（raw JSON-Schema 注册）：创建/编辑/撤销/重做/渲染/质检/导出/导入/打开/外科手术，引擎 `@office-kit/pptx@0.24.0` 本地纯 TS 构建最终 .pptx，不依赖 Python 主链 |
 | **双向性** | 读取并改写既有 .pptx：`ppt_import` 全量逆向进 PPTD 工程（图表/SmartArt/OLE 自动落灰底占位），`ppt_patch` 外科手术（改字/换图/调页序）不走 PPTD 往返，库级 L1 passthrough 保住未建模部件 |
-| **PPTD v3** | 自主契约的 YAML DSL（`deck.pptd` + `pages/*.page`），单页自包含、可视即所得；双方言（generate 生成 / reverse 逆向超集） |
+| **PPTD** | 自主契约的 YAML DSL（`deck.pptd` + `pages/*.page`），单页自包含、可视即所得；双方言（generate 生成 / reverse 逆向超集） |
 | **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板），所见即所得：双击文字就地改、拖拽调页序、图片一键替换、撤销/重做、版本历史（画布直渲预览任意快照并一键恢复）、409 冲突提示与「外部已修改」banner；导出成功在页脚状态条挂「打开方式」菜单（系统关联应用 + 显示文件位置，与 DSH 文件菜单同套 dsh-native-command 原语） |
 | **质检分层** | 规则层（文字溢出/出界/重叠/对比度/结构/缺字体）阻断式，blocker 拦导出；AI 层按需（`ppt_check ai:true`）把最终渲染页 PNG 送多模态模型看配色/层级/平衡，只出建议不阻断；结果落账 `manifest.qaReport`（含被阻断的导出），随 revision 可追溯 |
 | **字体嵌入** | 导出自动嵌入实际用到的字体（EOT 封装 `fntdata` + `embeddedFontLst`），未装字体的机器渲染不回落；子集/整字体/关闭三档（`export.fontEmbed`），逐字体 fsType 许可闸，`ppt_check` 预检许可与替代建议 |
@@ -45,7 +45,7 @@
 | `ppt_render` | 渲染每页 PNG 预览（最终 pptx 光栅化，96dpi 默认） |
 | `ppt_check` | 规则质检（默认）+ AI 视觉质检（`ai:true`，路由不支持图像时降级为 PNG 路径清单） |
 | `ppt_export` | 导出 .pptx（规则 blocker 拦截，`skipCheck:true` 绕过；摘要落账 manifest.exportReport） |
-| `ppt_import` | .pptx → PPTD v3 全量逆向（dropped/degraded 两级报告 + 占位形状回插） |
+| `ppt_import` | .pptx → PPTD 全量逆向（dropped/degraded 两级报告 + 占位形状回插） |
 | `ppt_open` | 把右侧栏工作台打开到指定工程（per-session openRequest，TTL 60s） |
 | `ppt_patch` | 对 .pptx 外科手术：set_text / replace_image / move_page |
 | | （不走 PPTD 往返，库 L1 passthrough 保住 chart/SmartArt/OLE） |
