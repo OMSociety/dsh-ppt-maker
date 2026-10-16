@@ -77,7 +77,7 @@ class CollectFontsTests(unittest.TestCase):
         pages = Path(root) / "pages"
         pages.mkdir()
         page = (
-            "version: v2\ntitle: t\nsize: [960, 540]\n"
+            "title: t\nsize: [960, 540]\n"
             "theme:\n"
             "  textStyles:\n"
             "    title:\n"
@@ -88,7 +88,7 @@ class CollectFontsTests(unittest.TestCase):
         )
         deck.write_text(page, encoding="utf-8")
         (pages / "01.page").write_text(
-            "version: v2\npage: 1\nelements:\n"
+            "page: 1\nelements:\n"
             "  - type: text\n    content:\n      text: hi\n"
             "      fontFamily:\n        latin: MiSans\n        ea: 站酷文艺体\n"
             "  - type: text\n    content:\n      text: inline\n"
@@ -107,7 +107,7 @@ class CollectFontsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             # No theme.textStyles, no inline fontFamily -> empty set.
             deck = Path(name) / "empty.pptd"
-            deck.write_text("version: v2\ntitle: t\nsize: [1, 1]\npages: []\n", encoding="utf-8")
+            deck.write_text("title: t\nsize: [1, 1]\npages: []\n", encoding="utf-8")
             self.assertEqual(MODULE.collect_fonts(str(deck)), set())
 
 
@@ -124,7 +124,7 @@ class MainArgvTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             deck = Path(name) / "deck.pptd"
             deck.write_text(
-                "version: v2\ntitle: t\nsize: [1, 1]\n"
+                "title: t\nsize: [1, 1]\n"
                 "theme:\n  textStyles:\n    title:\n      fontFamily:\n        latin: MiSans\n"
                 "pages: []\n",
                 encoding="utf-8",

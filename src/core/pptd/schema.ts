@@ -3,7 +3,7 @@
  *
  * Normative source: `docs/pptd-spec.md`. The format is an incremental spec: the
  * fields defined there are written out in full, everything else is inherited
- * from the v2 snapshot at `skills/ppt-maker/reference/pptd.md` by named
+ * from the upstream snapshot at `skills/ppt-maker/reference/pptd.md` by named
  * inheritance clauses. Those inherited parts are deliberately *not* re-typed in
  * detail here — a loose index signature keeps such fields flowing through the
  * tool layer unchanged, which is what "PPTD is an agent-friendly, human
@@ -593,7 +593,7 @@ export const REVERSE_ONLY_PAGE_FIELDS = [
   'sectionName'
 ] as const
 
-/** Reverse-only element fields (spec §6.1). `shapeName` is a v2 Shape field and is NOT dialect-bound. */
+/** Reverse-only element fields (spec §6.1). `shapeName` is an upstream Shape field and is NOT dialect-bound. */
 export const REVERSE_ONLY_ELEMENT_FIELDS = [
   'sourceRef',
   'originalName',

@@ -23,7 +23,7 @@ SPEC.loader.exec_module(MODULE)
 
 GREEN, BLUE, RED, WHITE = (0, 255, 0), (0, 0, 255), (255, 0, 0), (255, 255, 255)
 
-THEME = 'version: "v2"\nsize: [960, 540]\ntheme:\n  colors: {primary: "#0066B3"}\npages:\n  - pages/p1.page\n'
+THEME = 'size: [960, 540]\ntheme:\n  colors: {primary: "#0066B3"}\npages:\n  - pages/p1.page\n'
 
 
 def write_deck(root, page_body, theme=THEME):

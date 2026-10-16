@@ -2,7 +2,7 @@
 
 PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 YAML 抽象层：用 Agent 友好、单页自包含、人可肉眼审查的方式描述、生成与编辑幻灯片，并与 `.pptx` 双向转换。
 
-本文件是 PPTD 的规范性文档（normative document）：以本文件描述的工程结构为准。本文件采用**增量规格**（incremental specification）写法——本版新增与改动的部分在此写全文，上游快照沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/ppt-maker/reference/pptd.md`（上游 PPTD v2 快照，2029 行）的具体章节与行号；被点名的 v2 章节与本文件同等 normative。两者冲突时以本文件为准。
+本文件是 PPTD 的规范性文档（normative document）：以本文件描述的工程结构为准。本文件采用**增量规格**（incremental specification）写法——本版新增与改动的部分在此写全文，上游快照沿用不变的部分以**承继条款**（inheritance clause）点名到 `skills/ppt-maker/reference/pptd.md`（上游 PPTD 快照，2027 行）的具体章节与行号；被点名的上游章节与本文件同等 normative。两者冲突时以本文件为准。
 
 ---
 
@@ -14,7 +14,7 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 - **方言归属**：只属于某一方言（dialect）的字段，注释里标 `// 仅逆向方言` 或 `// 仅生成方言`；两方言通用的字段不标。
 - **引擎版本锚**：动画与转场词表逐字取自 `@office-kit/pptx@0.24.0` 的类型声明，出处行号在附录 A / 附录 B 标注。PPTD 只暴露**词表**（vocabulary），不暴露引擎 API：引擎更换时由引擎接口层负责词表映射。
 
-承继条款引用格式：`v2 §<章> › <节>（reference/pptd.md:<起>-<止>）`。
+承继条款引用格式：`上游 §<章> › <节>（reference/pptd.md:<起>-<止>）`。
 
 ---
 
@@ -22,11 +22,11 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 
 ### 1.1 语法
 
-承继 v2 §1 › Syntax（reference/pptd.md:15-18）：YAML 1.2；`: # { }` 等特殊字符须加引号或用块标量（block scalar）；`content.text` 这类富字段一律用 `|` 块标量独立成块。
+承继上游 §1 › Syntax（reference/pptd.md:15-18）：YAML 1.2；`: # { }` 等特殊字符须加引号或用块标量（block scalar）；`content.text` 这类富字段一律用 `|` 块标量独立成块。
 
 ### 1.2 坐标系与单位
 
-承继 v2 §1 › Coordinate System and Units（reference/pptd.md:20-24）：
+承继上游 §1 › Coordinate System and Units（reference/pptd.md:20-24）：
 
 - 全部几何与尺寸单位为 **px**，原点 `(0, 0)` 在页面左上角；
 - 本规格定义 **1px = 1pt**（`fontSize: 18` 即 PPTX 里的 18pt）；
@@ -41,11 +41,11 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 
 | 链 | 承继条款 |
 |---|---|
-| 文本框内文字样式（六级链） | v2 §1 › Style Priority › 1（reference/pptd.md:32-53） |
-| 表格单元格样式（九级链） | v2 §1 › Style Priority › 2（reference/pptd.md:55-85） |
-| 图表样式（3.1 系列主体色 / 3.2 字体 / 3.3 dataLabels / 3.4 seriesDefaults 合并 / 3.5 `boolean \| Config` 约定） | v2 §1 › Style Priority › 3（reference/pptd.md:87-139） |
+| 文本框内文字样式（六级链） | 上游 §1 › Style Priority › 1（reference/pptd.md:32-53） |
+| 表格单元格样式（九级链） | 上游 §1 › Style Priority › 2（reference/pptd.md:55-85） |
+| 图表样式（3.1 系列主体色 / 3.2 字体 / 3.3 dataLabels / 3.4 seriesDefaults 合并 / 3.5 `boolean \| Config` 约定） | 上游 §1 › Style Priority › 3（reference/pptd.md:87-139） |
 
-`lineHeight`（倍数）与 `lineHeightPx`（固定 px）互斥、同设时 `lineHeightPx` 优先——承继 v2（reference/pptd.md:30）。
+`lineHeight`（倍数）与 `lineHeightPx`（固定 px）互斥、同设时 `lineHeightPx` 优先——承继上游（reference/pptd.md:30）。
 
 本版补充：**逆向方言不参与优先级链回落**。逆向方言要求样式值在导入时解析为字面量（见 §2.3 R2/R4），因此每个样式位置都有显式值；优先级链只在生成方言（以及逆向工程被改写为生成方言后）发挥回落作用。
 
@@ -63,14 +63,14 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
   import.report.yml    # 逆向导入报告（仅逆向工程；见 §10.3）
 ```
 
-路径规则承继 v2 §1 › Multi-File Structure（reference/pptd.md:141-160）：
+路径规则承继上游 §1 › Multi-File Structure（reference/pptd.md:141-160）：
 
 1. **完全自包含**：所有被引用文件必须位于 `deck.pptd` 所在目录内，禁止引用目录外文件；
 2. **只支持相对路径**（相对 `deck.pptd` 所在目录）：`pages/01_cover.page`、`media/image1.jpg`；
 3. **素材支持 URL**：`Image.src`、`ImageFill.src` 可为 `https://...`（jpg/jpeg/png/gif）；
 4. **主入口必需**：一切加载必须经 `deck.pptd`，单个 `.page` 不能直接交给转换/校验命令。
 
-与上游快照的差别只有一处：主入口文件名固定为 `deck.pptd`（v2 允许任意 `<name>.pptd`），因为 `manifest.json` 与 `.history/` 需要稳定的工程根锚点。
+与上游快照的差别只有一处：主入口文件名固定为 `deck.pptd`（上游允许任意 `<name>.pptd`），因为 `manifest.json` 与 `.history/` 需要稳定的工程根锚点。
 
 ---
 
@@ -104,7 +104,7 @@ interface Presentation {
 
 ### 2.2 生成方言（generation dialect）
 
-**设计系统槽位**：生成方言的第一等公民是 `Theme`（v2 §3 › Theme，reference/pptd.md:378-394）——`theme.colors` / `theme.textStyles` / `theme.tableStyles` 三张表，页内用 `$<key>` 引用：
+**设计系统槽位**：生成方言的第一等公民是 `Theme`（上游 §3 › Theme，reference/pptd.md:376-392）——`theme.colors` / `theme.textStyles` / `theme.tableStyles` 三张表，页内用 `$<key>` 引用：
 
 | 主题表 | 引用位置 | 示例 |
 |---|---|---|
@@ -114,7 +114,7 @@ interface Presentation {
 
 **生成语义**（generation semantics）：
 
-- G1 **可省略即可自适应**：标 `?` 的对象型图表字段省略等价于 `{}`（承继 v2 General Rules 第 5 条，reference/pptd.md:1100）；`fontSize` 省略时文本按链回落、图表按尺寸自适应；坐标轴 `min`/`max` 省略时按数据自适应。
+- G1 **可省略即可自适应**：标 `?` 的对象型图表字段省略等价于 `{}`（承继上游 General Rules 第 5 条，reference/pptd.md:1098）；`fontSize` 省略时文本按链回落、图表按尺寸自适应；坐标轴 `min`/`max` 省略时按数据自适应。
 - G2 **`$key` 优先**：颜色/文字样式/表格样式优先写主题引用而非字面量，换设计系统只改 `theme`。
 - G3 **语义标签驱动排版**：`Page.pageType`（`cover` / `table_of_contents` / `chapter` / `content` / `final` 或任意自定义串）是语义标签，不影响渲染，供设计系统与质检判断版式惯例。
 - G4 **元素类型封闭**：只有 `text` / `shape` / `line` / `image` / `icon` / `table` / `chart` 七类；`placeholder` 不允许出现（见 §11）。
@@ -153,7 +153,7 @@ interface Presentation {
 | `deck.theme` | 推荐，`$key` 引用的落点 | 可省略；不写 `$key` |
 | `deck.source` | 不使用 | 必填（§3.1） |
 | `deck.export` | 三字段全可用 | 三字段全可用（`transition` 受页级覆盖，见 §8.2） |
-| `bounds` | 必填（v2 既有约束） | 必填，且由 EMU 换算、保留两位小数 |
+| `bounds` | 必填（上游既有约束） | 必填，且由 EMU 换算、保留两位小数 |
 | `rotation`/`opacity`/`flip` | 省略即默认 | 源文件有变换就显式写出 |
 | `Color` 取值域 | HEX6 / HEX8 / `$key` | HEX6 / HEX8 / `scheme:<token>`(+`colorTransforms`) |
 | `fontFamily` | 设计系统字体名或 `{latin, ea}` | 目标机实装名或 `{latin, ea}` |
@@ -174,10 +174,10 @@ interface Presentation {
 
 | 档 | 触发 | 检查内容 |
 |---|---|---|
-| generate 档 | `profile` 为 `generate` 或省略 | v2 全部既有约束（承继）+ `$key` 引用必须在 `theme` 中存在 + `export` 字段取值域 + 动画词表与选项适用性（§7.3）+ 不得出现逆向专属字段 |
-| reverse 档 | `profile: reverse` | v2 既有约束中**与字面量不冲突**的部分 + R1–R7 全部硬规则 + `placeholder` 字段完整性 + 动画/转场记录字段完整性 + `source` 必填 |
+| generate 档 | `profile` 为 `generate` 或省略 | 上游全部既有约束（承继）+ `$key` 引用必须在 `theme` 中存在 + `export` 字段取值域 + 动画词表与选项适用性（§7.3）+ 不得出现逆向专属字段 |
+| reverse 档 | `profile: reverse` | 上游既有约束中**与字面量不冲突**的部分 + R1–R7 全部硬规则 + `placeholder` 字段完整性 + 动画/转场记录字段完整性 + `source` 必填 |
 
-两档共用：图表数据完整性错误码（承继 v2 ChartData 约束，reference/pptd.md:1084-1092）、几何出界与文字溢出质检（由规则质检层执行，不属本规格）。错误码总表见 §11。
+两档共用：图表数据完整性错误码（承继上游 ChartData 约束，reference/pptd.md:1082-1090）、几何出界与文字溢出质检（由规则质检层执行，不属本规格）。错误码总表见 §11。
 
 ---
 
@@ -206,7 +206,7 @@ interface DeckSource {
 }
 ```
 
-承继条款：`CustomFont`（v2 §3 › CustomFont，reference/pptd.md:460-469）、`Theme` / `TextStyleConfig` / `CellStyle` / `TableStyleConfig`（v2 §3 › Theme 及其子节，reference/pptd.md:378-458）全部不变。
+承继条款：`CustomFont`（上游 §3 › CustomFont，reference/pptd.md:458-467）、`Theme` / `TextStyleConfig` / `CellStyle` / `TableStyleConfig`（上游 §3 › Theme 及其子节，reference/pptd.md:376-456）全部不变。
 
 > **提示**：`CustomFont.src` 是 Google Fonts CSS URL，离线环境下不可达；导出字体嵌入（§9）只认工程内 `media/fonts/` 与目标机实装字体，不从该 URL 拉取。
 
@@ -296,11 +296,11 @@ interface ExportConfig {
 
 | 结构 | 承继条款 |
 |---|---|
-| `Theme` | v2 §3 › Theme（reference/pptd.md:378-394） |
-| `TextStyleConfig` | v2 §3 › TextStyleConfig（reference/pptd.md:396-413） |
-| `CellStyle` | v2 §3 › CellStyle（reference/pptd.md:415-429） |
-| `TableStyleConfig`（含行/列类别样式规则、`rowOverColumn`） | v2 §3 › TableStyleConfig（reference/pptd.md:431-458） |
-| `CustomFont` | v2 §3 › CustomFont（reference/pptd.md:460-469） |
+| `Theme` | 上游 §3 › Theme（reference/pptd.md:376-392） |
+| `TextStyleConfig` | 上游 §3 › TextStyleConfig（reference/pptd.md:394-411） |
+| `CellStyle` | 上游 §3 › CellStyle（reference/pptd.md:413-427） |
+| `TableStyleConfig`（含行/列类别样式规则、`rowOverColumn`） | 上游 §3 › TableStyleConfig（reference/pptd.md:429-456） |
+| `CustomFont` | 上游 §3 › CustomFont（reference/pptd.md:458-467） |
 
 ---
 
@@ -330,9 +330,9 @@ interface LayoutRef {
 }
 ```
 
-承继条款：`Page` 的五个基础字段（`pageType` / `background` / `notes` / `elements` / `animations`）连同默认值承继 v2 §4 › Page（reference/pptd.md:473-503）不变；本版仅新增 `transition` / `hidden` / `layoutRef` / `sectionName` 四个逆向方言专属字段。
+承继条款：`Page` 的五个基础字段（`pageType` / `background` / `notes` / `elements` / `animations`）连同默认值承继上游 §4 › Page（reference/pptd.md:471-501）不变；本版仅新增 `transition` / `hidden` / `layoutRef` / `sectionName` 四个逆向方言专属字段。
 
-`Fill` 承继 v2 §2 › Fill（reference/pptd.md:270-325）。逆向方言的页面背景若为图案填充（pattern fill），按 §10.1 记 `background.patternFill` 降级并落到最接近的 solid/gradient 字面量。
+`Fill` 承继上游 §2 › Fill（reference/pptd.md:270-325）。逆向方言的页面背景若为图案填充（pattern fill），按 §10.1 记 `background.patternFill` 降级并落到最接近的 solid/gradient 字面量。
 
 **生成方言示例**：
 
@@ -391,19 +391,19 @@ elements:
 
 ## 5. 共享类型
 
-全部承继 v2 §2，本版不改定义（逆向方言对 `Color` 的取值域收窄见 §2.3 R2）：
+全部承继上游 §2，本版不改定义（逆向方言对 `Color` 的取值域收窄见 §2.3 R2）：
 
 | 类型 | 承继条款 |
 |---|---|
-| `Color` | v2 §2 › Color（reference/pptd.md:165-169） |
-| `FontFamily` | v2 §2 › FontFamily（reference/pptd.md:171-180） |
-| `Alignment`（`[HorizontalAlign, VerticalAlign]`） | v2 §2 › Alignment（reference/pptd.md:182-193） |
-| `LineStyle` | v2 §2 › LineStyle（reference/pptd.md:195-198） |
-| `Border` / `BorderSpec`（四边分设与 `null` 清除语义） | v2 §2 › Border、BorderSpec（reference/pptd.md:200-226） |
-| `Shadow` | v2 §2 › Shadow（reference/pptd.md:228-236） |
-| `ColorStop` | v2 §2 › ColorStop（reference/pptd.md:238-245） |
-| `ImageFit` / `ImageCrop` | v2 §2 › ImageFit / ImageCrop（reference/pptd.md:247-268） |
-| `Fill`（solid / gradient / image） | v2 §2 › Fill（reference/pptd.md:270-325） |
+| `Color` | 上游 §2 › Color（reference/pptd.md:165-169） |
+| `FontFamily` | 上游 §2 › FontFamily（reference/pptd.md:171-180） |
+| `Alignment`（`[HorizontalAlign, VerticalAlign]`） | 上游 §2 › Alignment（reference/pptd.md:182-193） |
+| `LineStyle` | 上游 §2 › LineStyle（reference/pptd.md:195-198） |
+| `Border` / `BorderSpec`（四边分设与 `null` 清除语义） | 上游 §2 › Border、BorderSpec（reference/pptd.md:200-226） |
+| `Shadow` | 上游 §2 › Shadow（reference/pptd.md:228-236） |
+| `ColorStop` | 上游 §2 › ColorStop（reference/pptd.md:238-245） |
+| `ImageFit` / `ImageCrop` | 上游 §2 › ImageFit / ImageCrop（reference/pptd.md:247-268） |
+| `Fill`（solid / gradient / image） | 上游 §2 › Fill（reference/pptd.md:270-325） |
 
 本版新增两个共享类型，供 §7 动画与 §2.3 R2 逆向颜色复用：
 
@@ -433,21 +433,21 @@ type SchemeRef = `scheme:${SchemeColorToken}`;
 
 | 元素 | 承继条款 |
 |---|---|
-| `ElementBase`（`elementId` / `elementType` / `bounds`） | v2 §5 › ElementBase（reference/pptd.md:507-521） |
-| `Text` + `TextContent` | v2 §5 › Text、TextContent（reference/pptd.md:523-609） |
-| 富文本规则（标签表、`<p>`/`<li>`/`<span>` 的 style 映射、纯文本简写、LaTeX 公式 `\(...\)`） | v2 §5 › Rich Text Rules（reference/pptd.md:611-711） |
-| `Shape`（`shapeName` / `adjustments` / `custom` + `viewBox` + `path` / 镂空方向约定） | v2 §5 › Shape（reference/pptd.md:713-784） |
-| `Line`（`viewBox` / `points` / `curve` / `arrow`） | v2 §5 › Line（reference/pptd.md:786-830） |
-| `Image` + `ShapeDef`（`crop → fit → cropShape` 渲染次序） | v2 §5 › Image（reference/pptd.md:832-891） |
-| `Icon`（`iconName` 形如 `fas:house`，Font Awesome 7.x 免费集） | v2 §5 › Icon（reference/pptd.md:893-928） |
-| `Table` + `Cell`（`columnWidths`/`rowHeights` 比例约束、合并单元格省略规则） | v2 §5 › Table、Cell（reference/pptd.md:930-1023） |
-| `Chart` 全族（13 种 series、`ChartData`、General Rules、`TextStyle` / `LineStyleConfig` / `TitleConfig` / `LegendConfig` / `DataLabelConfig` / `MarkerConfig` / `AxisConfig` / `SeriesDefaults` / `SpokeAxisConfig` / `LinearSeriesBase`、字段速查 5.1–5.5） | v2 §5 › Chart 及其全部子节（reference/pptd.md:1025-1904） |
+| `ElementBase`（`elementId` / `elementType` / `bounds`） | 上游 §5 › ElementBase（reference/pptd.md:505-519） |
+| `Text` + `TextContent` | 上游 §5 › Text、TextContent（reference/pptd.md:521-607） |
+| 富文本规则（标签表、`<p>`/`<li>`/`<span>` 的 style 映射、纯文本简写、LaTeX 公式 `\(...\)`） | 上游 §5 › Rich Text Rules（reference/pptd.md:609-709） |
+| `Shape`（`shapeName` / `adjustments` / `custom` + `viewBox` + `path` / 镂空方向约定） | 上游 §5 › Shape（reference/pptd.md:711-782） |
+| `Line`（`viewBox` / `points` / `curve` / `arrow`） | 上游 §5 › Line（reference/pptd.md:784-828） |
+| `Image` + `ShapeDef`（`crop → fit → cropShape` 渲染次序） | 上游 §5 › Image（reference/pptd.md:830-889） |
+| `Icon`（`iconName` 形如 `fas:house`，Font Awesome 7.x 免费集） | 上游 §5 › Icon（reference/pptd.md:891-926） |
+| `Table` + `Cell`（`columnWidths`/`rowHeights` 比例约束、合并单元格省略规则） | 上游 §5 › Table、Cell（reference/pptd.md:928-1021） |
+| `Chart` 全族（13 种 series、`ChartData`、General Rules、`TextStyle` / `LineStyleConfig` / `TitleConfig` / `LegendConfig` / `DataLabelConfig` / `MarkerConfig` / `AxisConfig` / `SeriesDefaults` / `SpokeAxisConfig` / `LinearSeriesBase`、字段速查 5.1–5.5） | 上游 §5 › Chart 及其全部子节（reference/pptd.md:1023-1902） |
 
 `Element` 联合类型扩展为：
 
 ```ts
 type Element =
-  | Text | Shape | Line | Image | Icon | Table | Chart   // 承继 v2
+  | Text | Shape | Line | Image | Icon | Table | Chart   // 承继上游
   | Placeholder;                                          // 本版新增，仅逆向方言（§10.2）
 ```
 
@@ -483,7 +483,7 @@ interface SourceRef {
 ```ts
 // Line 扩展：连接关系记录
 interface Line extends ElementBase {
-  // ...承继 v2 全部字段（reference/pptd.md:788-802）
+  // ...承继上游全部字段（reference/pptd.md:786-800）
   glue?: {                     // 仅逆向方言；连接线（connector）的黏附关系
     fromElementId?: string;    // 起点黏附到的元素（本页 elementId）
     toElementId?: string;      // 终点黏附到的元素
@@ -494,7 +494,7 @@ interface Line extends ElementBase {
 
 // Image 扩展：源文件的图像调整
 interface Image extends ElementBase {
-  // ...承继 v2 全部字段（reference/pptd.md:835-846）
+  // ...承继上游全部字段（reference/pptd.md:833-844）
   imageAdjust?: {              // 仅逆向方言
     brightness?: number;       // 亮度，[-1, 1]，默认 0
     contrast?: number;         // 对比度，[-1, 1]，默认 0
@@ -504,7 +504,7 @@ interface Image extends ElementBase {
 
 // Table 扩展：内置表格样式还原信息
 interface Table extends ElementBase {
-  // ...承继 v2 全部字段（reference/pptd.md:933-941）
+  // ...承继上游全部字段（reference/pptd.md:931-939）
   builtinStyle?: {             // 仅逆向方言
     id: string;                // 源文件里的表格样式 id（GUID）
     name?: string;             // 样式名（内置样式可解出，如 "Medium Style 2 - Accent 1"）
@@ -1006,7 +1006,7 @@ degraded:
 
 ### 11.6 承继的错误码
 
-图表数据完整性错误码全部承继 v2（reference/pptd.md:1084-1092、1309、1598），本版不改：`DuplicateColumnError`、`EmptyColumnError`、`RowLengthError`、`UnknownColumnError`、`NonNumericValueError`、`StackModeMismatchError`、`InvalidValueError`。
+图表数据完整性错误码全部承继上游（reference/pptd.md:1082-1090、1309、1598），本版不改：`DuplicateColumnError`、`EmptyColumnError`、`RowLengthError`、`UnknownColumnError`、`NonNumericValueError`、`StackModeMismatchError`、`InvalidValueError`。
 
 ---
 

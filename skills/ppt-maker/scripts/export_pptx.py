@@ -412,8 +412,6 @@ def build_image_map(root: Path) -> Dict[str, str]:
 
 def build_payload(manifest: Path) -> Dict[str, Any]:
     manifest_text, manifest_data = read_yaml_mapping(manifest)
-    if manifest_data.get("version") != "v2":
-        raise ExportError("local PPTX export currently requires PPTD version: v2")
     page_paths = manifest_data.get("pages")
     if not isinstance(page_paths, list) or not page_paths:
         raise ExportError("PPTD manifest must contain a non-empty pages list")

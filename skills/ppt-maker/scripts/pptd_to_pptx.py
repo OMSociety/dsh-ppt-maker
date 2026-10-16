@@ -558,8 +558,6 @@ def main():
     args = ap.parse_args()
     base = os.path.dirname(os.path.abspath(args.manifest))
     m = yaml.safe_load(open(args.manifest, encoding="utf-8"))
-    if m.get("version") != "v2":
-        sys.exit("仅支持 PPTD v2")
     size = m.get("size", [960, 540])
     theme = m.get("theme", {}) or {}
     theme_colors = theme.get("colors", {}) or {}

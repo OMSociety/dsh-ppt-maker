@@ -6,7 +6,7 @@
  *     (dialect-independent) validation of the required shape.
  *  2. `validateDeck` / `validatePage` — the rule set of
  *     `docs/pptd-spec.md`, selected by dialect: the `generate` profile gets
- *     v2-inherited requirements + `$key` resolution + export domains; the
+ *     上游继承的字段要求 + `$key` resolution + export domains; the
  *     `reverse` profile gets the R1–R7 hard rules.
  *
  * Validation never throws: every violation becomes an `Issue` with the spec's

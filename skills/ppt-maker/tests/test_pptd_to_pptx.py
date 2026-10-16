@@ -27,8 +27,7 @@ SPEC.loader.exec_module(MODULE)
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 P = "http://schemas.openxmlformats.org/presentationml/2006/main"
 
-THEME = """version: "v2"
-size: [960, 540]
+THEME = """size: [960, 540]
 theme:
   colors:
     primary: "#0066B3"

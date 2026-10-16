@@ -267,7 +267,7 @@ function richRunsToSpecs(
 
 function runToSpecs(run: RichRun, base: ResolvedContent, resolver: ThemeResolver, fonts: Set<string>): ParagraphSpec['runs'] {
   // A run containing '\n' (<br/>) splits into several runs; the library keeps
-  // a CR LF inside a run as a line break, which is exactly the v2 semantics.
+  // a CR LF inside a run as a line break, which is exactly the upstream semantics.
   const format: TextFormat = {}
   const size = run.style.fontSize ?? base.fontSize
   if (size !== undefined) format.size = size

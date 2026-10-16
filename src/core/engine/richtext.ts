@@ -1,7 +1,7 @@
 /**
  * Rich-text compiler: PPTD `content.text` markup → paragraph/run IR.
  *
- * Grammar (v2 §5 › Rich Text Rules):
+ * Grammar (上游 §5 › Rich Text Rules):
  *  - block tags: <p style="...">, <ul>, <ol>, <li style="...">
  *  - inline tags: <span style="...">, <strong>, <em>, <u>, <s>, <sup>, <sub>,
  *    <a href="...">

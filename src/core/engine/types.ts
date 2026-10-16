@@ -15,7 +15,7 @@ import type { ElementBase, Page, Presentation } from '../pptd/schema.js'
 /* ------------------------------------------------------------------ *
  * Resolved styles
  *
- * The six-level text inheritance chain (v2 §1) is collapsed by the engine
+ * The six-level text inheritance chain (上游 §1) is collapsed by the engine
  * implementation (it owns the theme tables) into these literal records.
  * ------------------------------------------------------------------ */
 

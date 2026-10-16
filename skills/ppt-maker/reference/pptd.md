@@ -330,7 +330,6 @@ fill:
 
 ```ts
 interface Presentation {
-  version: "v2";                // required, fixed to "v2" (version identifier)
   title?: string;              // default: no title
   customFonts?: CustomFont[];  // default: no custom fonts are loaded
   size: [number, number];      // [width, height]; see "Coordinate System and Units" for PPT and poster recommendations
@@ -342,7 +341,6 @@ interface Presentation {
 **Example**:
 
 ```yaml
-version: v2
 title: Annual Work Summary
 size: [960, 540]
 customFonts:
@@ -1024,7 +1022,7 @@ interface Cell {
 
 ### Chart (charts)
 
-PPTD v2's chart element follows the ECharts philosophy: **the chart top level carries no `type` field**; each `series[i].type` determines its own form. 13 series types are supported in total, laid out flat by type name, all equal in status:
+PPTD's chart element follows the ECharts philosophy: **the chart top level carries no `type` field**; each `series[i].type` determines its own form. 13 series types are supported in total, laid out flat by type name, all equal in status:
 
 `bar` / `line` / `area` / `scatter` / `bubble` / `candlestick` / `pie` / `radar` / `waterfall` / `heatmap` / `treemap` / `sunburst` / `sankey`
 
