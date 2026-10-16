@@ -10,3 +10,6 @@ pnpm-lock.yaml
 pnpm-workspace.yaml
 
 tests/_pr3_tmp/
+
+# 语料脱敏红线词表：含来源专名，只在本机存在
+tests/corpus/sensitive-words.txt

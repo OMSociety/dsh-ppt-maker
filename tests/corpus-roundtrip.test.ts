@@ -2,11 +2,16 @@
  * 语料对拍（PR 1 plan §5 一致性测试、§8「20 份真实语料 round-trip」）：
  * tests/corpus/ 20 份脱敏 pptx → loadPresentation → 断言关键字段。
  *
- * 断言口径（与 MANIFEST.md 的覆盖矩阵逐条对应）：
- *  - 每份：能打开、页数与清单一致、画布尺寸是 16:9；
- *  - 每份：至少一处可读文本、形状数 > 0；
- *  - 按清单点名抽查：图表（xiaohui 蓝版 6 个 / xueshu 4 个）、表格（xiaohui
- *    蓝版 1 个）、隐藏页（mun-v2 第 5 页 show=0）、备注（fumunc-v1 有文本备注）。
+ * 语料分两类，文件名保持中性（不含来源机构/会议/主题名）：
+ *  - `real-*` / `tpl-*`：真实 deck 的脱敏变体（10 份）。原始文件与脱敏映射都在
+ *    本机暂存区，**不进仓库**；改名只为不带出可识别的专名。
+ *  - `syn-*`：按设计系统合成的 10 份，无来源。
+ *
+ * 断言口径：
+ *  - 每份：能打开、页数与台账一致、画布接近 16:9；
+ *  - 每份：至少一处可读文本、形状数 > 0、结构校验零 error；
+ *  - 按覆盖点抽查：图表（徽标蓝版 6 个 / 答辩 4 个）、表格（徽标蓝版 1 个）、
+ *    隐藏页（training-v2 第 5 页 show=0）、备注（notes-v1 有文本备注）。
  *
  * 这批文件是「引擎 + 解析层面对真实世界 pptx 不炸」的护栏：任何引擎升级
  * （0.24.0 → 以后）先过这里再谈合并。
@@ -31,19 +36,21 @@ import {
 } from '@office-kit/pptx'
 
 const CORPUS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'corpus')
+/** 脱敏词表：只在本机存在（.gitignore 挡住），仓库里不留任何真实专名。 */
+const SENSITIVE_WORDS = path.join(CORPUS_DIR, 'sensitive-words.txt')
 
-/** MANIFEST.md 第一节的页数台账（手工对拍口径的唯一来源）。 */
+/** 页数台账（覆盖矩阵的机器可读版本）。 */
 const EXPECTED_PAGE_COUNTS: Record<string, number> = {
-  'mun-training-desens-v1.pptx': 22,
-  'mun-training-desens-v2.pptx': 20,
-  'mun-training-desens-v3.pptx': 23,
-  'fumunc-closing-desens-v1.pptx': 8,
-  'fumunc-closing-desens-v2.pptx': 7,
-  'tpl-shekehong-jianyue-desens.pptx': 20,
-  'tpl-shekehong-xingzheng-desens.pptx': 25,
-  'tpl-xiaohui-blue-desens.pptx': 51,
-  'tpl-xiaohui-red-desens.pptx': 51,
-  'tpl-xueshu-dabian-desens.pptx': 25,
+  'real-training-v1.pptx': 22,
+  'real-training-v2.pptx': 20,
+  'real-training-v3.pptx': 23,
+  'real-notes-v1.pptx': 8,
+  'real-notes-v2.pptx': 7,
+  'tpl-theme-a-desens.pptx': 20,
+  'tpl-theme-b-desens.pptx': 25,
+  'tpl-badge-blue-desens.pptx': 51,
+  'tpl-badge-red-desens.pptx': 51,
+  'tpl-defense-desens.pptx': 25,
   'syn-academic-v1.pptx': 9,
   'syn-academic-v2.pptx': 8,
   'syn-consulting-v1.pptx': 9,
@@ -92,7 +99,7 @@ function deckText(pres: PresentationData): string {
 }
 
 describe('语料对拍：20 份脱敏 pptx → loadPresentation', () => {
-  it('tests/corpus 恰好是清单里的 20 份', async () => {
+  it('tests/corpus 恰好是台账里的 20 份', async () => {
     const files = (await readdir(CORPUS_DIR)).filter((f) => f.endsWith('.pptx')).sort()
     expect(files).toEqual(Object.keys(EXPECTED_PAGE_COUNTS).sort())
   })
@@ -101,13 +108,12 @@ describe('语料对拍：20 份脱敏 pptx → loadPresentation', () => {
     it(`${name}：打开 + ${pageCount} 页 + 有文本 + 结构校验零 error`, async () => {
       const pres = await loadCorpus(name)
 
-      // 页数与清单一致
+      // 页数与台账一致
       expect(getSlideCount(pres)).toBe(pageCount)
       expect(getSlides(pres)).toHaveLength(pageCount)
 
-      // 画布尺寸：16:9（12192000×6858000 EMU）或 16:10（18288000×11430000 不
-      // 在语料里；fumunc 两份是 18288000×10287000，即 A4 横向 16:9 高的变体）。
-      // 口径：尺寸必须能读出来且宽高比落在 16:9~16:10 之间。
+      // 画布尺寸：必须能读出来且宽高比落在 16:9~16:10 之间（real-notes 两份是
+      // 18288000×10287000，即 A4 横向的 16:9 变体）。
       const size = getSlideSize(pres)
       expect(size).not.toBeNull()
       const w = Number(size!.width)
@@ -129,39 +135,51 @@ describe('语料对拍：20 份脱敏 pptx → loadPresentation', () => {
     })
   }
 
-  /* ---------------- 按清单点名抽查（覆盖矩阵的抽样对拍） ---------------- */
+  /* ---------------- 按覆盖点抽查 ---------------- */
 
-  it('tpl-xiaohui-blue-desens：6 个图表 + 1 个表格（清单口径）', async () => {
-    const pres = await loadCorpus('tpl-xiaohui-blue-desens.pptx')
+  it('tpl-badge-blue-desens：6 个图表 + 1 个表格', async () => {
+    const pres = await loadCorpus('tpl-badge-blue-desens.pptx')
     // 实测 API 形态：getPresentation*CountsBySlide 返回 number[]（每页计数）。
     expect(sumCounts(getPresentationChartCountsBySlide(pres))).toBe(6)
     expect(sumCounts(getPresentationTableCountsBySlide(pres))).toBe(1)
   })
 
-  it('tpl-xueshu-dabian-desens：4 个图表', async () => {
-    const pres = await loadCorpus('tpl-xueshu-dabian-desens.pptx')
+  it('tpl-defense-desens：4 个图表', async () => {
+    const pres = await loadCorpus('tpl-defense-desens.pptx')
     expect(sumCounts(getPresentationChartCountsBySlide(pres))).toBe(4)
   })
 
-  it('mun-training-desens-v2：第 5 页隐藏（show=0）', async () => {
-    const pres = await loadCorpus('mun-training-desens-v2.pptx')
+  it('real-training-v2：第 5 页隐藏（show=0）', async () => {
+    const pres = await loadCorpus('real-training-v2.pptx')
     expect(isSlideHidden(getSlides(pres)[4])).toBe(true)
     // 其余页不隐藏（抽第 1 页对照）
     expect(isSlideHidden(getSlides(pres)[0])).toBe(false)
   })
 
-  it('fumunc-closing-desens-v1：至少有 1 页带文本备注', async () => {
-    const pres = await loadCorpus('fumunc-closing-desens-v1.pptx')
+  it('real-notes-v1：至少有 1 页带文本备注', async () => {
+    const pres = await loadCorpus('real-notes-v1.pptx')
     // 实测 API 形态：getSlideNotes 返回 string | null。
     const withNotes = getSlides(pres).filter((s) => notesText(s).trim().length > 0)
     expect(withNotes.length).toBeGreaterThan(0)
   })
 
-  it('脱敏红线抽查：全 20 份文本不含「中国社会科学院大学」', async () => {
-    // 语料入库时已做 45 串双通道零命中校验；这里抽最显眼的一串做回归。
+  it('脱敏红线：全 20 份文本不含本机词表里的任一串', async () => {
+    // 词表刻意不入库（内含来源专名）；权威口径在语料生成管线里（45 串双通道零命中）。
+    let words: string[]
+    try {
+      words = (await readFile(SENSITIVE_WORDS, 'utf8'))
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && !s.startsWith('#'))
+    } catch {
+      return // 本机没有词表就跳过：这项校验的前提是「本机持有原始语料」
+    }
+    expect(words.length).toBeGreaterThan(0)
     for (const name of Object.keys(EXPECTED_PAGE_COUNTS)) {
-      const pres = await loadCorpus(name)
-      expect(deckText(pres)).not.toContain('中国社会科学院大学')
+      const text = deckText(await loadCorpus(name))
+      for (const word of words) {
+        expect(text, `${name} 命中词表串`).not.toContain(word)
+      }
     }
   })
 })
