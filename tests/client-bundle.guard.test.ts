@@ -1,5 +1,5 @@
 /**
- * 客户端 bundle 的形态守卫（`npm run build:client` 产物 `lib/client.js` 打架了就红）。
+ * 客户端 bundle 的形态守卫（`npm run build` 产物 `lib/client.js` 打架了就红）。
  *
  * 这几条一旦破掉，插件在浏览器里会**整块不加载**，而宿主侧测试全绿也发现不了：
  *   1. 产物必须是 `window.__ModuleLoader__.load({ id, factory })` —— DSH 客户端模块系统的唯一形态；
@@ -240,7 +240,7 @@ describe('客户端 bundle 形态', () => {
     expect(typeof exports.apply).toBe('function')
   })
 
-  it('产物必须提交：lib/client.js 是构建产物，改动后须跑 npm run build:client（本测试就在守它）', async () => {
+  it('产物必须提交：lib/client.js 是构建产物，改动后须跑 npm run build（本测试就在守它）', async () => {
     // 这条用 esbuild 再跑一次构建，比对落盘产物——不一致即提醒提交产物。
     // 逐字构造结果会带 banner，所以先剥成可比较的干净交集：
     // 产物 xhr 形状（首尾两行 + id 行稳定）+ 内部必须经过 renderBundle 缩进。
@@ -251,7 +251,7 @@ describe('客户端 bundle 形态', () => {
     const result = await bundleClient()
     const expected = renderBundle(result.outputFiles[0].text)
     const actual = fs.readFileSync(BUNDLE, 'utf8')
-    expect(actual, 'lib/client.js 与 client/ 源码不同步——跑 npm run build:client 并提交产物').toBe(expected)
+    expect(actual, 'lib/client.js 与 client/ 源码不同步——跑 npm run build 并提交产物').toBe(expected)
   }, 30000)
 
   it('产物只由本仓库 client/ 的源码打包而成（metafile 挡住 esbuild 静默内联）', async () => {

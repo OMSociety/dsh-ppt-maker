@@ -56,7 +56,7 @@ export function renderBundle(code) {
     .join('\n')
 
   return `/**
- * 自动生成，请勿手改 —— 源码在 client/，用 \`npm run build:client\` 重新生成。
+ * 自动生成，请勿手改 —— 源码在 client/，用 \`npm run build\` 重新生成。
  * 改完记得把本文件一起提交：\`dsh plugin add dsh-ppt-maker\` 只安装、不构建。
  */
 window.__ModuleLoader__.load({
