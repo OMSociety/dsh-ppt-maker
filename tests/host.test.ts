@@ -1,5 +1,5 @@
 /**
- * PR2 宿主路由测试（task-2 验收清单）：
+ * 宿主路由测试：
  *  - sameOrigin 各分支（cross-site / 非环路 Host / Origin:null / Origin 不匹配 / 环路好）
  *  - 413 请求体超限（MAX_BODY 8MB 流式）
  *  - 415 写方法未带 application/json
@@ -121,7 +121,7 @@ async function apiJson(pathname: string, init?: { method?: string; headers?: Rec
   return { ...res, json: json as Record<string, unknown> | null }
 }
 
-/** 用 PR1 冻结项目 store 现造一个工程（返回 {key, dir} 并登记到 per-session store 里）。 */
+/** 用冻结的项目 store 现造一个工程（返回 {key, dir} 并登记到 per-session store 里）。 */
 async function seedProject(dir = 'proj') {
   const result = await createProject(cwd, { dir, title: 'host 测试工程', sessionId: SESSION })
   const { key } = sessionStore.registerProject(SESSION, cwd, dir)

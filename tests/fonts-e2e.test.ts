@@ -1,5 +1,5 @@
 /**
- * PR3 端到端字体嵌入冒烟（真实 PPTD 工程 → 导出 → 解包核对四件套 → 库回读）
+ * 端到端字体嵌入冒烟（真实 PPTD 工程 → 导出 → 解包核对四件套 → 库回读）
  *
  * 测试字体走系统已装 TTF（环境变量 PPT_TEST_FONT 可覆盖）；找不到可用字体时整条跳过，
  * 并在文件顶层打印一行原因——不用「用例体内提前 return」的假通过写法。
@@ -53,7 +53,7 @@ if (!canRun) {
   )
 }
 
-describe('PR3 e2e：导出管线完整跑通字体嵌入', () => {
+describe('字体嵌入 e2e：导出管线完整跑通', () => {
   it.skipIf(!canRun)(
     `create → build → saveProjectPptx → 嵌 ${TEST_FAMILY ?? '(无)'} → 四件套齐 + 库回读`,
     async () => {
@@ -66,7 +66,7 @@ describe('PR3 e2e：导出管线完整跑通字体嵌入', () => {
         // 塞一页内容 + theme 引用测试字体
         const deckText = [
           'profile: generate',
-          'title: PR3 端到端字体嵌入',
+ 'title: 端到端字体嵌入',
           'size: [960, 540]',
           'theme:',
           '  textStyles:',

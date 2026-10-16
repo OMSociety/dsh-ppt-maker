@@ -9,6 +9,6 @@
  *
  * `name` and `inject` must stay statically exported here: the loader reads them
  * before `apply` runs, and a missing injected service means `apply` is never
- * called at all (silently). `webServer` joins the list in PR 2.
+ * called at all (silently).
  */
 export { name, inject, apply } from '../lib/index.js'

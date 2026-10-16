@@ -1,5 +1,5 @@
 /**
- * subset.ts — 字体子集化包装（PR3 计划 §4；spike 实测背书 subset-font 四款全过）
+ * subset.ts — 字体子集化包装（spike 实测背书 subset-font 四款全过）
  *
  * 策略：
  *  - fontEmbed=full → 直通不子集

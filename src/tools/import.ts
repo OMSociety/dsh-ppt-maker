@@ -5,7 +5,7 @@
  * （对导入 deck 的轻改——改字/换图/调页序）does NOT go through here; that
  * path is ppt_patch on a raw .pptx.
  *
- * Frozen contract (PR 2 plan §3):
+ * Frozen contract:
  *  - input: source（相对 cwd 的 .pptx 路径）、targetDir、title、open；
  *  - mode: 'full'（默认，走逆向）| 'surgical'（早退，返回 guidance，由调用
  *    方走 ppt_patch；本工具只建空 projectDir 不动它）；

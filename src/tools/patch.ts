@@ -1,9 +1,9 @@
 /**
- * ppt_patch — 外科手术模式（PR 2 plan §2）：对 .pptx 做轻改而**不**走
+ * ppt_patch — 外科手术模式：对 .pptx 做轻改而**不**走
  * PPTD 逆向/重导出。适用面:调用方拿到一份既有 pptx，只想改字 / 换图 /
  * 调页序，且不愿冒「图表/SmartArt/OLE 被逆向卡掉重写成占位」的风险。
  *
- * 底层契约（PR 1 §L1）：@office-kit/pptx 的 loadPresentation →
+ * 底层契约：@office-kit/pptx 的 loadPresentation →
  * savePresentation **passthrough** 保证「库不建模的部件在 round-trip 中
  * 原样保留」；本工具只做三类窄操作，不去解析 / 重建没建模的东西。
  *

@@ -1,5 +1,5 @@
 /**
- * ppt_export — build the project and write a .pptx (PR 1 plan §2):
+ * ppt_export — build the project and write a .pptx:
  * { ok, path, revision, check: { pass, blockerCount } }.
  *
  * The rule-layer review runs by default and blockers abort the export;

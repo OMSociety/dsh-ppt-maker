@@ -1,7 +1,7 @@
 /**
  * Project store: the only code that reads/writes a PPTD project on disk.
  *
- * Ownership rules (PR 1 plan §3, §4, §7):
+ * Ownership rules:
  *  - `manifest.json` has exactly ONE writer: this module. Tools and future PR
  *    stages never touch it directly; `history.ts` owns `.history/` and nothing
  *    else.
@@ -155,7 +155,7 @@ export function checksumOf(deckText: string, pages: Map<string, string>): string
 }
 
 /* ------------------------------------------------------------------ *
- * Path containment (PR 1 plan §7: dir must resolve inside the session cwd)
+ * Path containment (dir must resolve inside the session cwd)
  * ------------------------------------------------------------------ */
 
 export function resolveProjectDir(cwd: string, dir: string): string {
@@ -175,7 +175,7 @@ export function resolveProjectDir(cwd: string, dir: string): string {
 }
 
 /* ------------------------------------------------------------------ *
- * Per-directory mutex (PR 1 plan §4)
+ * Per-directory mutex
  * ------------------------------------------------------------------ */
 
 const locks = new Map<string, Promise<unknown>>()
@@ -359,7 +359,7 @@ export async function createProject(cwd: string, options: CreateProjectOptions):
 }
 
 /* ------------------------------------------------------------------ *
- * Ops (frozen op-array shape, PR 1 plan §2)
+ * Ops (frozen op-array shape)
  * ------------------------------------------------------------------ */
 
 /**

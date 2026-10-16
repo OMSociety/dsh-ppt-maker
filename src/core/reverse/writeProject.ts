@@ -1,7 +1,7 @@
 /**
- * Reverse write-back layer (PR 2 plan §1 step 3 / §3 tool plumbing):
+ * Reverse write-back layer (tool plumbing):
  * materialise a { deck, pages, media, report } tuple into a real PPTD
- * project directory, reusing the PR 1 store/history contracts so the project
+ * project directory, reusing the store/history contracts so the project
  * the user sees afterwards is exactly the project the tool layer sees.
  *
  * Layout produced:
@@ -63,7 +63,7 @@ export async function writeReverseProject(
 ): Promise<ReverseWriteResult> {
   const absDir = resolveProjectDir(options.cwd, options.dir)
 
-  // 1. create the project shell via the PR 1 single-writer path. This gives us
+  // 1. create the project shell via the single-writer path. This gives us
   //    manifest.json + .history/r0000 + media/ for free.
   const created = await createProject(options.cwd, {
     dir: options.dir,

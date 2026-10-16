@@ -1,5 +1,5 @@
 /**
- * embed.ts — OOXML 字体嵌入后处理（PR3 计划 §2.3；spike 六轮实测背书）
+ * embed.ts — OOXML 字体嵌入后处理（spike 六轮实测背书）
  *
  * 幂等四件套：
  *   1) [Content_Types].xml  加 per-part Override（幂等：已存在则跳）
@@ -92,7 +92,7 @@ function nextFontIndex(parts: Record<string, Uint8Array>): number {
 
 /**
  * 对 savePresentation 产物做字体嵌入。
- * 非幂等（重复注入会产生重复部件）——导出口径「每次导出重嵌」（PR3 计划 §2.1）。
+ * 非幂等（重复注入会产生重复部件）——导出口径「每次导出重嵌」。
  */
 export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanEntry[]): EmbedResult {
   const log: string[] = []

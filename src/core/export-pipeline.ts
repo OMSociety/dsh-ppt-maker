@@ -1,6 +1,6 @@
 /**
- * Export/render pipeline shared by ppt_export, ppt_render and ppt_check
- * (PR 1 plan §2): load project → build native deck → (save pptx | render PNG |
+ * Export/render pipeline shared by ppt_export, ppt_render and ppt_check:
+ * load project → build native deck → (save pptx | render PNG |
  * review). One path, three entry points — render and check never approximate
  * the final artifact, they always go through the same engine build.
  */
@@ -172,7 +172,7 @@ export interface CheckResult {
 export interface CheckOptions {
   pages?: number[]
   withMissingFonts?: boolean
-  /** AI 按需深检（PR 1 plan §6）：给了 deps 才跑，只出建议不阻断。 */
+ /** AI 按需深检：给了 deps 才跑，只出建议不阻断。 */
   ai?: { deps: AiReviewDeps; cwd: string }
 }
 
@@ -181,7 +181,7 @@ export async function checkProject(cwd: string, dir: string, options: CheckOptio
   const pres = pipeline.built.native as PresentationData
   const review = reviewDeck(pres, { pages: options.pages })
 
-  // PR3：字体许可预检（不动导出也可见）——收集 fsType 位与缺字体清单
+ // 字体许可预检（不动导出也可见）——收集 fsType 位与缺字体清单
   const fontLicenseIssues = await reviewFontLicenses(pipeline.deck, pipeline.pages, { projectDir: pipeline.dir })
 
   let missingFonts: string[] = []

@@ -1,5 +1,5 @@
 /**
- * Tool-layer contract tests for ppt_import / ppt_open / ppt_patch (PR2 S3).
+ * Tool-layer contract tests for ppt_import / ppt_open / ppt_patch.
  *
  * These tests don't drive the DSH host: they stub the minimum `tools` +
  * `sessions` services the registration functions need, then call the

@@ -1,5 +1,5 @@
 /**
- * AI 质检层单测（PR 1 plan §8：mock LLM 返回固定 JSON，测解析/校验/门控分支）。
+ * AI 质检层单测（mock LLM 返回固定 JSON，测解析/校验/门控分支）。
  *
  * 不碰真实宿主：llm/attachments/sessions 全部是结构型 stub；
  * renderPptxImages 不在这里跑（runAiReview 的 images 直接手喂）。

@@ -1,5 +1,5 @@
 /**
- * Reverse engine tests (PR 2 task-1).
+ * Reverse engine tests.
  *
  * Fixtures are built with the same engine that writes production decks
  * (`createOfficeKitEngine`) so this test doubles as a round-trip check:
@@ -71,7 +71,7 @@ describe('reverse engine（PPTX → PPTD 逆向）', () => {
     expect(report.source.slideCount).toBe(1)
     expect(report.summary.dropped).toBe(0)
 
-    // Re-load through the PR 1 store to prove the project is well-formed.
+    // Re-load through the project store to prove the project is well-formed.
     const loaded = await loadProject(cwd, 'proj')
     expect(loaded.deck.profile).toBe('reverse')
     expect(loaded.deck.source?.slideCount).toBe(1)

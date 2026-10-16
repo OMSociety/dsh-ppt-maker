@@ -1,5 +1,5 @@
 /**
- * PR3 字体子系统单测：
+ * 字体子系统单测：
  *  - fsType 位判定（bit 组合 / TTC face 数组 / 无 OS/2 保守跳过）
  *  - collectFontUsage：theme.textStyles + 页面内联 + chart 子组件 / slot 推导 / charset 去重
  *  - eot.wrap / readFontMeta（用系统已装的真件字节）
@@ -102,7 +102,7 @@ async function barePptxBytes(): Promise<Uint8Array> {
   return savePresentation(pres)
 }
 
-describe('PR3 字体子系统 · fsType 位判定', () => {
+describe('字体子系统 · fsType 位判定', () => {
   it('纯函数 licenseOf 各 bit 组合', () => {
     expect(licenseOf(0x0000)).toMatchObject({ embeddable: true, readonly: false, noSubset: false })
     expect(licenseOf(FS_PREVIEW_PRINT)).toMatchObject({ embeddable: true, readonly: true })
@@ -161,7 +161,7 @@ describe('PR3 字体子系统 · fsType 位判定', () => {
   })
 })
 
-describe('PR3 字体子系统 · usage 收集', () => {
+describe('字体子系统 · usage 收集', () => {
   const deck: Presentation = {
     size: [960, 540],
     theme: {
@@ -211,7 +211,7 @@ describe('PR3 字体子系统 · usage 收集', () => {
   })
 })
 
-describe('PR3 字体子系统 · EOT 封装与四件套注入', () => {
+describe('字体子系统 · EOT 封装与四件套注入', () => {
   itFont('wrapEot：真件封装后头部断言（EOTSize / Version 0x00020001 / Magic LP）+ fsType 交叉一致', () => {
     const ttf = readReal()
     const { eot, meta } = wrapEot(ttf)
@@ -299,7 +299,7 @@ function parseXml(text: string) {
   return new DOMParser().parseFromString(text, 'application/xml')
 }
 
-describe('PR3 字体子系统 · selfCheckEmbedded 反例（篡改必须抛）', () => {
+describe('字体子系统 · selfCheckEmbedded 反例（篡改必须抛）', () => {
   itFont('四类篡改各自命中对应断言', async () => {
     const ttf = readReal()
     const bare = await barePptxBytes()
@@ -371,7 +371,7 @@ describe('PR3 字体子系统 · selfCheckEmbedded 反例（篡改必须抛）',
   })
 })
 
-describe('PR3 字体子系统 · 整链 smoke（空工程走通）', () => {
+describe('字体子系统 · 整链 smoke（空工程走通）', () => {
   it('空 deck + off 模式：原样通过，零警告', async () => {
     const { embedFontsForPptx } = await import('../src/core/fonts/embed-pipeline.js')
     const bare = await barePptxBytes()
@@ -388,7 +388,7 @@ describe('PR3 字体子系统 · 整链 smoke（空工程走通）', () => {
   })
 })
 
-describe('PR3 resolver · assets/fonts 命中按字体内部族名而非文件 stem', () => {
+describe('resolver · assets/fonts 命中按字体内部族名而非文件 stem', () => {
   itFont('文件名与内部族名不一致时，仍按族名命中，且命中项来自工程 assets/fonts', async () => {
     const { mkdtempSync, mkdirSync, copyFileSync } = await import('node:fs')
     const tmp = mkdtempSync(path.join(os.tmpdir(), 'ppt-resolver-'))

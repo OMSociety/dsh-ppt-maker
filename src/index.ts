@@ -1,12 +1,12 @@
 /**
- * Cordis host plugin for dsh-ppt-maker (renamed from dsh-kimi-ppt, v1.0.0).
+ * Cordis host plugin for dsh-ppt-maker.
  *
  * Two jobs:
  *  1. Register the bundled `skills/ppt-maker` directory as a DSH skill so the
  *     model can load it (DSH never discovers skill files shipped inside a
  *     package on its own).
  *  2. Register the eleven project tools（ppt_create / ppt_themes / ppt_edit /
- *     ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check + PR2 的
+ *     ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check /
  *     ppt_import / ppt_open / ppt_patch；raw JSON-Schema via ctx.tools.register）——
  *     经 src/lazy-tools.ts 懒展开：技能被 invoke 前工具不进会话工具表。
  *
@@ -101,7 +101,7 @@ interface ApplyCtx {
 }
 
 /* ------------------------------------------------------------------ *
- * webServer 路由 + 宿主 → 工具 backchannel（PR2 §4/§7）
+ * webServer 路由 + 宿主 → 工具 backchannel
  *
  * The host routes live in `plugin/host/routes.mjs` (plain JS so DSH can run
  * them without a TS loader), but they take their core from this bundle via
@@ -261,8 +261,8 @@ export function apply(ctx: ApplyCtx): void {
         registerRenderTool,
         registerExportTool,
         registerCheckTool,
-        // PR 2 tools (raw JSON-Schema; rely on the optional bridge for ppt_open /
-        // the open=true path of ppt_import).
+        // Reverse / open / patch tools (raw JSON-Schema; ppt_open and the
+        // open=true path of ppt_import rely on the optional bridge).
         registerImportTool,
         registerOpenTool,
         registerPatchTool

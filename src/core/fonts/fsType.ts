@@ -1,5 +1,5 @@
 /**
- * fsType.ts — OS/2.fsType 许可位读取与嵌入策略判定（PR3 计划 §1.3 + 审查修订 4）
+ * fsType.ts — OS/2.fsType 许可位读取与嵌入策略判定
  *
  * 位定义按 Microsoft Learn OpenType OS/2 规范（fsType @ OS/2+8）。
  * 判定一律按位与，禁止等值比较（位可组合）。

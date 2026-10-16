@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 pptd_to_pptx.py — 本地 .pptd -> .pptx 转换器（纯本地版）
-不依赖无头浏览器 / agent-browser / www.kimi.com，只用 python-pptx + 本地文件。
+不依赖无头浏览器，只用 python-pptx + 本地文件。
 
 用法:
   python pptd_to_pptx.py <deck.pptd> [-o <out.pptx>]

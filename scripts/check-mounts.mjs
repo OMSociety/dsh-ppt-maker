@@ -1,5 +1,5 @@
 /**
- * check:mounts — 静态核对 dsh-ppt-maker 的挂载面声明与产物一致性（PR2 §8）。
+ * check:mounts — 静态核对 dsh-ppt-maker 的挂载面声明与产物一致性。
  *
  * 三条口径：
  *  1. `cordis.patch.yml` 里声明的 bundle 名必须等于 package.json 的 `name`
@@ -9,7 +9,7 @@
  *  3. `lib/index.js` 与 `lib/client.js` 都得存在且非空——前者是宿主插件
  *     的入口，后者是客户端 bundle。缺一个就走不到 apply / 面板是空的。
  *
- * 这是「不可在 CI 偷懒」的那一档（PR2 §8 / §10）：错一次用户装上是空
+ * 这是「不可在 CI 偷懒」的那一档：错一次用户装上是空
  * 面板 + 无报错。
  */
 import { readFileSync, existsSync, statSync } from 'node:fs'

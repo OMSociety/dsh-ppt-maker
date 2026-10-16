@@ -1,5 +1,5 @@
 /**
- * check:build — 守 `lib/` 产物与源码同步（PR2 计划 §8）。
+ * check:build — 守 `lib/` 产物与源码同步。
  *
  * 为什么单独成脚本：lib/ 是包发布的边界（`dsh plugin add` 不构建），源码改了
  * 而产物没跟上会让装好的用户拿到旧代码。CI 用 `git diff --exit-code` 把这条

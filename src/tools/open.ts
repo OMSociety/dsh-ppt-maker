@@ -6,7 +6,7 @@
  * poll on /ppt-maker/api/state picks the request up, focuses the right
  * session, and opens the tab.
  *
- * Frozen contract (PR 2 plan §4/§7):
+ * Frozen contract:
  *  - cwd resolution: `sessions.get(sessionId).header.cwd`; missing is an
  *    error, no process.cwd() fallback.
  *  - `path` must resolve inside cwd to an existing PPTD project

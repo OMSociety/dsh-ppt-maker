@@ -1,8 +1,8 @@
 /**
- * ppt_check — rule-layer quality review (PR 1 plan §6): text overflow,
+ * ppt_check — rule-layer quality review: text overflow,
  * out-of-canvas, overlap, contrast, structural sanity, missing fonts.
  *
- * `ai: true` adds the on-demand AI visual pass (PR1-C): screenshots are the
+ * `ai: true` adds the on-demand AI visual pass: screenshots are the
  * libreoffice-kit renders of the FINAL pptx, shipped through
  * ctx.attachments.saveImages → ctx.llm.stream on the session's own route
  * (requestHeader().config). Routes without image input degrade to "PNG paths

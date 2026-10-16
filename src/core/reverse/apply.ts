@@ -1,5 +1,5 @@
 /**
- * Reverse orchestration (PR 2 plan §1): pptx bytes / file → PPTD project.
+ * Reverse orchestration: pptx bytes / file → PPTD project.
  *
  * This module is the public facade the tool layer (`ppt_import`) and any
  * future route handler call. It owns:

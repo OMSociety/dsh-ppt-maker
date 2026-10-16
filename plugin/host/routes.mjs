@@ -1,5 +1,5 @@
 /**
- * `/ppt-maker/api/*` HTTP 路由：浏览器侧唯一的读写入口（PR2 计划 §7，轨迹对齐
+ * `/ppt-maker/api/*` HTTP 路由：浏览器侧唯一的读写入口（轨迹对齐
  * fishpai 的 plugin/host/routes.mjs——那份是本任务口径的仲裁参考）。
  *
  * 安全边界（浏览器与文件系统之间唯一的一道门）：
@@ -31,12 +31,11 @@ const MAX_BODY = 8 * 1024 * 1024
 export const MAX_ASSET_BYTES = 5 * 1024 * 1024
 
 /* ------------------------------------------------------------------ *
- * Core 依赖注入（PR1 冻结面由 src/index.ts 接线时传入；路由层自己不 import lib）
+ * Core 依赖注入（冻结面由 src/index.ts 接线时传入；路由层自己不 import lib）
  *
- * PR2 纪律：路由工厂只接受 `deps.core`——那一份由整合任务（task-6）在
+ * 纪律：路由工厂只接受 `deps.core`——由
  * `src/index.ts` `apply(ctx)` 里接 src/core/project/store.ts / export-pipeline.ts
- * 的命名出口。宿主路由层绝不打开 `lib/` 产物（依赖打包形态、违背 PR1 的"工具层层
- * 面透明"契约）；测试里直接注入 src 的命名导入，由 vite-node 跑 ts。
+ * 的命名出口。宿主路由层绝不打开 `lib/` 产物（依赖打包形态、违背「工具层层面透明」契约）；测试里直接注入 src 的命名导入，由 vite-node 跑 ts。
  * ------------------------------------------------------------------ */
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Reverse map layer (PR 2 plan §1 step 2): turn the read model into PPTD
+ * Reverse map layer: turn the read model into PPTD
  * AST nodes in the *reverse* dialect, plus the two-level degradation report
  * and the media asset pool.
  *

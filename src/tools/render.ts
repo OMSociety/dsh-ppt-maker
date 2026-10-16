@@ -1,6 +1,6 @@
 /**
- * ppt_render — render project pages to PNG previews via libreoffice-kit
- * (PR 1 plan §2): { ok, images: [{ page, path }] }. Renders the engine-built
+ * ppt_render — render project pages to PNG previews via libreoffice-kit:
+ * { ok, images: [{ page, path }] }. Renders the engine-built
  * pptx bytes BEFORE font embedding (LibreOffice 会误用嵌入的子集 EOT 字体，
  * 预览必须走未嵌入字节，由系统字体承担渲染).
  */

@@ -73,9 +73,9 @@ export function resultSchema(properties: Record<string, unknown> = {}): Record<s
 export interface PluginToolCtx {
   tools: { register(def: ToolDef): unknown }
   sessions?: SessionsLike
-  /** AI 质检通路（PR1-C）：宿主 llm 服务，缺席时 ppt_check ai:true 显式降级。 */
+ /** AI 质检通路：宿主 llm 服务，缺席时 ppt_check ai:true 显式降级。 */
   llm?: import('../core/review/ai.js').LlmLike
-  /** AI 质检通路（PR1-C）：图片入库服务。 */
+ /** AI 质检通路：图片入库服务。 */
   attachments?: import('../core/review/ai.js').AttachmentsLike
 }
 

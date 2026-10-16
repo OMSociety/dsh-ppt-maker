@@ -1,5 +1,5 @@
 /**
- * resolver.ts — typeface → 字体文件解析（PR3 计划 §3.2）
+ * resolver.ts — typeface → 字体文件解析
  *
  * 优先级：工程 assets/fonts/ 自带 > 用户显式指定 > 系统已装 > 失败给替代建议
  *

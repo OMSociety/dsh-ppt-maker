@@ -1,5 +1,5 @@
 /**
- * 语料对拍（PR 1 plan §5 一致性测试、§8「20 份真实语料 round-trip」）：
+ * 语料对拍（一致性测试：20 份真实语料 round-trip）：
  * tests/corpus/ 20 份脱敏 pptx → loadPresentation → 断言关键字段。
  *
  * 语料分两类，文件名保持中性（不含来源机构/会议/主题名）：

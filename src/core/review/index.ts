@@ -1,5 +1,5 @@
 /**
- * Rule-based quality review (PR 1 plan §6): runs against a built native deck,
+ * Rule-based quality review: runs against a built native deck,
  * so the object under review is always the final pptx — never an intermediate
  * approximation.
  *

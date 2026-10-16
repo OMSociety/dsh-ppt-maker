@@ -1,15 +1,13 @@
 /**
  * Revision history: append-only snapshot log + cursor.
  *
- * Model (PR 1 plan §4, frozen):
+ * Model (frozen):
  *  - `.history/r0000`, `r0001`, … is an append-only log of full-state snapshots
  *    (`deck.pptd` + every `pages/*.page` + `meta.json` + `media.json`).
  *  - `manifest.json#revision` is a *cursor* into that log, not a stack pointer.
- *    Undo/redo are pure cursor moves, so redo needs no pop-stack and PR 2 does
- *    not have to rework the model.
+ *    Undo/redo are pure cursor moves, so redo needs no pop-stack.
  *  - Media is never copied into snapshots: `media.json` holds a content-hash
- *    reference list (`media/.objects/<sha1>` dedup is the importer's job in
- *    PR 2). pptx bytes are never snapshotted — they are a derived artifact and
+ *    reference list (`media/.objects/<sha1>` dedup is the importer's job). pptx bytes are never snapshotted — they are a derived artifact and
  *    would cost 10–20 MB per revision once fonts are embedded.
  *
  * The three fine-print rules the plan calls out are all implemented here:

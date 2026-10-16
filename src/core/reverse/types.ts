@@ -1,5 +1,5 @@
 /**
- * Reverse-engineering types (PR 2 plan §1). Pure data contracts shared across
+ * Reverse-engineering types. Pure data contracts shared across
  * the read / map / writeback layers. No @office-kit/pptx imports here.
  */
 import type { Presentation, Page } from '../pptd/schema.js'

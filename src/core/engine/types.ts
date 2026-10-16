@@ -1,5 +1,5 @@
 /**
- * Engine interface layer (PR 1 plan §5) — the seam between the PPTD AST and
+ * Engine interface layer — the seam between the PPTD AST and
  * the concrete pptx library.
  *
  * PPTD types (schema.ts) never leak library API shapes; engine implementations

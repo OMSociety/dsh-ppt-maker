@@ -1,5 +1,5 @@
 /**
- * AI 视觉质检层（PR 1 plan §6 按需深检，`ai: true` 才跑）。
+ * AI 视觉质检层（按需深检，`ai: true` 才跑）。
  *
  * 通路（全部按宿主已发布源码实测落地，无臆造 API）：
  *  - 路由：`ctx.sessions.get(sessionId).requestHeader()?.config` 取

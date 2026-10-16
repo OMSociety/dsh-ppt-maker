@@ -1,5 +1,5 @@
 /**
- * @office-kit/pptx implementation of the deck engine (PR 1 plan §5).
+ * @office-kit/pptx implementation of the deck engine.
  *
  * This is the ONLY file that imports @office-kit/pptx. Swapping engines means
  * replacing this file; PPTD types and tool code never see the library API.
@@ -925,7 +925,7 @@ function buildChart(
   const supported = new Set(['bar', 'line', 'area', 'pie'])
   const firstType = String(series[0]?.type ?? '')
   if (!supported.has(firstType)) {
-    ctx.warnings.push(`${where}：图表类型 ${firstType} 暂不支持（PR1 最小集 bar/line/area/pie），落为占位`)
+    ctx.warnings.push(`${where}：图表类型 ${firstType} 暂不支持（最小集只覆盖 bar/line/area/pie），落为占位`)
     return buildPlaceholder(slide, { ...element, originalType: 'chart' }, resolver, ctx, new Set())
   }
 

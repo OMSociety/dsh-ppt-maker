@@ -1,5 +1,5 @@
 /**
- * Reverse engine — PPTX → PPTD (PR 2 plan §1).
+ * Reverse engine — PPTX → PPTD.
  *
  * This directory is the **second** sanctioned `@office-kit/pptx` import point
  * in the repo (`core/engine/officekit.ts` is the first). The two halves never
@@ -10,7 +10,7 @@
  *   - `reverseImport(options)` — one-shot bytes/path → project directory.
  *   - Types for the two-level report and intermediate model.
  *
- * Tool layer (`src/tools/import.ts`, PR2 task-3) builds on `reverseImport`.
+ * Tool layer (`src/tools/import.ts`) builds on `reverseImport`.
  */
 export {
   reverseImport,

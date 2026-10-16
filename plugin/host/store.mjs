@@ -1,7 +1,7 @@
 /**
- * Per-session 工程 store：`/ppt-maker/api/*` 与模型工具（PR2 S3）共用的内存状态。
+ * Per-session 工程 store：`/ppt-maker/api/*` 与模型工具共用的内存状态。
  *
- * 形态（PR2 计划 §4，逐字口径对齐 fishpai 的 requestOpen / consumeOpenRequest /
+ * 形态（逐字口径对齐 fishpai 的 requestOpen / consumeOpenRequest /
  * pendingOpenRequest）：
  *   Map<sessionId, {
  *     projects: Map<key, dir>,   // 本会话登记过的工程（key → 相对/工程目录写法）

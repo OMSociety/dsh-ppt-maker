@@ -1,5 +1,5 @@
 /**
- * fontLicense.ts — 字体许可预检（PR3 计划 §7：ppt_check 不动导出也可见的预检）
+ * fontLicense.ts — 字体许可预检（ppt_check 不动导出也可见的预检）
  *
  * 覆盖口径（与 fsType.ts / resolver.ts 同源）：
  *  - 收集 deck 用到的全部 typeface

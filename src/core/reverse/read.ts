@@ -1,5 +1,5 @@
 /**
- * Reverse read layer (PR 2 plan §1 step 1): pull a PresentationData from pptx
+ * Reverse read layer: pull a PresentationData from pptx
  * bytes and walk every slide/shape into a flat Reverse*Record model.
  *
  * This is the second sanctioned `@office-kit/pptx` import point in the repo

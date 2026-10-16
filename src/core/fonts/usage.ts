@@ -1,7 +1,7 @@
 /**
  * usage.ts — 扫 deck 收集①用到的字体清单（typeface → slot 集合）②子集化字符集
  *
- * 覆盖范围（PR3 计划 §3.1）：
+ * 覆盖范围：
  *  - deck.pptd.theme.textStyles[*].fontFamily（string 或 {latin, ea}）
  *  - pages/* 各元素 content.fontFamily（text/shape 内文本）
  *  - table cell 的 textStyle 内联 fontFamily
