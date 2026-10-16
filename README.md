@@ -1,3 +1,5 @@
+<p align="center"><strong>中文</strong> · <a href="README_en.md">English</a></p>
+
 <div align="center">
   <img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" alt="PPT 创客" width="160">
   <h1>PPT 创客 dsh-ppt-maker</h1>
@@ -14,8 +16,6 @@
 
 <a href="#这是什么">这是什么</a> • <a href="#核心特性">核心特性</a> • <a href="#效果">效果</a> • <a href="#安装方式">安装方式</a> • <a href="#模型工具">模型工具</a> • <a href="#工作台">工作台</a> • <a href="#开发">开发</a> • <a href="#更新日志">更新日志</a> • <a href="#支持与致谢">支持与致谢</a> • <a href="#许可证与作者">许可证与作者</a>
 </div>
-
-> **免责声明：**本插件为非官方项目，与 Moonshot AI 无关。PPTD 为自主维护的契约（不跟踪上游）。
 
 ## 这是什么
 
