@@ -90,28 +90,63 @@ describe('PptStore（S6 骨架纪律）', () => {
     store.dispose()
   })
 
-  it('重启竞态自愈：init 撞上「会话尚未注册」的 400 进 error，宿主恢复后 applyPoll 必须把人救回空面板', async () => {
+  it('重启竞态：init 撞「会话尚未注册」的 400 不进错误屏，保持 loading 等宿主就绪', async () => {
     const store = seedStore()
-    // 宿主刚起来时 sessions.get 还没注册该会话：/state 回 400，init 挂 error
+    // 宿主刚起来时 sessions.get 还没注册该会话：/state 回 400——这是已知瞬时态，
+    // 用户应看到「正在打开工作台」而非「无法解析会话工作目录」错误屏
     mockApi.state.mockRejectedValueOnce(new Error('无法解析会话工作目录：s1'))
     await store.actions.init()
-    expect(store.getSnapshot().status).toBe('error')
+    expect(store.getSnapshot().status).toBe('loading')
+    expect(store.getSnapshot().error).toBeNull()
+    expect(mockApi.state).toHaveBeenCalledTimes(1)
+    store.dispose()
+  })
 
-    // 会话注册完成后某次轮询成功（本会话恰好没有任何工程）：必须离开 error，不许卡死在错误屏
+  it('重启竞态：等待中由轮询把人带进面板（loading 态 applyPoll 成功即恢复）', async () => {
+    const store = seedStore()
+    mockApi.state.mockRejectedValueOnce(new Error('无法解析会话工作目录：s1'))
+    await store.actions.init()
+    expect(store.getSnapshot().status).toBe('loading')
+
+    // 会话注册完成后某次轮询成功（本会话恰好没有任何工程）：直接恢复成 empty
     await store.actions.applyPoll({ ...STATE_R1, projects: [], activeKey: null, manifest: null })
     expect(store.getSnapshot().status).toBe('empty')
     store.dispose()
   })
 
-  it('重启竞态自愈（带回工程）：error 后 applyPoll 成功同样恢复 ready', async () => {
+  it('重启竞态：init 自身静默重试，800ms 后自动再拉一次直到成功', async () => {
     const store = seedStore()
-    mockApi.state.mockRejectedValueOnce(new Error('无法解析会话工作目录：s1'))
+    mockApi.state
+      .mockRejectedValueOnce(new Error('无法解析会话工作目录：s1'))
+      .mockRejectedValueOnce(new Error('无法解析会话工作目录：s1'))
     await store.actions.init()
-    expect(store.getSnapshot().status).toBe('error')
+    expect(store.getSnapshot().status).toBe('loading')
 
-    await store.actions.applyPoll(STATE_R1)
+    await vi.advanceTimersByTimeAsync(800)
+    expect(mockApi.state).toHaveBeenCalledTimes(2)
+    expect(store.getSnapshot().status).toBe('loading')
+
+    await vi.advanceTimersByTimeAsync(800)
+    expect(mockApi.state).toHaveBeenCalledTimes(3)
+    // 第三次拉取走 seedStore 的默认成功 mock：恢复 ready
     expect(store.getSnapshot().status).toBe('ready')
-    expect(store.getSnapshot().projects).toHaveLength(1)
+    store.dispose()
+  })
+
+  it('重启竞态：等满 3 秒提示换成「宿主正在就绪」，超过 15 秒预算才升级成错误屏', async () => {
+    const store = seedStore()
+    mockApi.state.mockRejectedValue(new Error('无法解析会话工作目录：s1'))
+    await store.actions.init()
+    expect(store.getSnapshot().loadingHint).toBeNull()
+
+    await vi.advanceTimersByTimeAsync(3500)
+    expect(store.getSnapshot().status).toBe('loading')
+    expect(store.getSnapshot().loadingHint).toContain('宿主正在就绪')
+
+    // 预算耗尽（15 秒）：才允许挂 error
+    await vi.advanceTimersByTimeAsync(13000)
+    expect(store.getSnapshot().status).toBe('error')
+    expect(store.getSnapshot().error).toContain('无法解析会话工作目录')
     store.dispose()
   })
 

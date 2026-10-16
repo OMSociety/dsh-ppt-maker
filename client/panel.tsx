@@ -39,8 +39,8 @@ export function Title() {
   )
 }
 
-/** 「加载中」态（还没拉过 /state）。 */
-function BlankLoading() {
+/** 「加载中」态（还没拉过 /state；hint 非空时换成具体的等待原因）。 */
+function BlankLoading({ hint }: { hint?: string | null }) {
   return (
     <div className="ppt-blank">
       <div className="ppt-blank-card">
@@ -49,7 +49,7 @@ function BlankLoading() {
           <span>PPT 工作台</span>
         </div>
         <div className="ppt-sweep" aria-hidden="true" />
-        <p>正在打开工作台…</p>
+        <p>{hint || '正在打开工作台…'}</p>
       </div>
     </div>
   )
@@ -272,7 +272,7 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
   return (
     <div className="ppt-root">
       <Toolbar store={store} historyOpen={historyOpen} onShowHistory={() => setHistoryOpen((v) => !v)} />
-      {state.status === 'loading' && <BlankLoading />}
+      {state.status === 'loading' && <BlankLoading hint={state.loadingHint} />}
       {state.status === 'error' && <BlankError error={state.error || '面板载入失败'} onRetry={() => void store.actions.init()} />}
       {state.status === 'empty' && <BlankEmpty />}
       {state.status === 'ready' && !state.activeKey && <ProjectList store={store} />}

@@ -232,14 +232,14 @@ export function apply(ctx: any): void {
         }
         // 面板自己的 init() 已拉过 /state；第一轮 tick 不重复 push 一遍，但第二轮起
         // 通通都进 store（skeleton 的 ProjectList / 空面板都靠 store.projects）。
-        // 例外：init() 失败（status=error，典型是重启竞态里会话还没注册、/state 回 400）时
-        // 不许跳过——这一轮成功的 /state 正是恢复信号，applyPoll 会把错误屏救回面板。
+        // 例外：init() 还没成功（loading=仍在等宿主就绪，error=已失败）时首轮不许跳过——
+        // 这一轮成功的 /state 正是恢复信号，applyPoll 会把面板救回 ready/empty。
         const firstPoll = !seenSessions.has(sessionId)
         seenSessions.add(sessionId)
         const store = stores.get(sessionId)
         if (store) {
           const status = store.getSnapshot().status
-          if (firstPoll && status !== 'error') return
+          if (firstPoll && (status === 'ready' || status === 'empty')) return
           await store.actions.applyPoll(st)
         }
       } catch (error) {

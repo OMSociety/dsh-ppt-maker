@@ -36,6 +36,8 @@ import type { ProjectEntry } from './api'
 export interface PptState {
   status: 'loading' | 'ready' | 'empty' | 'error'
   error: string | null
+  /** loading 态的辅助提示（如「宿主正在就绪」）；null = 默认「正在打开工作台…」。 */
+  loadingHint: string | null
   sessionId: string
   /** 当前会话里已知的工程列表（来自轮询 /state 的 projects）。 */
   projects: ProjectEntry[]
@@ -76,6 +78,7 @@ function initialState(sessionId: string): PptState {
   return {
     status: 'loading',
     error: null,
+    loadingHint: null,
     sessionId,
     projects: [],
     activeKey: null,
@@ -109,6 +112,15 @@ export function createPptStore(sessionId: string) {
   // 属性级 op（update_element/update_page/add_element/remove_element）不清，原地静默重拉。
   const STRUCTURAL_OPS = new Set(['add_page', 'remove_page', 'move_page', 'page_duplicate'])
   let stageTimer: ReturnType<typeof setTimeout> | null = null
+  /**
+   * 重启竞态预算：init 撞「无法解析会话工作目录」（宿主侧会话还没注册完，/state 回 400）
+   * 是已知瞬时态——保持 loading、短间隔静默重试；超过预算仍失败才升级成错误屏。
+   * 这样用户看到的是「正在打开工作台」，而不是一闪而过、还得手动点的错误屏。
+   */
+  const SESSION_RACE_BUDGET_MS = 15000
+  const SESSION_RACE_RETRY_MS = 800
+  let sessionRaceSince = -1
+  let sessionRaceTimer: ReturnType<typeof setTimeout> | null = null
   function scheduleFlush() {
     if (stageTimer) clearTimeout(stageTimer)
     stageTimer = setTimeout(() => {
@@ -327,11 +339,34 @@ export function createPptStore(sessionId: string) {
     /** 面板挂载时初始化：拉一次 /state，把 projects 与 active 排进 store。 */
     async init() {
       try {
-        patch({ status: 'loading', error: null })
+        patch({ status: 'loading', error: null, loadingHint: null })
         const st = await api.state(state.sessionId)
+        // 成功：竞态预算清零，下一次失败重新计时。
+        sessionRaceSince = -1
         await applyPoll(st)
       } catch (error) {
-        patch({ status: 'error', error: (error as Error).message })
+        const message = (error as Error).message
+        if (message.includes('无法解析会话工作目录')) {
+          const now = Date.now()
+          if (sessionRaceSince < 0) sessionRaceSince = now
+          if (now - sessionRaceSince <= SESSION_RACE_BUDGET_MS) {
+            // 等过 3 秒还没好，把提示从「正在打开工作台」换成「宿主正在就绪」，
+            // 让用户知道没卡死，只是宿主还没登记完这个会话。
+            const waited = now - sessionRaceSince
+            patch({
+              status: 'loading',
+              error: null,
+              loadingHint: waited >= 3000 ? '宿主正在就绪，请稍候…' : null,
+            })
+            if (sessionRaceTimer) clearTimeout(sessionRaceTimer)
+            sessionRaceTimer = setTimeout(() => {
+              sessionRaceTimer = null
+              void actions.init()
+            }, SESSION_RACE_RETRY_MS)
+            return
+          }
+        }
+        patch({ status: 'error', error: message, loadingHint: null })
       }
     },
 
@@ -661,6 +696,10 @@ export function createPptStore(sessionId: string) {
       if (stageTimer) {
         clearTimeout(stageTimer)
         stageTimer = null
+      }
+      if (sessionRaceTimer) {
+        clearTimeout(sessionRaceTimer)
+        sessionRaceTimer = null
       }
       listeners.clear()
     },
