@@ -14,6 +14,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { unzipSync, zipSync, strToU8, strFromU8 } from 'fflate'
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import { createPresentation, addBlankSlide, savePresentation, addSlideTextBox, emu } from '@office-kit/pptx'
 import { licenseOf, readFsType, readFsTypeAll, FS_BITMAP_ONLY, FS_NO_SUBSET, FS_PREVIEW_PRINT, FS_RESTRICTED } from '../src/core/fonts/fsType.js'
 import { readFontMeta, wrapEot } from '../src/core/fonts/eot.js'
@@ -274,6 +276,98 @@ describe('PR3 字体子系统 · EOT 封装与四件套注入', () => {
     expect(dv.getUint32(8, true)).toBe(0x00020001)
     // 子集产物 TTF 其 EOTSize 应大大小于原始整字体 EOT
     expect(eot.length).toBeLessThan(ttf.length / 100)
+  })
+})
+
+type ZipParts = Record<string, Uint8Array>
+
+/** 解包 → 改坏 → 压回：selfCheckEmbedded 的反例都要经过这一步 */
+function tamper(bytes: Uint8Array, mutate: (parts: ZipParts) => void): Uint8Array {
+  const parts = unzipSync(bytes) as ZipParts
+  mutate(parts)
+  return zipSync(parts)
+}
+
+/** 改打包内某个 XML 部件 */
+function editXml(parts: ZipParts, name: string, mutate: (doc: ReturnType<typeof parseXml>) => boolean): void {
+  const doc = parseXml(strFromU8(parts[name]))
+  if (!mutate(doc)) throw new Error(`反例构造失败：${name} 里没有可改的目标`)
+  parts[name] = strToU8(new XMLSerializer().serializeToString(doc))
+}
+
+function parseXml(text: string) {
+  return new DOMParser().parseFromString(text, 'application/xml')
+}
+
+describe('PR3 字体子系统 · selfCheckEmbedded 反例（篡改必须抛）', () => {
+  itFont('四类篡改各自命中对应断言', async () => {
+    const ttf = readReal()
+    const bare = await barePptxBytes()
+    const plan = [{ typeface: REAL_FAMILY!, slot: 'regular' as const, bytes: ttf, subsetted: false }]
+    const good = embedFontsPostProcess(bare, plan)
+    expect(() => selfCheckEmbedded(good.bytes, { fontPlan: plan })).not.toThrow()
+
+    const cases: Array<{ name: string; mutate: (parts: ZipParts) => void; message: RegExp }> = [
+      {
+        name: 'embeddedFontLst 引用不存在的 r:id',
+        message: /r:id=rId9999 在 rels 里不存在/,
+        mutate: (parts) =>
+          editXml(parts, 'ppt/presentation.xml', (doc) => {
+            const slot = doc.getElementsByTagName('p:embeddedFontLst').item(0)?.getElementsByTagName('p:regular').item(0)
+            if (!slot) return false
+            slot.setAttribute('r:id', 'rId9999')
+            return true
+          })
+      },
+      {
+        name: 'rels 的 font Target 指向不存在的部件',
+        message: /在包里不存在/,
+        mutate: (parts) =>
+          editXml(parts, 'ppt/_rels/presentation.xml.rels', (doc) => {
+            const rels = doc.getElementsByTagName('Relationship')
+            for (let i = 0; i < rels.length; i++) {
+              const el = rels.item(i)
+              if (el?.getAttribute('Type') === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/font') {
+                el.setAttribute('Target', 'fonts/gone.fntdata')
+                return true
+              }
+            }
+            return false
+          })
+      },
+      {
+        name: '[Content_Types] 缺 fntdata Override',
+        message: /缺 Override/,
+        mutate: (parts) =>
+          editXml(parts, '[Content_Types].xml', (doc) => {
+            const ovr = doc.getElementsByTagName('Override')
+            for (let i = 0; i < ovr.length; i++) {
+              const el = ovr.item(i)
+              if (el?.getAttribute('ContentType') === 'application/x-fontdata') {
+                el.parentNode?.removeChild(el)
+                return true
+              }
+            }
+            return false
+          })
+      },
+      {
+        name: 'EOT Version 被改坏',
+        message: /EOT Version .* != 0x00020001/,
+        mutate: (parts) => {
+          const name = Object.keys(parts).find((n) => n.startsWith('ppt/fonts/') && n.endsWith('.fntdata'))
+          if (!name) throw new Error('反例构造失败：产物里没有 fntdata 部件')
+          const copy = new Uint8Array(parts[name])
+          new DataView(copy.buffer, copy.byteOffset, copy.byteLength).setUint32(8, 0x00020002, true)
+          parts[name] = copy
+        }
+      }
+    ]
+
+    for (const c of cases) {
+      const broken = tamper(good.bytes, c.mutate)
+      expect(() => selfCheckEmbedded(broken, { fontPlan: plan }), c.name).toThrow(c.message)
+    }
   })
 })
 
