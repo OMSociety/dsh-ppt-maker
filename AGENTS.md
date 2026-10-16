@@ -46,6 +46,8 @@ Windows PowerShell 里等价写法是先把环境变量设进当前会话，再�
 
 全量测试还有第二个前置：`tests/corpus/*.pptx` 不在 git 里（被 `.gitignore` 的 `*.pptx` 排除），缺语料时语料测试直接 ENOENT。在没有这份语料的机器上，验收链只能跑到语料测试以外的部分；补齐办法见「已知风险区」那一行。
 
+字体类用例（`fonts-embed` / `fonts-e2e` / `fonts-resolver`）取系统已装字体：TTF 优先 `C:\Windows\Fonts\simhei.ttf`，TTC 优先 `msyh.ttc`，中文族名用例依赖「阿里妈妈数黑体」。候选一个都不在位时，相关用例用 `it.skip` 显式跳过并在运行日志里打印原因（不用用例体内的提前 `return`，那会显示为「通过」）；要换字体设 `PPT_TEST_FONT` 指向任一 TTF。
+
 ## 架构边界
 
 三个面各有独立产物与加载方式，不要互相 import：

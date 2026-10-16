@@ -1,37 +1,61 @@
 /**
- * PR3 端到端字体嵌入冒烟（真实 PPTD 工程 → ppt_export → 解包验证四件套 + 用 oracle64 headless 裁决）
+ * PR3 端到端字体嵌入冒烟（真实 PPTD 工程 → 导出 → 解包核对四件套 → 库回读）
  *
- * 前置：WorkBench/spike-font-embed/r6/oracle64.exe 已编译；assets 下四款字体留档
+ * 测试字体走系统已装 TTF（环境变量 PPT_TEST_FONT 可覆盖）；找不到可用字体时整条跳过，
+ * 并在文件顶层打印一行原因——不用「用例体内提前 return」的假通过写法。
+ *
  * 本测试：
- *  1) 造一个最小 PPTD 工程（theme.textStyles 用 MiSans）
- *  2) 调 checkProject + saveProjectPptx 导出
- *  3) 解包断言 embeddedFontLst / fntdata / rels / ContentTypes 全在
- *  4) 用 node 起子进程调 oracle64.exe 对每个 fntdata 裁决 TTLoadEmbeddedFont 返回 0
+ *  1) 造一个最小 PPTD 工程（theme.textStyles 用该字体的 name 表族名）
+ *  2) 调 buildProjectDeck + saveProjectPptx 导出
+ *  3) 解包断言 fntdata / Content_Types Override / rels / presentation.xml 标记全在
+ *  4) 产物能被 @office-kit/pptx 回读
+ *
+ * 字体字节本身能否被 PowerPoint 的 t2embed 收下，属 spike 期的 headless 裁决范围，
+ * 结论记在 docs/DECISIONS.md；本测试只守结构面。
  */
 import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { unzipSync } from 'fflate'
 import { DOMParser } from '@xmldom/xmldom'
 import { loadPresentation } from '@office-kit/pptx'
 import { buildProjectDeck, saveProjectPptx } from '../src/core/export-pipeline.js'
 import { createProject } from '../src/core/project/store.js'
+import { readFontMeta } from '../src/core/fonts/eot.js'
 
-const execFileAsync = promisify(execFile)
+/** 候选测试字体（TTC 不含：这里要按 name 表族名声明并子集化，取单 face TTF） */
+const FONT_CANDIDATES = [
+  process.env.PPT_TEST_FONT,
+  'C:\\Windows\\Fonts\\simhei.ttf',
+  'C:\\Windows\\Fonts\\Deng.ttf',
+  'C:\\Windows\\Fonts\\arial.ttf'
+].filter((p): p is string => typeof p === 'string' && p.length > 0)
 
-const SPIKE_DIR = 'D:\\WorkSpace\\WorkBench\\spike-font-embed'
-const ORACLE64 = path.join(SPIKE_DIR, 'r6', 'oracle64.exe')
-const MISANS_TTF = path.join(SPIKE_DIR, 'assets', 'MiSans-Regular.ttf')
+const TEST_FONT = FONT_CANDIDATES.find((p) => existsSync(p)) ?? null
 
-const hasAssets = existsSync(ORACLE64) && existsSync(MISANS_TTF)
+/** 族名取字体 name 表（platform 3 / lang 0x409），与导出链路解析字体同一口径 */
+const TEST_FAMILY = TEST_FONT === null ? null : familyOf(TEST_FONT)
 
-describe('PR3 e2e：导出管线完整跑通字体嵌入 + headless 裁决', () => {
-  it.runIf(hasAssets)(
-    'create → build → saveProjectPptx → 嵌 MiSans → 四件套在 + oracle64 对每个 fntdata 裁决 E_NONE',
+function familyOf(file: string): string | null {
+  try {
+    return readFontMeta(new Uint8Array(readFileSync(file))).familyName
+  } catch {
+    return null
+  }
+}
+
+const canRun = TEST_FONT !== null && TEST_FAMILY !== null
+if (!canRun) {
+  console.warn(
+    `[fonts-e2e] 跳过：未找到可用测试字体（候选 ${FONT_CANDIDATES.join(' / ')}，可用 PPT_TEST_FONT 指定一个 TTF）`
+  )
+}
+
+describe('PR3 e2e：导出管线完整跑通字体嵌入', () => {
+  it.skipIf(!canRun)(
+    `create → build → saveProjectPptx → 嵌 ${TEST_FAMILY ?? '(无)'} → 四件套齐 + 库回读`,
     async () => {
       const tmp = mkdtempSync(path.join(os.tmpdir(), 'ppt-pr3-e2e-'))
       const dir = '工程甲'
@@ -39,7 +63,7 @@ describe('PR3 e2e：导出管线完整跑通字体嵌入 + headless 裁决', () 
         await mkdir(path.join(tmp, dir), { recursive: true })
         await createProject(tmp, { dir })
 
-        // 塞一页内容 + theme 引用 MiSans
+        // 塞一页内容 + theme 引用测试字体
         const deckText = [
           'profile: generate',
           'title: PR3 端到端字体嵌入',
@@ -47,7 +71,7 @@ describe('PR3 e2e：导出管线完整跑通字体嵌入 + headless 裁决', () 
           'theme:',
           '  textStyles:',
           '    h1:',
-          '      fontFamily: MiSans',
+          `      fontFamily: ${TEST_FAMILY}`,
           '      fontSize: 40',
           '      bold: true',
           'export:',
@@ -74,7 +98,7 @@ describe('PR3 e2e：导出管线完整跑通字体嵌入 + headless 裁决', () 
         const saved = await saveProjectPptx(pipeline)
         expect(saved.fontEmbed).not.toBeNull()
         expect(saved.fontEmbed!.facesEmbedded.length).toBeGreaterThan(0)
-        const written = saved.fontEmbed!.facesEmbedded.filter((f) => f.typeface === 'MiSans')
+        const written = saved.fontEmbed!.facesEmbedded.filter((f) => f.typeface === TEST_FAMILY)
         expect(written.length).toBeGreaterThan(0)
 
         // 解包验证
@@ -116,33 +140,6 @@ describe('PR3 e2e：导出管线完整跑通字体嵌入 + headless 裁决', () 
         // 库能回读
         const reloaded = await loadPresentation(saved.bytes)
         expect(reloaded).toBeTruthy()
-
-        // oracle64 的调用协议（读 spike r6/oracle.c）：返回码 = TTLoadEmbeddedFont HRESULT
-        // 但时序签名是 14 参 Win11 x64 版，且对 miSans 已装 E_FONTNAMEALREADYEXISTS(0x010F) 也算「能读」
-        // 我们对「进程未启动 / exit==1（HRESULT 可接受区外）」判失败，其余按 spike 第六轮的成功先例放行
-        for (const fp of fontParts) {
-          const fntdata = parts[fp]
-          const tmpFon = path.join(tmp, `font-${path.basename(fp)}.fntdata`)
-          writeFileSync(tmpFon, fntdata)
-          try {
-            const { stdout, stderr } = await execFileAsync(ORACLE64, [tmpFon], { maxBuffer: 1024 * 1024 })
-            // stdout 的 [oracle] 行是稳定侧信道
-            void stdout
-            void stderr
-          } catch (err) {
-            const code = (err as { code?: number | string }).code
-            // TTLoadEmbeddedFont 的 HRESULT：0=E_NONE，0x010F=NAMEALREADYEXISTS（能读但同名）
-            // 其余非 0（0x0102 FONTDATAINVALID / 0x0111 ERRORDECOMPRESSING 等）判失败
-            if (typeof code === 'number' && code !== 0 && code !== 0x010f) {
-              // 0x0102 等高位在 Windows 上直接被 exit code 截断到 8 bit，出现在 (code & 0xff)
-              const lo = code & 0xff
-              if (lo === 0x02 || lo === 0x11) {
-                throw new Error(`oracle64 拒载 ${fp}：exit=0x${code.toString(16)}`)
-              }
-              // 其他非零放行（详见 spike 第六轮对 0x010F 的容忍）
-            }
-          }
-        }
       } finally {
         await rm(tmp, { recursive: true, force: true }).catch(() => {})
       }
