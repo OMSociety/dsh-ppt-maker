@@ -39,8 +39,10 @@
     "locale/*.json",
     "plugin",
     "skills",
+    "!skills/ppt-maker/tests",
     "cordis.patch.yml",
     "README.md",
+    "README_en.md",
     "LICENSE"
   ],
   "peerDependencies": {
