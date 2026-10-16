@@ -90,6 +90,31 @@ describe('PptStore（S6 骨架纪律）', () => {
     store.dispose()
   })
 
+  it('重启竞态自愈：init 撞上「会话尚未注册」的 400 进 error，宿主恢复后 applyPoll 必须把人救回空面板', async () => {
+    const store = seedStore()
+    // 宿主刚起来时 sessions.get 还没注册该会话：/state 回 400，init 挂 error
+    mockApi.state.mockRejectedValueOnce(new Error('无法解析会话工作目录：s1'))
+    await store.actions.init()
+    expect(store.getSnapshot().status).toBe('error')
+
+    // 会话注册完成后某次轮询成功（本会话恰好没有任何工程）：必须离开 error，不许卡死在错误屏
+    await store.actions.applyPoll({ ...STATE_R1, projects: [], activeKey: null, manifest: null })
+    expect(store.getSnapshot().status).toBe('empty')
+    store.dispose()
+  })
+
+  it('重启竞态自愈（带回工程）：error 后 applyPoll 成功同样恢复 ready', async () => {
+    const store = seedStore()
+    mockApi.state.mockRejectedValueOnce(new Error('无法解析会话工作目录：s1'))
+    await store.actions.init()
+    expect(store.getSnapshot().status).toBe('error')
+
+    await store.actions.applyPoll(STATE_R1)
+    expect(store.getSnapshot().status).toBe('ready')
+    expect(store.getSnapshot().projects).toHaveLength(1)
+    store.dispose()
+  })
+
   it('exportDeck：toast 挂导出文件路径（打开方式菜单的数据源），并视觉残留 10 秒', async () => {
     const store = seedStore()
     await store.actions.init()

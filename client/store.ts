@@ -201,7 +201,10 @@ export function createPptStore(sessionId: string) {
     const nextRevision = nextKey && st.manifest ? st.manifest.revision : -1
 
     const patchBase: Partial<PptState> = {
-      status: state.status === 'error' && state.error ? 'error' : projects.length || nextKey ? 'ready' : 'empty',
+      // 不保留 error：applyPoll 只在 /state 成功时被调用（失败走 init/轮询的 catch，根本到不了这里），
+      // 一次成功的轮询就是「宿主恢复」的信号——重启竞态里 init 撞 400 后，这里负责把人救回面板，
+      // 否则错误屏会一直挂到用户手动点「重试」。
+      status: projects.length || nextKey ? 'ready' : 'empty',
       error: null,
       projects,
       // canUndo/canRedo 由宿主 /state 的 manifest 轮廓给出（activeKey 工程才有意义）。
