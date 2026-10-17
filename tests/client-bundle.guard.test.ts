@@ -333,7 +333,7 @@ describe('客户端 bundle 形态', () => {
     expect(tab.id).toBe('dsh-ppt-maker')
     expect(tab.kind).toBe('ppt')
     expect(tab.priority).toBe('extension')
-    expect((tab.title as () => string)()).toBe('PPT 创客')
+    expect((tab.title as () => string)()).toBe('PPT 工作台')
     expect(Array.isArray(tab.guide)).toBe(true)
     expect(((tab.guide as Array<{ title: () => string }>)[0].title)()).toMatch(/PPT|工作台/)
 

@@ -114,7 +114,7 @@ PowerShell 下最后一条改成分两句：先 `$env:NODE_OPTIONS='--max-old-sp
 
 跑之前确认 `tests/corpus/` 里 20 份语料在位。本机实测基线（2026-10-18）：typecheck 两个 tsconfig 均 0 错；build 后 `git status` 干净且 `check:build` 报「lib/ 与 git 一致」；全量 24 个测试文件 / 245 个用例通过，约 70s（高负载下 fonts-embed 单文件可到 85s，整轮约 2 分钟）。
 
-面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 创客」页签、新会话 invoke `ppt-maker` 技能后 11 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
+面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 11 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
 ## 提交与协作
 

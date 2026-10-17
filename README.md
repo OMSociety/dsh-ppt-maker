@@ -60,7 +60,7 @@
 dsh plugin --profile <profile> add "dsh-ppt-maker"
 ```
 
-> **桌面版用户：**桌面的 `desktop` profile 由应用独占管理，CLI 无法代管安装，请在桌面应用内安装此插件。装好后刷新浏览器页面，从右侧栏打开「PPT 创客」——只重启宿主不够，客户端产物是页面加载时取的。
+> **桌面版用户：**桌面的 `desktop` profile 由应用独占管理，CLI 无法代管安装，请在桌面应用内安装此插件。装好后刷新浏览器页面，从右侧栏打开「PPT 工作台」——只重启宿主不够，客户端产物是页面加载时取的。
 
 > **依赖：**主链全 TS、无 Python；`ppt_render` 与质检用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。`skills/ppt-maker/scripts/` 下的 Python 脚本仅作逃生舱，见 SKILL.md「Python 逃生舱」。
 
@@ -93,7 +93,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 ## 工作台
 
-右侧栏「PPT 创客」是三栏编辑器：缩略图条 + 画布 + 属性面板。
+右侧栏「PPT 工作台」是三栏编辑器：缩略图条 + 画布 + 属性面板。
 
 - **底图即 DOM**：画布与缩略图把 PPTD 页 AST 直接渲染成 DOM（`client/components/PptdView.tsx`），打开即出、无需等 libreoffice 冷启动；元素、选择框、就地编辑器同一坐标系，恒对齐。table / chart / icon / SmartArt 等暂不支持渲染的元素显示灰底占位。
 - **左右栏可收缩**：左栏页列表默认展开、可收起；右栏属性面板选中元素才展开。收起态只留边缘把手。

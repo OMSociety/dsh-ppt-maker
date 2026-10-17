@@ -167,14 +167,14 @@ export function apply(ctx: any): void {
           id: TAB_ID,
           kind: TAB_KIND,
           priority: 'extension',
-          title: () => 'PPT 创客',
+          title: () => 'PPT 工作台',
           guide: [
             {
               // 0.1.7 起 guide 条目契约要求稳定 id（注册时的唯一性检查与渲染 key 都按它走）；
               // 旧版注册处不读这个字段，多了无害。
               id: 'workbench',
               order: 40,
-              title: () => 'PPT 创客',
+              title: () => 'PPT 工作台',
               description: () => '逆向导入 / 编辑 / 导出 .pptx；所见即所得',
               // 不给 icon 的话，新标签页的引导列表画一个默认的立方体占位。
               icon: PptMark,
