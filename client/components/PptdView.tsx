@@ -274,7 +274,10 @@ function LineView({
   )
 }
 
-/** 图片元素：media src 经 resolveMedia 映射成可访问 URL。 */
+/**
+ * 图片元素：media src 经 resolveMedia 映射成可访问 URL。
+ * 加载失败（媒体文件被删、映射失效）落成占位框——否则画布上留一块纯空白，看着像丢内容。
+ */
 function ImageView({
   el,
   style,
@@ -286,8 +289,15 @@ function ImageView({
 }) {
   const raw = (el.src ?? (el.content?.src as string)) as string | undefined
   const src = raw && resolveMedia ? resolveMedia(raw) : raw
-  if (!src) {
-    return <div style={{ ...style, ...placeholderBox() }}>图片</div>
+  // 记「哪一个 src 失败」而不是布尔值：换图后 src 一变，失败标记自动失效。
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null)
+  const failed = Boolean(src) && failedSrc === src
+  if (!src || failed) {
+    return (
+      <div style={{ ...style, ...placeholderBox() }}>
+        <span style={placeholderLabel()}>{failed ? '图片加载失败' : '图片'}</span>
+      </div>
+    )
   }
   return (
     <img
@@ -296,6 +306,7 @@ function ImageView({
       draggable={false}
       style={{ ...style, objectFit: 'cover', display: 'block' }}
       className="pptd-image"
+      onError={() => setFailedSrc(src ?? null)}
     />
   )
 }

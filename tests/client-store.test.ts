@@ -434,13 +434,13 @@ describe('PptStore（S6 骨架纪律）', () => {
     store.dispose()
   })
 
-  it('uploadMedia 走 /media/upload 通道：宿主要 key 与 base64 data， 返回 src 不会自动改元素', async () => {
+  it('uploadMedia 走 /media/upload 通道：宿主要 key 与 base64 data，返回的 src 不会自动写进元素', async () => {
     const store = seedStore()
     await store.actions.init()
     const res = await store.actions.uploadMedia({ name: 'cat.png', mime: 'image/png', data: 'aGVsbG8=' })
     expect(mockApi.uploadMedia).toHaveBeenCalledWith('s1', 'k1', { name: 'cat.png', mime: 'image/png', data: 'aGVsbG8=' })
     expect(res.src).toBe('media/x.png')
-    // 不上人不要把元素 src 写进去——那是 Inspector 去调用 updateElement('id', {src}) 的活
+    // 上传本身不写元素 src——那是 Inspector 去调用 updateElement('id', {src}) 的活
     expect(mockApi.edit).not.toHaveBeenCalled()
     store.dispose()
   })

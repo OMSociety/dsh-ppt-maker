@@ -76,11 +76,10 @@ export function Toolbar({
       </div>
       {state.conflict ? (
         <div className="ppt-banner" data-kind="error">
-          和服务端冲突了（服务端已改到 rev {state.conflict.revision}）。
-          <button type="button" className="ppt-btn ppt-btn-primary" onClick={() => void store.actions.applyDraft()}>
-            重试
-          </button>
-          <button type="button" className="ppt-btn" onClick={() => void store.actions.resolveConflictTheirs()}>
+          和服务端冲突了
+          {typeof state.conflict.revision === 'number' ? `（服务端已改到 rev ${state.conflict.revision}）` : ''}。
+          采用服务端版本会丢弃本地草稿。
+          <button type="button" className="ppt-btn ppt-btn-primary" onClick={() => void store.actions.resolveConflictTheirs()}>
             采用服务端版本
           </button>
         </div>

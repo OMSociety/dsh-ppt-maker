@@ -67,8 +67,8 @@ export interface PptState {
   canRedo: boolean
   /** 保存进行中（flush/saveNow 在飞）。 */
   saving: boolean
-  /** 409 冲突横幅：写编辑时 baseRevision 落后于服务端。 */
-  conflict: { revision: number } | null
+  /** 409 冲突横幅：写编辑时 baseRevision 落后于服务端；宿主没给出可用 revision 时该字段为 undefined。 */
+  conflict: { revision: number | undefined } | null
   /** 「外部已修改」横幅：轮询看见服务端 revision 变了，但本地 draft 没提交。 */
   externalChange: { revision: number } | null
   toast: Toast | null
@@ -110,8 +110,22 @@ export function createPptStore(sessionId: string) {
   const STAGE_DEBOUNCE_MS = 400
   // 会改 deck.pages 页序/数量的 op：pagesAst 按索引缓存，结构性变化后必须清缓存重拉；
   // 属性级 op（update_element/update_page/add_element/remove_element）不清，原地静默重拉。
-  const STRUCTURAL_OPS = new Set(['add_page', 'remove_page', 'move_page', 'page_duplicate'])
+  // add_page/remove_page 是规范拼写，page_add/page_delete 是宿主同时收下的别名（见 src/core/project/store.ts
+  // 的 op 词表），两侧都得算结构性变化，否则逆向导入回插的页面会让缩略图按旧索引渲染。
+  const STRUCTURAL_OPS = new Set([
+    'add_page',
+    'remove_page',
+    'page_add',
+    'page_delete',
+    'move_page',
+    'page_duplicate',
+  ])
   let stageTimer: ReturnType<typeof setTimeout> | null = null
+  // flush 撞上「上一批还在飞」时置位；成功后据此重排一次 flush，把在飞期间攒下的 op 送出去。
+  let flushPending = false
+  // 在飞的页 AST 请求（`force/auto:key#page`）：ThumbStrip 滚动与选中常同时点名同一页，
+  // 不去重就会同一页并发拉两遍、后到的响应覆盖先到的。
+  const astInflight = new Set<string>()
   /**
    * 重启竞态预算：init 撞「无法解析会话工作目录」（宿主侧会话还没注册完，/state 回 400）
    * 是已知瞬时态——保持 loading、短间隔静默重试；超过预算仍失败才升级成错误屏。
@@ -128,7 +142,11 @@ export function createPptStore(sessionId: string) {
       void flush()
     }, STAGE_DEBOUNCE_MS)
   }
-  /** 立刻把挂起的草稿 flush 掉（撤销/重做/卸载前必须先把最后一笔送出去）。 */
+  /**
+   * 立刻把挂起的草稿 flush 掉：先清防抖 timer，再走 flush 的正常路径。
+   * 只有「马上要没了」的时机用得到它（store dispose 时兜底最后一笔）；撤销/重做走 applyDraft，
+   * 那里同样先清 timer，但语义是「读之前先把草稿落地」，不是这个出口。
+   */
   async function flushNow(): Promise<boolean> {
     if (stageTimer) {
       clearTimeout(stageTimer)
@@ -140,7 +158,20 @@ export function createPptStore(sessionId: string) {
   const emit = () => {
     for (const fn of listeners) fn()
   }
+  /**
+   * 合入状态并通知订阅者。值没变的补丁不 emit：轮询每 3s 会把 projects / canUndo / 页数
+   * 原样推一遍，React 每次 emit 都要整块重渲染，面板跟着抖。只做浅比较——对象/数组每次
+   * 都是新引用，仍照常通知，所以不会漏掉真正的变化。
+   */
   const patch = (next: Partial<PptState>) => {
+    let changed = false
+    for (const key of Object.keys(next) as Array<keyof PptState>) {
+      if (!Object.is(state[key], next[key])) {
+        changed = true
+        break
+      }
+    }
+    if (!changed) return
     state = { ...state, ...next }
     emit()
   }
@@ -261,6 +292,9 @@ export function createPptStore(sessionId: string) {
         pagesAst: {},
       })
       void actions.ensurePageLoaded()
+      // revision 前进说明别人写过磁盘：可能加了页/删了页/换了序，页清单与 meta 得重拉，
+      // 否则 ThumbStrip 按旧索引渲染、页数停在旧值。
+      void actions.syncProjectPages()
       return
     }
 
@@ -268,29 +302,58 @@ export function createPptStore(sessionId: string) {
   }
 
   /**
-   * 累计草稿里的所有 op 一起送出去；或直接把「这一批」发出去（不传参 = 刷草稿）。
+   * 把草稿里的 op 送出去（不传参 = 刷整个草稿）。
    * 409 → 挂冲突横幅 + **草稿不动**（用户拿到横幅再决定），不要顺手把草稿清了；
-   * 成功才清（applied 的数量与草稿 ops 数对得上——上游 op 引擎对未应用的会回 warnings）。
+   * 成功只剪掉「这一批」已送出的 op——在飞期间用户可能又 stage 了新 op，草稿已是另一个
+   * 对象了，所以按发送时捕获的 ops 长度剪枝，残余换到新基线后重排一次 flush。
    */
   async function flush(): Promise<boolean> {
     if (!state.activeKey || !state.draft || !state.draft.ops.length) return false
     if (state.conflict) return false // 冲突未决不再重试：每个新 op 就再撞一次 409
-    if (state.saving) return false
     if (state.externalChange) return false // 本地 revision 已过期，写出去必然 409
+    if (state.saving) {
+      // 上一批还在飞：只记「还有草稿要送」，交给成功分支收尾时重排 flush。
+      // 不能只 return——防抖 timer 已经响过、不会再来一次，否则在飞期间攒下的 op
+      // 要等到用户下一次编辑才发得出去。
+      flushPending = true
+      return false
+    }
     const key = state.activeKey
     const base = state.draft.baseRevision
+    // 捕获发送时的数组与长度：await 之后 state.draft 可能已经追加了新 op（另一个对象）。
     const ops = state.draft.ops
+    const sent = ops.length
     patch({ saving: true })
     try {
       // eslint-disable-next-line no-use-before-define -- flush 是 actions 共用入口
       const res = await api.edit(state.sessionId, key, base, ops)
+      // 在飞期间有没有人又调了 flush（即攒下了新 op）；之后要据此重排一次。
+      const morePending = flushPending
+      flushPending = false
+      if (state.activeKey !== key) {
+        // 期间切了工程：这一批的 revision 属于旧工程，不落回当前状态。
+        patch({ saving: false })
+        return false
+      }
+      const rest = state.draft && state.draft.ops.length > sent ? state.draft.ops.slice(sent) : []
       patch({
         saving: false,
         lastSeenRevision: res.revision,
-        draft: null,
+        // 残余（在飞期间新 stage 的 op）换到新基线继续挂着；没有残余才清空草稿。
+        draft: rest.length ? { baseRevision: res.revision, ops: rest } : null,
         conflict: null,
         externalChange: null,
       })
+      const warnings = res.warnings ?? []
+      if (warnings.length) {
+        // 服务端把没应用上的 op 放在 warnings 里回来：不报出来用户会以为全都生效了。
+        toast(
+          warnings.length > 1
+            ? `已保存，但有 ${warnings.length} 条提示，首条：${warnings[0]}`
+            : `已保存，但有提示：${warnings[0]}`,
+          'info',
+        )
+      }
       // 编辑成功 => 磁盘变了。
       // 结构性 op 改 deck.pages 的页序与数量，pagesAst 按索引缓存会直接错位 → 清缓存重拉。
       // 属性级 op（update_element 等）：**不清缓存**——旧 AST 留在屏上继续渲染，后台静默
@@ -310,8 +373,11 @@ export function createPptStore(sessionId: string) {
         void actions.ensureAllPages()
       }
       void actions.syncProjectPages()
+      // 在飞期间攒过新 op：基线已经推到 res.revision，按新基线再刷一次。
+      if (morePending && rest.length) scheduleFlush()
       return true
     } catch (error) {
+      flushPending = false
       if (error instanceof ConflictError) {
         patch({ saving: false, conflict: { revision: error.revision } })
         return false
@@ -480,6 +546,7 @@ export function createPptStore(sessionId: string) {
      * 拉某一页的 AST 进 pagesAst 缓存（ThumbStrip 的 DOM 缩略图按页渲染用）。
      * 已有缓存且 revision 未变则复用；失败静默（缩略图退化为占位）。
      * 竞态守卫：捕获请求时的 activeKey，响应回来比对——切了工程就把旧响应丢掉。
+     * 并发守卫：同一页同时被滚动与选中触发时只发一次（in-flight 集合，force 与普通请求分开记）。
      */
     async ensurePageAst(pageIndex: number, force = false): Promise<void> {
       if (!state.activeKey) return
@@ -489,6 +556,9 @@ export function createPptStore(sessionId: string) {
       if (!force && hit && hit.revision === state.lastSeenRevision) return
       const key = state.activeKey
       const path = state.deckPages[pageIndex]
+      const inflightKey = `${force ? 'force' : 'auto'}:${key}#${pageIndex}`
+      if (astInflight.has(inflightKey)) return
+      astInflight.add(inflightKey)
       try {
         const res = await api.page(state.sessionId, key, path)
         if (state.activeKey !== key) return // 期间切了工程：旧响应不落盘
@@ -497,6 +567,8 @@ export function createPptStore(sessionId: string) {
         })
       } catch {
         /* 单页失败不阻断整列缩略图 */
+      } finally {
+        astInflight.delete(inflightKey)
       }
     },
 
@@ -510,7 +582,8 @@ export function createPptStore(sessionId: string) {
      * 重拉 /project 同步页清单：add/remove/move_page 之后 deck.pages 会变。
      * 只刷新 deck/deckPages——lastSeenRevision 的权威是 /edit 响应（flush 已推进），
      * 这里不覆盖（否则一个迟到的旧 project 响应会把 revision 拽回去）。
-     * 失败静默（下轮轮询还会再来）。
+     * 失败静默：轮询只在 revision 前进的分支里顺带调用本函数，所以这里失败就是静默丢一次，
+     * 要等下一次有人写盘（或下一次 save 成功）才会再拉。
      */
     async syncProjectPages(): Promise<void> {
       const key = state.activeKey
@@ -523,16 +596,15 @@ export function createPptStore(sessionId: string) {
           deckPages: Array.isArray(res.deck?.pages) ? res.deck.pages : [],
         })
       } catch {
-        /* 同步失败不阻断：下轮轮询兜底 */
+        /* 同步失败静默：页清单短暂停在旧值，下次写盘后重拉 */
       }
     },
 
     /**
      * 累积一杆 op（S8 TextEditor 提交、S9 ThumbStrip 页操作都走这里）：
-     * 只是先记入草稿 + 亮「save」，不立即 flush——真正的提交在
-     * 以下任一时候发生：①另一笔 op 跟着来；②点「保存/应用」；③切工程/关面板前。
-     * 简化骨架：草稿第一杆立刻 flush（面板容易做出「我改了但没生效」的错觉），
-     * 后续 op 攒到下一杆自然攒。
+     * 只是先记入草稿 + 亮「save」，不立即 flush。草稿落地有三条路：
+     * ①防抖窗口到期（scheduleFlush，见 STAGE_DEBOUNCE_MS）；②撤销/重做/导出前
+     * 主动调 applyDraft；③面板卸载时 dispose 里的 flushNow 兜底。
      */
     async stage(op: unknown) {
       if (!state.activeKey) {
@@ -549,9 +621,9 @@ export function createPptStore(sessionId: string) {
           : { draft: { baseRevision: state.lastSeenRevision, ops: [op] } },
       )
       // 不立即 flush：打字每次 onChange 都走 stage，若立即送就会「每敲一字整栏
-      // 闪一下」。攒 400ms 再送（见下面的 stageTimer）；期间用户继续打字会
-      // 顺延窗口。撤销/重做/切工程/关面板前会先 applyDraft 把草稿刷进 .history，
-      // 所以合批不会让撤销丢掉最后一笔。
+      // 闪一下」。攒 400ms 再送（见下面的 stageTimer）；期间用户继续打字会顺延窗口。
+      // 合批不丢最后一笔靠的下游：撤销/重做/导出前会先 applyDraft，面板卸载时 dispose
+      // 里还有 flushNow 兜底。
       scheduleFlush()
       return true
     },
@@ -691,6 +763,10 @@ export function createPptStore(sessionId: string) {
     },
     actions,
     dispose() {
+      // 关闭面板/销毁 store：防抖窗里可能还压着没送出去的 op，先把最后一笔送掉再清 timer。
+      // 冲突未决时不发——那必然再撞一次 409，草稿要留着让用户在横幅上决定。
+      // 不 await：调用方是同步的卸载路径，请求由面板宿主侧继续跑完。
+      if (state.draft && state.draft.ops.length && !state.conflict) void flushNow()
       for (const timer of toastTimers) clearTimeout(timer)
       toastTimers.clear()
       if (stageTimer) {

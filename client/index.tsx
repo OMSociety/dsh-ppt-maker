@@ -1,5 +1,5 @@
 /**
- * 客户端入口：把 PPT 工作台挂到 **官方右侧栏**（`sidebarRightTabs` + `sidebar.right.pane.tab`）。
+ * 客户端入口：把 PPT 创客挂到 **官方右侧栏**（`sidebarRightTabs` + `sidebar.right.pane.tab`）。
  *
  * 轮询（3s）承担「宿主 → 浏览器」的唯一推送：
  *   - `openRequest` 出现 → 自动打开/展开面板（模型调 ppt_import / ppt_open 后用户立刻看到）
@@ -108,7 +108,7 @@ export function apply(ctx: any): void {
     const sessionId = props?.sessionId || currentSessionId(ctx, readMounted)
     const store = React.useMemo(() => (sessionId ? storeFor(sessionId) : null), [sessionId])
     if (!sessionId || !store) {
-      return React.createElement('div', { className: 'ppt-root' }, 'PPT 工作台：拿不到当前会话，请在一个会话里打开。')
+      return React.createElement('div', { className: 'ppt-root' }, 'PPT 创客：拿不到当前会话，请在一个会话里打开。')
     }
     return React.createElement(SkeletonPanel, { store })
   }
@@ -121,6 +121,9 @@ export function apply(ctx: any): void {
     openOfficial()
   }
 
+  // tab-opened 只是通知宿主「这个 key 的面板被打开了」，失败不该挡住打开，
+  // 但全静默会让「面板打不开」无从排查，所以只记第一次。
+  let tabOpenedWarned = false
   const openIfRequested = (sessionId: string, key: string) => {
     try {
       openPanel?.()
@@ -129,7 +132,11 @@ export function apply(ctx: any): void {
       return false
     }
     storeFor(sessionId)
-    void api.tabOpened(sessionId, key).catch(() => {})
+    void api.tabOpened(sessionId, key).catch((error) => {
+      if (tabOpenedWarned) return
+      tabOpenedWarned = true
+      console.warn('[dsh-ppt-maker] 通知宿主 tab-opened 失败（只报这一次）：', error)
+    })
     return true
   }
 
@@ -160,14 +167,14 @@ export function apply(ctx: any): void {
           id: TAB_ID,
           kind: TAB_KIND,
           priority: 'extension',
-          title: () => 'PPT 工作台',
+          title: () => 'PPT 创客',
           guide: [
             {
               // 0.1.7 起 guide 条目契约要求稳定 id（注册时的唯一性检查与渲染 key 都按它走）；
               // 旧版注册处不读这个字段，多了无害。
               id: 'workbench',
               order: 40,
-              title: () => 'PPT 工作台',
+              title: () => 'PPT 创客',
               description: () => '逆向导入 / 编辑 / 导出 .pptx；所见即所得',
               // 不给 icon 的话，新标签页的引导列表画一个默认的立方体占位。
               icon: PptMark,

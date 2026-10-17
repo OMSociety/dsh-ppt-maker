@@ -74,6 +74,10 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
   // 用户正在敲的字优先（避免 stage 回写把光标顶走）。
   const [textMode, setTextMode] = React.useState<'plain' | 'markup'>('plain')
   const [textDraft, setTextDraft] = React.useState<{ key: string; value: string } | null>(null)
+  // 字号输入的本地草稿：受控值直接绑 content.fontSize 时，从 16 改成 8 得先删掉整个 16，
+  // 中间的空串/越界值被 onChange 的钳制丢掉，输入框会卡住。这里存原始输入，失焦才解析并
+  // 夹到 6..200。键=工程#页#元素，换元素即回到磁盘值。
+  const [fontDraft, setFontDraft] = React.useState<{ key: string; value: string } | null>(null)
 
   if (!selection || !selection.ids.length) {
     return (
@@ -137,6 +141,19 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
     setContentField({ text: textMode === 'plain' ? plainToMarkup(next) : next })
   }
 
+  const fontKey = `${state.activeKey ?? ''}#${state.currentPage}#${elementId}#fontSize`
+  const fontSizeOnDisk = typeof content.fontSize === 'number' ? content.fontSize : 16
+  const fontValue = fontDraft && fontDraft.key === fontKey ? fontDraft.value : String(fontSizeOnDisk)
+  const commitFontSize = (raw: string) => {
+    setFontDraft(null)
+    const trimmed = raw.trim()
+    if (!trimmed) return // 清空 = 放弃这一笔，回到磁盘值
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) return
+    const clamped = Math.min(200, Math.max(6, Math.round(parsed)))
+    if (clamped !== fontSizeOnDisk) setContentField({ fontSize: clamped })
+  }
+
   return (
     <div className="ppt-inspector">
       <div className="ppt-inspector-head">
@@ -164,6 +181,9 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
             placeholder="fas:house"
             onChange={(e) => setField({ iconName: e.target.value })}
           />
+          <span className="ppt-inspector-hint">
+            画布暂不渲染 icon（显示占位框）；这里改的 iconName 会照常写进 .page。
+          </span>
         </label>
       ) : null}
 
@@ -214,11 +234,9 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
             type="number"
             min={6}
             max={200}
-            value={typeof content.fontSize === 'number' ? content.fontSize : 16}
-            onChange={(e) => {
-              const v = Number(e.target.value)
-              if (Number.isFinite(v) && v >= 6 && v <= 200) setContentField({ fontSize: v })
-            }}
+            value={fontValue}
+            onChange={(e) => setFontDraft({ key: fontKey, value: e.target.value })}
+            onBlur={(e) => commitFontSize(e.target.value)}
           />
         </div>
       ) : null}
@@ -306,7 +324,8 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
                   const v = Number(e.target.value)
                   if (!Number.isFinite(v)) return
                   const next: [number, number, number, number] = [bx, by, bw, bh]
-                  next[i] = v
+                  // x/y 是画布内偏移，不能为负；w/h 是尺寸，必须为正（0 会让元素从画布上消失）。
+                  next[i] = i < 2 ? Math.max(0, v) : v > 0 ? v : 1
                   setField({ bounds: next })
                 }}
               />

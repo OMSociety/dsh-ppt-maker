@@ -97,18 +97,18 @@ describe('resolve.ts · $变量与样式解析', () => {
   it('fillToCss：image src 经 resolveMedia 映射（逆向工程的图片背景不 404）', () => {
     const map = (s: string) => `/ppt-maker/api/media?src=${s}`
     expect(fillToCss({ type: 'image', src: 'media/bg-0-slide.png' }, theme, map)).toBe(
-      'url(/ppt-maker/api/media?src=media/bg-0-slide.png) center/cover no-repeat',
+      'url("/ppt-maker/api/media?src=media/bg-0-slide.png") center/cover no-repeat',
     )
     // 无 resolveMedia 时原样（调用方负责可访问性）
     expect(fillToCss({ type: 'image', src: 'media/x.png' }, theme)).toBe(
-      'url(media/x.png) center/cover no-repeat',
+      'url("media/x.png") center/cover no-repeat',
     )
     expect(fillToCss({ type: 'image' }, theme)).toBeUndefined()
   })
 
   it('backgroundToCss：image 背景同样过 resolveMedia', () => {
     const map = (s: string) => `/m/${s}`
-    expect(backgroundToCss({ type: 'image', src: 'media/bg.png' }, theme, map)).toContain('url(/m/media/bg.png)')
+    expect(backgroundToCss({ type: 'image', src: 'media/bg.png' }, theme, map)).toContain('url("/m/media/bg.png")')
   })
 
   it('fillToCss：无 fill / 空 stops → undefined', () => {

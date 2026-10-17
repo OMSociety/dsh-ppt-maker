@@ -312,7 +312,8 @@ describe('客户端 bundle 形态', () => {
           return {
             ok: true,
             cwd: 'C:/ws',
-            projects: [{ key: 'k1', path: 'a/deck.pptd', title: 'T', pageCount: 3, revision: 3, updatedAt: 1 }],
+            // /state 的 projects 是 per-session store 的登记项：只有 { key, dir }。
+            projects: [{ key: 'k1', dir: 'a' }],
             activeKey: 'k1',
             openRequests: [{ key: 'k1', at: 1 }],
             canUndo: false,
@@ -332,7 +333,7 @@ describe('客户端 bundle 形态', () => {
     expect(tab.id).toBe('dsh-ppt-maker')
     expect(tab.kind).toBe('ppt')
     expect(tab.priority).toBe('extension')
-    expect((tab.title as () => string)()).toBe('PPT 工作台')
+    expect((tab.title as () => string)()).toBe('PPT 创客')
     expect(Array.isArray(tab.guide)).toBe(true)
     expect(((tab.guide as Array<{ title: () => string }>)[0].title)()).toMatch(/PPT|工作台/)
 

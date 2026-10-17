@@ -50,13 +50,14 @@ export function sanitizeStyle(style: string): string {
 /**
  * 浏览器路径：用 DOMParser 解析后递归重建一棵只含白名单节点的树，返回安全 HTML。
  * DOMParser 解析本身不执行脚本（inert document），安全。
+ * 直接解析到 body，不套 `<div>` 外壳：套壳后 `<tr>`/`<td>` 这类只能在特定父级存活的标签
+ * 会被解析器丢掉；正文里出现 `</div>` 还能提前闭合外壳，后续节点被 firstElementChild 截断。
  */
 export function sanitizeHtml(html: string): string {
   if (typeof DOMParser === 'undefined') return sanitizeHtmlString(html)
-  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html')
-  const root = doc.body.firstElementChild
-  if (!root) return ''
-  return cleanChildren(root)
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  if (!doc.body) return ''
+  return cleanChildren(doc.body)
 }
 
 function cleanChildren(node: Element): string {
@@ -117,6 +118,7 @@ function cleanOpenTag(tagText: string, tag: string): string {
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
-function escapeAttr(s: string): string {
+/** 属性值兜底转义（resolve.ts 拼 url("…") 也复用它）。 */
+export function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

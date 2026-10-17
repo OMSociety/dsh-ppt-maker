@@ -18,6 +18,8 @@
  *   { type:'image', src }
  */
 
+import { escapeAttr } from './sanitize'
+
 export interface ThemeLike {
   colors?: Record<string, string>
   textStyles?: Record<string, Record<string, unknown>>
@@ -141,7 +143,9 @@ export function fillToCss(
     const raw = typeof f.src === 'string' ? f.src : undefined
     if (!raw) return undefined
     const src = resolveMedia ? resolveMedia(raw) : raw
-    return `url(${src}) center/cover no-repeat`
+    // src 不加引号时，含空格/括号/分号的路径会把 url() 截断（甚至多出一条 CSS 声明）：
+    // 用双引号包起来，src 走 escapeAttr（与 sanitize 里的属性值同一套转义）。
+    return `url("${escapeAttr(src)}") center/cover no-repeat`
   }
   return undefined
 }

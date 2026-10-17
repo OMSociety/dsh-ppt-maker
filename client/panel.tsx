@@ -29,12 +29,12 @@ import { Inspector } from './components/Inspector'
 import { HistoryDrawer } from './components/HistoryDrawer'
 import { Toolbar } from './components/Toolbar'
 
-/** 右侧栏标签页（tab chip）里那个小标题：品牌图 + 「PPT 工作台」。 */
+/** 右侧栏标签页（tab chip）里那个小标题：品牌图 + 「PPT 创客」。 */
 export function Title() {
   return (
     <span className="ppt-title-label">
       <PptMark size={14} className="ppt-title-glyph" />
-      PPT 工作台
+      PPT 创客
     </span>
   )
 }
@@ -46,7 +46,7 @@ function BlankLoading({ hint }: { hint?: string | null }) {
       <div className="ppt-blank-card">
         <div className="ppt-brand">
           <PptMark size={20} />
-          <span>PPT 工作台</span>
+          <span>PPT 创客</span>
         </div>
         <div className="ppt-sweep" aria-hidden="true" />
         <p>{hint || '正在打开工作台…'}</p>
@@ -62,7 +62,7 @@ function BlankError({ error, onRetry }: { error: string; onRetry: () => void }) 
       <div className="ppt-blank-card">
         <div className="ppt-brand">
           <PptMark size={20} />
-          <span>PPT 工作台</span>
+          <span>PPT 创客</span>
         </div>
         <p>{error}</p>
         <div className="ppt-actions-row">
@@ -82,7 +82,7 @@ function BlankEmpty() {
       <div className="ppt-blank-card">
         <div className="ppt-brand">
           <PptMark size={20} />
-          <span>PPT 工作台</span>
+          <span>PPT 创客</span>
         </div>
         <p>还没有打开的演示文稿。</p>
       </div>
@@ -135,7 +135,10 @@ function ExportOpenMenu({
   const [error, setError] = React.useState<string | null>(null)
   const rootRef = React.useRef<HTMLSpanElement | null>(null)
 
+  // 上次「为哪个文件」查过关联应用：文件换了就重查；失败态不再自动重查，等用户点「重试」。
+  const queriedFor = React.useRef<string | null>(null)
   const load = React.useCallback(() => {
+    queriedFor.current = file
     setError(null)
     api
       .exportOpenMenu(sessionId, sessionKey, file)
@@ -144,9 +147,12 @@ function ExportOpenMenu({
   }, [sessionId, sessionKey, file])
 
   // 打开菜单 = 查询关联应用（同 DSH：点开才查，结果缓存）。
+  // effect 不依赖 error：否则「重试」里清掉 error 会立刻再触发一次查询，两发并发。
   React.useEffect(() => {
-    if (open && apps === null && !error) load()
-  }, [open, apps, error, load])
+    if (!open || apps !== null) return
+    if (queriedFor.current === file) return
+    load()
+  }, [open, apps, file, load])
 
   // 菜单外点 / Escape 收起。
   React.useEffect(() => {
@@ -193,7 +199,14 @@ function ExportOpenMenu({
       </button>
       {open ? (
         <div className="ppt-openwith-menu" role="menu">
-          {error ? <div className="ppt-openwith-note">{error}</div> : null}
+          {error ? (
+            <div className="ppt-openwith-note">
+              {error}
+              <button type="button" className="ppt-btn ppt-btn-mode" disabled={busy} onClick={() => load()}>
+                重试
+              </button>
+            </div>
+          ) : null}
           {!error && apps === null ? <div className="ppt-openwith-note">正在读取关联应用…</div> : null}
           {!error && apps
             ? apps.map((app) => (

@@ -126,10 +126,7 @@ export function ThumbStrip({ store, headerAction }: { store: PptStore; headerAct
                       className="ppt-thumb-pptd"
                     />
                   ) : (
-                    <ThumbAstLoader
-                      onVisible={() => void store.actions.ensurePageAst(index)}
-                      label={`第 ${pageNo} 页`}
-                    />
+                    <ThumbAstLoader pageIndex={index} store={store} label={`第 ${pageNo} 页`} />
                   )}
                 </button>
                 <div className="ppt-thumb-actions">
@@ -164,25 +161,36 @@ export function ThumbStrip({ store, headerAction }: { store: PptStore; headerAct
  * 缩略图占位 + 惰性拉取：进可视区才 ensurePageAst（IntersectionObserver）。
  * 没有 IO 的环境（老 WebView）直接拉。编辑后 pagesAst 被清，本组件重新挂载，
  * 已离开可视区的页不会立刻重拉——滚动到它们时才拉（这就是懒加载的意义）。
+ * effect 的依赖是「页序号 + store」这两个稳定值：早先传的是每次 render 都新建的箭头函数，
+ * effect 跟着重跑，观察器被反复断开重连、同一页还会被重复点名去拉 AST。
  */
-function ThumbAstLoader({ onVisible, label }: { onVisible: () => void; label: string }) {
+function ThumbAstLoader({
+  pageIndex,
+  store,
+  label,
+}: {
+  pageIndex: number
+  store: PptStore
+  label: string
+}) {
   const ref = React.useRef<HTMLSpanElement | null>(null)
   React.useEffect(() => {
     const el = ref.current
     if (!el) return
+    const load = () => void store.actions.ensurePageAst(pageIndex)
     if (typeof IntersectionObserver === 'undefined') {
-      onVisible()
+      load()
       return
     }
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) {
         io.disconnect()
-        onVisible()
+        load()
       }
     })
     io.observe(el)
     return () => io.disconnect()
-  }, [onVisible])
+  }, [pageIndex, store])
   return (
     <span ref={ref} className="ppt-thumb-preview-placeholder">
       <span className="ppt-thumb-skeleton" aria-hidden="true" />

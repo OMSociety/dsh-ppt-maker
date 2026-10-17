@@ -9,7 +9,8 @@
  *   POST /edit        → {ok, revision, appliedOps, warnings, merged}；409 → ConflictError
  *   POST /undo|redo   → {ok, revision, undoneOps}
  *   POST /media/upload → {ok, src, path, bytes}
- *   POST /export      → pptx 二进制流（走 exportPptx 专门处理，不走 call()）
+ *   POST /export      → {relativePath, absolutePath, filename, revision, bytes}（save:true 落盘；
+ *                       不走 call()——二进制/JSON 两种回包与 409 的判法不同，见 failExport）
  *   POST /active      → {ok, key}
  *   POST /tab-opened  → {ok}
  *
@@ -17,16 +18,20 @@
  */
 
 export interface ConflictInfo {
-  revision: number
+  revision?: number
   error?: string
 }
 
 export class ConflictError extends Error {
   constructor(
-    readonly revision: number,
+    /** 宿主没能在回包里给出可用 revision 时为 undefined（面板据此省略括注）。 */
+    readonly revision: number | undefined,
     message?: string,
   ) {
-    super(message || `revision 冲突：服务端是 ${revision}`)
+    super(
+      message ||
+        (revision === undefined ? 'revision 冲突：服务端没给出版本号' : `revision 冲突：服务端是 ${revision}`),
+    )
     this.name = 'ConflictError'
   }
 }
@@ -140,10 +145,18 @@ export interface OpenApplication {
 const PREFIX = '/ppt-maker/api'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${PREFIX}${path}`, {
-    ...init,
-    headers: init?.body ? { 'content-type': 'application/json', ...(init?.headers || {}) } : init?.headers,
-  })
+  let res: Response
+  try {
+    res = await fetch(`${PREFIX}${path}`, {
+      ...init,
+      headers: init?.body ? { 'content-type': 'application/json', ...(init?.headers || {}) } : init?.headers,
+    })
+  } catch (error) {
+    // fetch 只在网络层失败时 reject（TypeError: Failed to fetch / Load failed）：宿主路由还没挂上、
+    // 宿主进程断开、连接被重置都走这里。与「HTTP 4xx/5xx 带 JSON error」分开报——否则用户看到的
+    // 是浏览器原文，分不清是网络不通还是宿主拒了请求。
+    throw new Error(`网络不通：连不上宿主路由（${(error as Error).message}）`)
+  }
   let payload: Record<string, unknown> | null = null
   try {
     payload = (await res.json()) as Record<string, unknown> | null
@@ -151,9 +164,11 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     payload = null
   }
   if (res.status === 409) {
+    // 宿主给 revision 就用它；没给就留 undefined，不要拿 0 冒充「服务端是 rev 0」。
     const info = (payload as { conflict?: ConflictInfo } | null)?.conflict
-    const rev = Number(info?.revision ?? payload?.revision ?? 0) || 0
-    throw new ConflictError(rev, String(payload?.error ?? ''))
+    const raw = info?.revision ?? payload?.revision
+    const revision = typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined
+    throw new ConflictError(revision, String(payload?.error ?? ''))
   }
   if (!res.ok || !payload || payload.ok === false) {
     throw new Error(String((payload && payload.error) || `请求失败（HTTP ${res.status}）`))
@@ -173,7 +188,9 @@ const q = (params: Record<string, string>) =>
 async function failExport(res: Response): Promise<never> {
   if (res.status === 409) {
     const payload = (await res.json().catch(() => null)) as { conflict?: ConflictInfo; error?: string } | null
-    throw new ConflictError(Number(payload?.conflict?.revision ?? 0) || 0, payload?.error || '')
+    const raw = payload?.conflict?.revision
+    const revision = typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined
+    throw new ConflictError(revision, payload?.error || '')
   }
   let message = `导出失败（HTTP ${res.status}）`
   try {
@@ -225,20 +242,6 @@ export const api = {
     }),
 
   mediaUrl: (sessionId: string, key: string, src: string) => `${PREFIX}/media?${q({ sessionId, key, src })}`,
-
-  /**
-   * 导出：宿主回的是 .pptx **二进制流**（content-disposition attachment），
-   * 不能走 call()——那只会把响应体当 JSON。成功返回 Blob + 可能带上的 X-Revision 头。
-   */
-  async exportPptx(sessionId: string, key: string): Promise<{ blob: Blob; revision: string | null }> {
-    const res = await fetch(`${PREFIX}/export`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, key }),
-    })
-    if (!res.ok) await failExport(res)
-    return { blob: await res.blob(), revision: res.headers.get('x-pt-revision') || res.headers.get('x-revision') }
-  },
 
   /**
    * 面板导出口径：宿主把 pptx 落到工程目录 `export/` 下，只回相对路径与字节数——
