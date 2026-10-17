@@ -58,7 +58,7 @@ The intermediate format is **PPTD**, a self-defined contract in YAML (`deck.pptd
 dsh plugin --profile <profile> add "dsh-ppt-maker"
 ```
 
-> **Desktop users:** the desktop `desktop` profile is managed exclusively by the app and cannot be installed via CLI — install this plugin inside the desktop application. After installing, refresh the browser page and open "PPT Maker" from the right-hand rail — restarting the host alone is not enough, the client bundle is fetched when the page loads.
+> **Tip:** after installing, refresh the browser page and open "PPT Maker" from the right-hand rail — restarting the host alone is not enough, the client bundle is fetched when the page loads.
 
 > **Dependencies:** the main pipeline is pure TypeScript with no Python; `@deepseek-ai/libreoffice-kit@0.1.2`, used by `ppt_render` and QA, is a hard dependency (about 183MB per platform, installed with the package). The Python scripts under `skills/ppt-maker/scripts/` are an escape hatch only — see the "Python escape hatch" section in SKILL.md.
 

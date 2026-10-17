@@ -60,7 +60,7 @@
 dsh plugin --profile <profile> add "dsh-ppt-maker"
 ```
 
-> **桌面版用户：**桌面的 `desktop` profile 由应用独占管理，CLI 无法代管安装，请在桌面应用内安装此插件。装好后刷新浏览器页面，从右侧栏打开「PPT 工作台」——只重启宿主不够，客户端产物是页面加载时取的。
+> **提示**：装好后**刷新一下浏览器页面**，从右侧栏打开「PPT 工作台」——只重启宿主不够，客户端产物是页面加载时取的。
 
 > **依赖：**主链全 TS、无 Python；`ppt_render` 与质检用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。`skills/ppt-maker/scripts/` 下的 Python 脚本仅作逃生舱，见 SKILL.md「Python 逃生舱」。
 
