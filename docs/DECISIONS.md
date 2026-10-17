@@ -34,7 +34,7 @@
 |---|---|---|
 | @office-kit/pptx 0.x 破坏性变更 | 已防 | pin 0.24.0 + 引擎接口化 + 语料对拍 |
 | 字体嵌入 EOT | **已攻克** | 六轮实测：fntdata=EOT 封装（非裸字节）、EOT Version 必须 0x00020001（真件 0x00020002 是 MicroType 压缩通道版本号，配未压缩数据必死）、flags=0 未压缩即被 t2embed 加载、fsType 不设卡（0x0004→privStatus=P&P 只读提示）、MTX 压缩非硬要求（仅影响体积）。纯 TS 自研成立：spike 期用纯 JS 原型（19/19 断言）加本机 headless 裁决器背书，原型与裁决器都是暂存区产物，已随清理删除 |
-| 宿主 Node 版本 | 已排除 | 宿主 Node v24.21.0 ≥ 库要求 22.18 |
+| 宿主 Node 版本 | 已排除 | 宿主 Node v24.16.0 ≥ 库要求 22.18 |
 | LLM 视觉通路 | 已确认可行 | llm + attachments 服务源码实证；resolveModelInfo 模态门控；read_image 兜底 |
 | typeface 名不匹配静默失效 | 已防 | 同源取值 + 实测兜底 |
 | libreoffice-kit 体积 | 已接受 | 硬依赖 ~183MB/平台（用户拍板），锁 0.1.2 与宿主同轨 |

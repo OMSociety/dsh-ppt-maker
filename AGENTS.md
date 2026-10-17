@@ -10,7 +10,7 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 
 | 项 | 事实 |
 |---|---|
-| 语言 / 运行时 | TypeScript 5.9、ESM、Node >= 18（本机实测 v24.16.0） |
+| 语言 / 运行时 | TypeScript 5.9、ESM、Node >= 22.19（引擎 @office-kit/pptx 0.24.0 要 22.18、libreoffice-kit 0.1.2 要 22.19；本机实测 v24.16.0） |
 | 构建 | 宿主半侧 tsup：`src/` → `lib/index.js`；客户端半侧 esbuild：`client/` → `lib/client.js` |
 | 测试 | vitest 3.2，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
 | 包管理 | npm，锁文件 `package-lock.json`；根目录的 `pnpm-lock.yaml` / `pnpm-workspace.yaml` 未入库，勿提交 |
@@ -35,7 +35,7 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 | 挂载面静态核对 | `npm run check:mounts` |
 | 构建产物漂移核对 | `npm run check:build`（须在 build 之后） |
 
-测试必须带大堆并串行跑，否则本机会 OOM 或让 vitest worker 请求超时（实测：默认堆下 234 个用例跑到一半 `FATAL ERROR: invalid table size`；8GB 堆并行跑完用例后仍偶发 `[vitest-worker]: Timeout calling "onTaskUpdate"`，让整轮以 exit 1 收尾）：
+测试必须带大堆并串行跑，否则本机会 OOM 或让 vitest worker 请求超时（当时实测：默认堆下 234 个用例跑到一半 `FATAL ERROR: invalid table size`；8GB 堆并行跑完用例后仍偶发 `[vitest-worker]: Timeout calling "onTaskUpdate"`，让整轮以 exit 1 收尾）：
 
 ```bash
 NODE_OPTIONS=--max-old-space-size=12288 npm test -- --no-file-parallelism
@@ -46,7 +46,7 @@ Windows PowerShell 里等价写法是先把环境变量设进当前会话，再�
 
 全量测试还有第二个前置：`tests/corpus/*.pptx` 不在 git 里（被 `.gitignore` 的 `*.pptx` 排除），缺语料时语料测试直接 ENOENT。在没有这份语料的机器上，验收链只能跑到语料测试以外的部分；补齐办法见「已知风险区」那一行。
 
-字体类用例（`fonts-embed` / `fonts-e2e` / `fonts-resolver`）取系统已装字体：TTF 优先 `C:\Windows\Fonts\simhei.ttf`，TTC 优先 `msyh.ttc`，中文族名用例依赖「阿里妈妈数黑体」。候选一个都不在位时，相关用例用 `it.skip` 显式跳过并在运行日志里打印原因（不用用例体内的提前 `return`，那会显示为「通过」）；要换字体设 `PPT_TEST_FONT` 指向任一 TTF。
+字体用例取系统已装中文字体（微软雅黑/等线/黑体/楷体），候选不在位时 skip+原因；PPT_TEST_FONT 仅 embed/e2e 生效。
 
 ## 架构边界
 
@@ -112,14 +112,14 @@ NODE_OPTIONS=--max-old-space-size=12288 npm test -- --no-file-parallelism
 
 PowerShell 下最后一条改成分两句：先 `$env:NODE_OPTIONS='--max-old-space-size=12288'`，再 `npm test -- --no-file-parallelism`。
 
-跑之前确认 `tests/corpus/` 里 20 份语料在位。本机实测基线（2026-10-16）：typecheck 两个 tsconfig 均 0 错；build 后 `git status` 干净且 `check:build` 报「lib/ 与 git 一致」；全量 23 个测试文件 / 234 个用例通过，约 62s。
+跑之前确认 `tests/corpus/` 里 20 份语料在位。本机实测基线（2026-10-18）：typecheck 两个 tsconfig 均 0 错；build 后 `git status` 干净且 `check:build` 报「lib/ 与 git 一致」；全量 24 个测试文件 / 245 个用例通过，约 70s（高负载下 fonts-embed 单文件可到 85s，整轮约 2 分钟）。
 
 面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 创客」页签、新会话 invoke `ppt-maker` 技能后 11 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
 ## 提交与协作
 
 - 分支：`main` 是发布线，工作分支用 `feat/<主题>` 或 `fix/<主题>`（近例：`feat/history-qa-transitions`、`fix/right-rail-collapse-invisible`）。
-- Commit：Conventional Commits + 中文描述，scope 用改动所在的面：`engine` / `tools` / `host` / `workbench` / `fonts` / `reverse`，如 `feat(engine): …`、`fix(workbench): …`。
+- Commit：Conventional Commits + 中文描述，scope 用改动所在的面：`engine` / `tools` / `host` / `workbench` / `fonts` / `reverse` / `docs` / `chore`，如 `feat(engine): …`、`fix(workbench): …`、`docs(readme): …`。
 - PR：无 CI，合并前在本地跑完上节五条。
 
 ## 已知风险区

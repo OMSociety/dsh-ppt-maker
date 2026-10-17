@@ -104,13 +104,13 @@ When you receive a Sample, template, or screenshot, first look at the page's act
 - **Objects that cannot be inherited**: the sample's brands, photos, characters, specific copy, proprietary color values, and decorative motifs.
 - **Applicable page types**: only note whether it suits concepts, cases, exercises, or steps — do not expand it into a whole-deck template.
 
-One material borrows at most two or three mutually compatible features from a single reference sample; after borrowing, re-name the semantics of colors and components. Without a sample, still build the system yourself from the learning task. Sample 1 enjoys no default priority; it is only one reference direction for editorial-style courseware.
+One material borrows at most two or three mutually compatible features from a single reference sample; after borrowing, re-name the semantics of colors and components. Without a sample, still build the system yourself from the learning task. No single reference sample enjoys default priority; each is only one reference direction among others.
 
 ## 7. Reference Directions (Inspiration Only; New Directions May Be Generated)
 
 These directions help you understand design choices quickly; they are not fixed palettes, font tables, or page templates. Take only the parts that fit the task.
 
-### Direction A: Editorial Study Handbook (May Reference Sample 1)
+### Direction A: Editorial Study Handbook (Editorial-Style Reference)
 
 - **Borrowable**: a clear title–exhibit–explanation hierarchy; a stable reading grid; few and explicit accent colors; cases, methods, and sources placed in their own zones; images separated from text.
 - **Suits**: concept teaching, methodology, case reading, blended courses, and materials that require self-study.
@@ -201,7 +201,7 @@ Check whether every chapter has comprehension, demonstration, application, feedb
 
 ### 2. Reference-Sample Extraction
 
-If there is a Sample, template, or screenshot, finish the reference extraction card before writing the visual brief. The card must not directly copy the object layer (brands, photos, copy, proprietary color values, proprietary motifs); keep only the transferable structure, tone, and graphic relationships. Samples 1, 2, and 3 are all merely candidate references and must not become implicit defaults.
+If there is a Sample, template, or screenshot, finish the reference extraction card before writing the visual brief. The card must not directly copy the object layer (brands, photos, copy, proprietary color values, proprietary motifs); keep only the transferable structure, tone, and graphic relationships. All reference samples are merely candidate references and must not become implicit defaults.
 
 ### 3. Visual Brief
 

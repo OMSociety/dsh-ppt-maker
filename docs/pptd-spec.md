@@ -528,6 +528,8 @@ interface Table extends ElementBase {
 
 ## 7. 动画（animations）
 
+本节的动画词表不承继上游 §6，以本节与附录 A 为准。
+
 页级可选数组 `Page.animations`，通过 `elementId` 引用本页 `elements` 中的元素；数组顺序决定动画之间的先后关系，`trigger` 决定每条动画何时开始。
 
 本版的 `effect` 取值域 = 附录 A 的 **95 个 preset**（预设效果），逐字取自 `@office-kit/pptx@0.24.0` 的 `AnimationEffect` 声明（dist/index-WCK8v0WT.d.ts:1403）。preset 编号与行为与桌面参考应用的「进入 / 强调 / 退出」三个效果库一致，因此 PPTD 声明与 OOXML `<p:timing>` 之间不存在翻译层。
@@ -1006,7 +1008,7 @@ degraded:
 
 ### 11.6 承继的错误码
 
-图表数据完整性错误码全部承继上游（reference/pptd.md:1082-1090、1309、1598），本版不改：`DuplicateColumnError`、`EmptyColumnError`、`RowLengthError`、`UnknownColumnError`、`NonNumericValueError`、`StackModeMismatchError`、`InvalidValueError`。
+图表数据完整性错误码全部承继上游（reference/pptd.md:1082-1090、1307、1596），本版不改：`DuplicateColumnError`、`EmptyColumnError`、`RowLengthError`、`UnknownColumnError`、`NonNumericValueError`、`StackModeMismatchError`、`InvalidValueError`。
 
 ---
 

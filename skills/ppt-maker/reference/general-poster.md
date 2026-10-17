@@ -73,11 +73,11 @@ Determine the output scenario and canvas first, then design the grid, font sizes
 
 | Common ratio | PPTD reference size | Common scenarios |
 |---|---:|---|
-| 9:16 portrait | `[540, 960]` | Mobile reading, social media, vertical narrative |
-| 3:4 portrait | `[720, 960]` | Print-like posters, person/object hero visuals |
-| 1:1 square | `[720, 720]` | Social media, centered structures, moderate information volume |
-| 4:3 landscape | `[720, 540]` | Higher-density text-image content, document embedding |
-| 16:9 landscape | `[960, 540]` | Widescreen display, horizontal relationships and parallel multi-column layouts |
+| 9:16 portrait | `[720, 1280]` | Mobile reading, social media, vertical narrative |
+| 3:4 portrait | `[960, 1280]` | Print-like posters, person/object hero visuals |
+| 1:1 square | `[1080, 1080]` | Social media, centered structures, moderate information volume |
+| 4:3 landscape | `[1280, 960]` | Higher-density text-image content, document embedding |
+| 16:9 landscape | `[1280, 720]` | Widescreen display, horizontal relationships and parallel multi-column layouts |
 
 A PPTD canvas can use any `[width, height]`; the sizes in the table are references, not enumerated restrictions.
 

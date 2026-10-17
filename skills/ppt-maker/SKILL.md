@@ -56,6 +56,7 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 ### 三、生成内容的纪律
 
 - **新建**：按场景读 `reference/slides_categories.md` 对应场景的规范；指定设计系统时只读该主题（`reference/design_system/<族>/<子风格>/design.md`），**严禁混搭**。
+- **海报/信息图**：单页、强视觉的交付先读 `reference/general-poster.md`，按其中的画布比例与质量基线设计，不套普通内容页模板。
 - **复刻**（图片/PDF → PPTD）：尽量 1:1。看不清的位置用网格线、放大观察；照片/头像这类无法用图形近似的，存 `media/` 后作为图片元素插入。
 - **编辑现有 PPT**：既有 .pptx 走 `ppt_import`（全量逆向成 PPTD 工程，改完再 `ppt_export`）或 `ppt_patch`（只改字/换图/调页序，不逆向你没动的东西）；已在 PPTD 工程里的直接 `ppt_edit`。
 - **版式纪律**：多页 deck 避免版式雷同——同一套「三张等宽卡片」不要页页复用，按内容换用非对称两栏、Zig-Zag 交错、整幅图配文字条、时间轴等；层级用字重与色彩对比控制，不靠超大字号撑场面。
@@ -85,15 +86,15 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 - **三档模式**（`deck.pptd` 的 `export.fontEmbed`）：`subset`（默认，只嵌用到的字符，体积小；他人在 PowerPoint 里新增未覆盖字符会豆腐块，与 PowerPoint 官方默认一致）、`full`（整字体嵌入，可自由编辑，体积大）、`off`（不嵌入）。
 - **许可闸**：逐字体读 OS/2.fsType——Restricted / BitmapOnly 跳过并在摘要给出警告；Preview & Print 嵌入但目标机只读；No Subset 强制整字体。`ppt_check` 会提前列出每款字体的许可判定与缺失替代建议，不动导出也可见。
 - **授权口径**：嵌入即随文件再分发，字体授权责任在用户侧；内置设计系统推荐的免费商用字体（MiSans / 思源系 / 阿里妈妈系 / 站酷 / LXGW 等）一般可嵌，一律以运行时实测 fsType 为准。
-- **淡入淡出**：`export.transition`（默认 `fade`）页面级转场、`export.animations`（默认 `auto`）按 `.page` 的 `animations` 字段写入元素入场动画，均与原桌面轨道产物语义一致。
+- **淡入淡出**：`export.transition`（默认 `fade`）页面级转场、`export.animations`（默认 `auto`）按 `.page` 的 `animations` 字段写入元素入场动画，均与既有导出语义一致。
 
 - **交付清单**：给出绝对路径的可点击链接——工程目录、`.pptd`、`pages/`、`media/`、`.pptx`；结尾补一句后续操作提示。
 - **手动微调**：直接改 `.page` / `.pptd` 文件，然后 `ppt_render` 复核 + `ppt_export` 重出（工具层会发现磁盘内容与账本不一致并给 warning）。
 
 ### 六、Python 逃生舱（默认不启用）
 
-`scripts/` 下的 Python 脚本（`pptd_to_pptx.py` / `pptd_to_png.py` / `check_fonts.py`）是**逃生舱**：只在引擎库拒收的破损文件、或工具层明确覆盖不了的边角场景启用。常规创建/编辑/导出**不要走这条路**（本地轨道对表格/图表/动画的支持是真子集，会打 `dropped` 降级清单）。
+`scripts/` 下的 Python 脚本（`pptd_to_pptx.py` / `pptd_to_png.py` / `check_fonts.py`）是**逃生舱**：只在引擎库拒收的破损文件、或工具层明确覆盖不了的边角场景启用。常规创建/编辑/导出**不要走这条路**（本地轨道对表格/图表/动画的支持是真子集，会打 `dropped` 降级清单）。运行依赖 pip 包 `PyYAML` / `Pillow` / `python-pptx`（按脚本取用），缺包时先装齐再跑。
 
 ## 动画与备注
 
-默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的完整清单见 `docs/pptd-spec.md` 附录 A/B。
+默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的速查见 `reference/animation-tokens.md`；完整规范与易混淆 token 辨析见 `docs/pptd-spec.md` 附录 A/B（仓库内）。
