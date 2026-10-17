@@ -26,9 +26,9 @@ Structure and discipline (distilled from deliverables established as benchmarks)
 8. Open with the problem statement and a one-sentence contribution; close with numbered conclusions (claims, not a summary) and an explicit list of open questions.
 9. Place citations in a compact footnote line at the bottom of the slide where they are used; unless the genre requires it, avoid a full-slide wall of dense references.
 
-Default baseline (distilled from the layout skill; PART B may override): organize each slide around one evidence unit (figure/table/equation); charts must include complete axis labels, units, and sample definitions; keep charts honest—do not truncate the y-axis to exaggerate differences, and distinguish correlation from causation explicitly in the copy; ensure projection readability on a 960×540 canvas, with body text at ≥14pt equivalent and chart labels at ≥10pt equivalent.
+Default baseline (内部设计沉淀; PART B may override): organize each slide around one evidence unit (figure/table/equation); charts must include complete axis labels, units, and sample definitions; keep charts honest—do not truncate the y-axis to exaggerate differences, and distinguish correlation from causation explicitly in the copy; ensure projection readability on a 960×540 canvas, with body text at ≥14pt equivalent and chart labels at ≥10pt equivalent.
 
-**Title sequence test**: Reading only the slide titles in order should tell the complete story; if they do not form a coherent narrative, the structure is not working.
+**Title read-through test**: Reading only the slide titles in order should tell the complete story; if they do not form a coherent narrative, the structure is not working.
 
 Density anchor: The specific minimums for each style (number of evidence modules and charts per slide, annotation conventions) are defined by the 【Density Baseline】 reverse-engineered from that style’s source deck—this baseline does not impose a universal number.
 
@@ -57,7 +57,7 @@ Source-deck facts: sans serif `GoogleSans-Regular/Medium/Bold` (render with {lat
 【Chart Language】
 Observed types: rows of person icons, layered tree/process diagrams, central-node loop diagrams, two-row treatment/control comparisons, small “pre–intervention–post” line charts, four-step numbered processes, and paired-metric case-study blocks. Dense conventional tables are not a stable signature; axis labels, units, and measurement conventions inherit PART A.
 
-⭐Signature techniques:
+Signature techniques:
 1. Use gray/blue/black person icons with a matching legend to communicate group attribution.
 2. Use light blue → cyan → deep blue → gray nodes, thin black outlines, and orthogonal connectors to show a four-level hierarchy.
 3. Link line-art icons with a black loop line and place a primary-blue circle at the center to express system relationships.

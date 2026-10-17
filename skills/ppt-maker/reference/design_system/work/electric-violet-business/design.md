@@ -1,6 +1,6 @@
 # Electric Violet Business · Work STYLE DESIGN SYSTEM
 
-## PART A — Category Baseline (Universal Floor)
+## PART A — Category Baseline (General Minimum)
 
 A conclusion-first business review benchmarked against top-tier operating reviews and project progress briefings. Every slide in this deck must be scannable within 30 seconds, and every figure must withstand drill-down questioning: status is backed by evidence, variances are attributed, and requests are stated explicitly.
 
@@ -26,7 +26,7 @@ Structure and discipline (distilled from work we recognize as best-in-class):
 8. Every number must include its unit, period, and definition (GMV or revenue, order volume or sales value); label estimated values as internally defined examples.
 9. The deck must end with items requiring management decisions and support—list each separately with the consequence of delay; never close with a thank-you slide.
 
-Default baseline (distilled from the layout skill; PART B may override): use one consistent lightweight component system throughout for progress, attainment rates, and red/amber/green status; each slide contains 1 topic + 2–4 supporting points, with the conclusion graspable within 5 seconds; every metric must be paired with a “So what?”—cause, impact, or next action—rather than presented as a bare number.
+Default baseline (内部设计沉淀; PART B may override): use one consistent lightweight component system throughout for progress, attainment rates, and red/amber/green status; each slide contains 1 topic + 2–4 supporting points, with the conclusion graspable within 5 seconds; every metric must be paired with a “So what?”—cause, impact, or next action—rather than presented as a bare number.
 
 **Title read-through test**: reading only the slide titles should tell the complete story; if they do not read coherently in sequence, the structure has not been established.
 
@@ -55,7 +55,7 @@ Source canvas: 10×5.625 inches, 16:9. Standard slides have no full-width header
 The source PPTX explicitly uses Tahoma as the primary typeface, a neutral sans serif; Roboto appears sparingly in a few section titles/table labels and must not be elevated to primary status. Body text 1x=7pt; standard titles approximately 3.1x=22pt; section titles approximately 3.7x=26pt; covers occasionally use 5.1x=36pt; large figures approximately 2.4–3.7x=17–26pt; footnotes approximately 0.86–0.93x=6–6.5pt. Titles, KPI figures, and section bands use bold; body copy stays regular, with hierarchy built through weight, scale, and space. Use sentence case for titles; section numbers always use a two-digit index followed by an em dash; large figures may be followed immediately by “+” or a unit. For new non-English content, retain a comparable sans serif and the same scale ratios; render with QuattrocentoSans (Latin text/numerals) and MiSans (Chinese).
 
 【Chart Language】
-The source deck uses single-series vertical bars, horizontal progress/comparison bars, dot-matrix ratings, number bubbles, bubble matrices, and tables; maps and radial charts appear only occasionally. ⭐Dot-matrix rating: in a row of outlined Electric Violet circles, fill only one circle and place the value at the end of the row; use for a 10-point scale or stage position. ⭐Progress bar: fine Electric Violet outline, solid fill from the left, with the percentage right-aligned inside the frame. ⭐Number bubble: equal-size solid circles as numeric containers; never use area to imply quantity; no more than 4 within one group. ⭐Vertical bar chart: use #5114F6 for every bar with fine light-gray gridlines; do not recolor individual bars; use a #000000 star only occasionally for a small number of focus items. ⭐Bubble matrix, occasional use only: a 44/56 split between an Electric Violet index area on the left and a white coordinate area on the right.
+The source deck uses single-series vertical bars, horizontal progress/comparison bars, dot-matrix ratings, number bubbles, bubble matrices, and tables; maps and radial charts appear only occasionally. Signature: Dot-matrix rating: in a row of outlined Electric Violet circles, fill only one circle and place the value at the end of the row; use for a 10-point scale or stage position. Signature: Progress bar: fine Electric Violet outline, solid fill from the left, with the percentage right-aligned inside the frame. Signature: Number bubble: equal-size solid circles as numeric containers; never use area to imply quantity; no more than 4 within one group. Signature: Vertical bar chart: use #5114F6 for every bar with fine light-gray gridlines; do not recolor individual bars; use a #000000 star only occasionally for a small number of focus items. Signature: Bubble matrix, occasional use only: a 44/56 split between an Electric Violet index area on the left and a white coordinate area on the right.
 
 【Signature Components】
 1. Section index title: use “NN—” to establish rhythm; appears only on full-bleed Electric Violet section slides, once per slide.

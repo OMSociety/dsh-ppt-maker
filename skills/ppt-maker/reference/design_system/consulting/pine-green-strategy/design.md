@@ -26,9 +26,9 @@ Structure and discipline (distilled from outputs we recognize as benchmarks):
 8. Open with one overview executive summary + a numbered page-by-page contents list; close with numbered conclusions (claims, not a summary) + an implications page split by reader type (such as policy makers/operators/buyers), with each column landing on an action.
 9. Numbers must carry units, time ranges, and definitions; express uncertainty through monitorable observable metrics, not hedging language.
 
-Default baseline (distilled from the layout skill, PART B may override): body pages are high-density and multi-column, carrying at least one complex chart or one multi-row, multi-column data table; never use「one large sentence + expansive blank space」as a body page; build framework diagrams (strategy maps/2×2/driver trees) with fine, clear vector lines rather than stacked color blocks; use fine table borders with no heavy fills, and keep the dominant hues on one page ≤2.
+Default baseline (内部设计沉淀, PART B may override): body pages are high-density and multi-column, carrying at least one complex chart or one multi-row, multi-column data table; never use「one large sentence + expansive blank space」as a body page; build framework diagrams (strategy maps/2×2/driver trees) with fine, clear vector lines rather than stacked color blocks; use fine table borders with no heavy fills, and keep the dominant hues on one page ≤2.
 
-**Read-the-titles test**: reading only the page titles across the deck should let you hear the complete story; if they do not read coherently, the structure is not working.
+**Title read-through test**: reading only the page titles across the deck should let you hear the complete story; if they do not read coherently, the structure is not working.
 
 > Priority note: this section is the minimum baseline for consulting contexts. When the Signature System below (PART B) conflicts with it, follow the Signature System—especially for background, color, and typography; the font/color items above apply as defaults only when the Signature System is silent.
 

@@ -1,6 +1,6 @@
 # Warm Clay Works · Work STYLE DESIGN SYSTEM
 
-## PART A — work_report Baseline (Universal Floor)
+## PART A — Category Baseline (General Minimum)
 
 **Master-crafted**: every page is polished to the standard of a master charging a six-figure fee per slide — layout, type, color, and alignment carry no defaults and no AI-template smell; details decide success.
 
@@ -67,9 +67,9 @@ Hierarchy rests on size, weight, and tracking alone — no decorative lettering,
 
 【Chart Language】
 Only types that actually appear in the samples:
-- ⭐ Single-series vertical bar chart (recurs in samples): flat terracotta-orange bars, reversed-white values labeled inside each bar, baseline only — no y-axis, no grid; basis and reading notes below the chart, no curve fitting.
-- ⭐ Borderless comparison table (recurs in samples): fine horizontal rules only, generous row height; latest/key column lit in terracotta orange, blanks as em dashes; 1–2 lines of notes hang below every table.
-- ⭐ Full-width status table: text status chips instead of status lights, negative chips in bold terracotta, rows sorted by deviation severity; sorting and basis noted below the table.
+- Signature: Single-series vertical bar chart (recurs in samples): flat terracotta-orange bars, reversed-white values labeled inside each bar, baseline only — no y-axis, no grid; basis and reading notes below the chart, no curve fitting.
+- Signature: Borderless comparison table (recurs in samples): fine horizontal rules only, generous row height; latest/key column lit in terracotta orange, blanks as em dashes; 1–2 lines of notes hang below every table.
+- Signature: Full-width status table: text status chips instead of status lights, negative chips in bold terracotta, rows sorted by deviation severity; sorting and basis noted below the table.
 - KPI big-number strip: 4–5 columns split by thin vertical rules, each column a three-part stack of "small label + big number with small unit + two lines of explanation"; exactly one column per page lit in terracotta.
 - Big-number stats rail: 2–3 stacked on the left, each with one small terracotta basis note.
 - Baseline→target transition figures: "value → value + unit" set in one line, with a faint source line below.

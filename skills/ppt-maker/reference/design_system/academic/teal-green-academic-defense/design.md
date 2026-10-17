@@ -1,6 +1,6 @@
 # Teal-Green Academic Defense · Academic STYLE DESIGN SYSTEM
 
-## PART A — Category Baseline (Universal Minimum)
+## PART A — Category Baseline (General Minimum)
 
 Create a rigorous, formally typeset academic presentation benchmarked against top-tier research talks and thesis defenses (at the level of the main programs of NeurIPS/CHI/SIGGRAPH), with clarity of argument taking precedence over decoration. The deck must read as a reproducible scientific argument, not as marketing collateral. Use academic language throughout: standard terminology for research questions, hypotheses, evidence, significance, contributions, and limitations, with no marketing language or corporate jargon. Shift the visual emphasis by discipline: theoretical work should devote substantial space to equations and proof steps; computer science and engineering should be structured around system diagrams, code, execution traces, and performance curves; experimental research should organize equations, charts, and images tightly around a single conclusion; humanities and social sciences should layer archival material, maps, manuscripts, and other textual evidence with narrative depth on top of academic rigor.
 
@@ -26,9 +26,9 @@ Structure and discipline (distilled from work established as the benchmark):
 8. Open with the problem statement and a one-sentence contribution; close with numbered conclusions (claims, not a summary) and an explicit list of open questions.
 9. Place citations in a compact footnote line at the bottom of the slide where they are referenced; unless the format requires it, do not create a full slide densely packed with references.
 
-Default baseline (distilled from the layout skill; PART B may override): organize each slide around one evidence unit (chart/table/equation); give charts complete axis labels, units, and sample definitions; represent data honestly, without truncating the y-axis to exaggerate differences; distinguish correlation from causation explicitly in the copy; ensure projection readability, with body text at ≥14 pt equivalent and chart labels at ≥10 pt equivalent on a 960×540 canvas.
+Default baseline (内部设计沉淀; PART B may override): organize each slide around one evidence unit (chart/table/equation); give charts complete axis labels, units, and sample definitions; represent data honestly, without truncating the y-axis to exaggerate differences; distinguish correlation from causation explicitly in the copy; ensure projection readability, with body text at ≥14 pt equivalent and chart labels at ≥10 pt equivalent on a 960×540 canvas.
 
-**Title sequence test**: Read only the slide titles from beginning to end; they should tell the complete story. If the sequence is incoherent, the structure has not been established.
+**Title read-through test**: Read only the slide titles from beginning to end; they should tell the complete story. If the sequence is incoherent, the structure has not been established.
 
 Density anchor: The specific minimum for each style (number of evidence modules and charts per slide, annotation conventions) is defined by the 【Density Baseline】 reverse-engineered from that style’s source deck—this baseline does not impose a universal number.
 

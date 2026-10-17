@@ -6,17 +6,9 @@
 
 **Landscape Delivery**: Deliver the final presentation in a consistent 16:9 landscape format. Portrait or non-16:9 source materials are references for style observation only; they must be recomposed for 16:9 landscape and must never retain the original canvas proportions directly.
 
-**Layout Coordination**: style.md is the final authority on style (typography, color, components, chart language, and prohibited treatments); the “Layout/Visual Task” line for each slide in query.md governs that slide’s content structure, primary anchor, and reading order. Both are execution specifications: follow the task behavior in query.md for layout intent and style.md for the final visual treatment.
-### Global Prohibitions
+**Layout Coordination**: style.md is the final authority on style (typography, color, components, chart language, and prohibited treatments); the “Layout/Visual Task” line for each slide in 用户任务简报 governs that slide’s content structure, primary anchor, and reading order. Both are execution specifications: follow the task behavior in 用户任务简报 for layout intent and style.md for the final visual treatment.
 
-1. **Do not use cards by default**: Unless the user explicitly requests them, never use rounded rectangles or rectangular cards to create hierarchy or alignment. Functional containers such as status indicators, assumption boxes, and quotation frames are not considered cards. Lines, negative space, type scale, and weight contrast are better tools.
-2. **Do not use equal-split compositions**: Unless no viable alternative exists, do not default to three equal columns, four equal columns, or a two-by-two matrix. An equal split must be justified by the content structure—three scenarios naturally warrant three columns, and frameworks explicitly named in the body content are exempt.
-3. **Do not use ungrounded AI color schemes**: Institutional palettes specified in the content are exempt. The prohibition applies to generic, overfamiliar, unjustified defaults—blue-purple gradients, cyan-purple neon, rainbow flares, glass cards, and glowing borders.
-4. **Do not introduce elements that conflict with the overall style**: Never use forms outside the established visual language, such as rounded icons or rounded rectangles in a sharp-edged style.
-5. **Keep chart backgrounds transparent**: Use transparency or the slide background color, except when reversing to light graphics on a dark background.
-6. **Use large areas of negative space deliberately**: Maintain appropriate density in the content area. Artificially padding or diluting content, or cramming a slide, is a defect. Negative space used for breathing room, grouping, and rhythm is permitted; form must follow content, and content must never be forced in merely to fill the canvas.
-
-## PART A — Category Baseline (Universal Minimum Standard)
+## PART A — Category Baseline (General Minimum)
 
 A brand presentation that leads with emotion while keeping every piece of evidence auditable, benchmarked against top-tier agency annual reports, campaign retrospectives, and destination or product launch decks. Every slide must land one memorable creative idea while keeping every claim verifiable—bold in form, disciplined with numbers.
 
@@ -47,6 +39,14 @@ Default baseline (derived from the layout skill; PART B may override): one scree
 
 Density anchor: the specific minimum for each style—the number of evidence modules and charts per slide, plus annotation conventions—must follow the 【Density Baseline】 reverse-engineered from that style's source deck. This baseline does not impose one universal numeric target.
 
+### Global Prohibitions
+
+1. **Do not use cards by default**: Unless the user explicitly requests them, never use rounded rectangles or rectangular cards to create hierarchy or alignment. Functional containers such as status indicators, assumption boxes, and quotation frames are not considered cards. Lines, negative space, type scale, and weight contrast are better tools.
+2. **Do not use equal-split compositions**: Unless no viable alternative exists, do not default to three equal columns, four equal columns, or a two-by-two matrix. An equal split must be justified by the content structure—three scenarios naturally warrant three columns, and frameworks explicitly named in the body content are exempt.
+3. **Do not use ungrounded AI color schemes**: Institutional palettes specified in the content are exempt. The prohibition applies to generic, overfamiliar, unjustified defaults—blue-purple gradients, cyan-purple neon, rainbow flares, glass cards, and glowing borders.
+4. **Do not introduce elements that conflict with the overall style**: Never use forms outside the established visual language, such as rounded icons or rounded rectangles in a sharp-edged style.
+5. **Keep chart backgrounds transparent**: Use transparency or the slide background color, except when reversing to light graphics on a dark background.
+6. **Use large areas of negative space deliberately**: Maintain appropriate density in the content area. Artificially padding or diluting content, or cramming a slide, is a defect. Negative space used for breathing room, grouping, and rhythm is permitted; form must follow content, and content must never be forced in merely to fill the canvas.
 
 ## PART B — Signature System (Template-Specific Signature; Overrides PART A in Case of Conflict)
 
@@ -58,7 +58,7 @@ One-line style signature: a warm, humanistic editorial handbook—gray-beige pap
 
 【Typography】 Source typography facts: embedded fonts verified in the PDF are the sans-serif Marr Sans for titles and the serif Capitaine for body copy. Use Capitaine Regular for narrative text; use Marr Sans Semibold/Bold for subheads. Keep the hierarchy of content-slide titles moderately differentiated, and enlarge chapter titles substantially only on transition slides. The source deck establishes no consistent convention for large numbers; use them as local focal points only when the content contains a genuine headline metric. Footnotes and page numbers must recede clearly. Set content-slide titles and chapter eyebrows in uppercase with slightly increased tracking; narrative chapter titles may use sentence case. Render with {latin: SortsMillGoudy, ea: 思源宋体} (serif narrative body) and {latin: Liter, ea: MiSans} (sans titles/structure). In the 16:9 landscape format, preserve the role relationship of “sans serif structures, serif tells the story”; do not retain the source deck’s absolute font sizes or scaling ratios.
 
-【Chart Language】 No statistical charts were observed; tables appear only in finished sample spreads. ⭐ Leader-line anatomy diagram: connect one large central sample to 6–10 short labels using fine #B0D0D9 lines and hollow circles; this treatment appears consistently on 5 slides and is used to explain composition. ⭐ Image evidence matrix: use a 2×2 grid or a single column of four equal-width cropped images, each with a short heading and description, to compare parallel evidence. ⭐ Pairing matrix (occasional): use square-cornered color blocks to show recommended and not-recommended combinations together, strictly for compatibility judgments.
+【Chart Language】 No statistical charts were observed; tables appear only in finished sample spreads. Signature: Leader-line anatomy diagram: connect one large central sample to 6–10 short labels using fine #B0D0D9 lines and hollow circles; this treatment appears consistently on 5 slides and is used to explain composition. Signature: Image evidence matrix: use a 2×2 grid or a single column of four equal-width cropped images, each with a short heading and description, to compare parallel evidence. Signature: Pairing matrix (occasional): use square-cornered color blocks to show recommended and not-recommended combinations together, strictly for compatibility judgments.
 
 【Signature Components】 Photography is a hard constraint: specific people and places must not be replaced with illustrations. On chapter openings with photography, the image occupies the lower 58%–70% of the slide; crop body-slide evidence images with square corners. Select only documentary images with natural light, authentic environments, and unstaged subjects; never substitute cutout figures or generic stock photography. Split-color principles board: use the left 1/3 in #EFEBE5 for the lead-in and fill the right 2/3 with #246B81, holding 3–4 sets of “photo + white-text description”; use this component no more than once per slide. Allow no more than one set of technical annotations per slide; fine lines must not cross body copy or become a decorative grid.
 

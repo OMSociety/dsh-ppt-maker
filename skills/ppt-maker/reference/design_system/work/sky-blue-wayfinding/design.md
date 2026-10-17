@@ -1,6 +1,6 @@
 # Sky Blue Wayfinding · Work STYLE DESIGN SYSTEM
 
-## PART A — Category Baseline (General Minimum Standard)
+## PART A — Category Baseline (General Minimum)
 
 A conclusion-first business performance report benchmarked against top-tier operating review meetings and project progress briefings. Every page in this deck must be scannable within 30 seconds, and every number must withstand drill-down questions: status is evidenced, variances are attributed, and requests are explicit.
 
@@ -28,7 +28,7 @@ Structure and discipline (distilled from the work we recognize as benchmarks):
 
 Default baseline (derived from the layout skill; PART B may override): use one consistent lightweight component system throughout for progress, attainment, and red/amber/green status; each page has 1 theme + 2–4 supporting points, with the conclusion evident within 5 seconds; every metric must include a “So what?”—the cause, impact, or next action—rather than a pile of bare numbers.
 
-**Headline read-through test**: reading only the slide titles should tell the complete story; if the sequence does not flow, the structure is not working.
+**Title read-through test**: reading only the slide titles should tell the complete story; if the sequence does not flow, the structure is not working.
 
 Density anchor: the specific minimum for each style (number of evidence modules and charts per page, plus annotation conventions) follows that style’s 【Density Baseline】 reverse-engineered from the source deck—this baseline does not impose a single universal number.
 
@@ -55,7 +55,7 @@ Source-deck facts: the canvas is 720×405pt, 16:9. Body-slide titles are fixed n
 Source-deck font facts: the embedded fonts are the sans-serif OrstedSansOffice (body copy, tables, and standard titles, Regular/Bold) and OrstedSans (cover and section display titles, Regular/Bold); no serif fonts are used. Keep numbers and English text in the same sans-serif family. Record dense body text at approximately 8–9pt as 1x; sparse narrative text may increase to 11–12pt. Standard titles are approximately 18pt≈2x, key figures approximately 12–14pt≈1.5–1.8x, and footnotes approximately 6pt≈0.7x. Section-card titles are approximately 28pt, and Q&A divider titles are larger; both belong only to special slides. Titles generally use English sentence case or Title Case and are limited to two lines. Table numbers consistently include units/percent signs and align by column; negative values use parentheses or a minus sign, never a decorative numeric typeface. Render with Liter (Latin text/numerals) and MiSans (Chinese).
 
 【Chart Language】
-Chart types present in the source include horizontal or vertical bar charts, waterfall/bridge charts, paired columns, 100% stacked columns, donut charts (occasional), dense multi-period tables, and combination slides with a “table + small chart on the right.” ⭐Waterfall charts use thin connector lines and values above the bars to break down movement from opening to closing, followed immediately by two to four causal explanations. ⭐Paired-column charts place “before/after” or “baseline/current state” side by side, with leader-line annotations above showing the matching ratio or difference. ⭐Multi-period tables use thin blue top/bottom rules, a pale-blue highlight across the entire current-period column, bold total rows, and a methodology footnote at the bottom. Bar charts generally label each bar or group directly; the primary series uses #007ACC and comparison series use #C2E6FF/#001142. Keep legends to the essential two or three items; do not rely on hover states or large color-block legends.
+Chart types present in the source include horizontal or vertical bar charts, waterfall/bridge charts, paired columns, 100% stacked columns, donut charts (occasional), dense multi-period tables, and combination slides with a “table + small chart on the right.” Signature: Waterfall charts use thin connector lines and values above the bars to break down movement from opening to closing, followed immediately by two to four causal explanations. Signature: Paired-column charts place “before/after” or “baseline/current state” side by side, with leader-line annotations above showing the matching ratio or difference. Signature: Multi-period tables use thin blue top/bottom rules, a pale-blue highlight across the entire current-period column, bold total rows, and a methodology footnote at the bottom. Bar charts generally label each bar or group directly; the primary series uses #007ACC and comparison series use #C2E6FF/#001142. Keep legends to the essential two or three items; do not rely on hover states or large color-block legends.
 
 【Signature Components】
 1. Header section rail: a pale-blue horizontal bar at the upper left overlaid with a shorter label, providing section navigation; place it once at the top of each body slide.

@@ -1,6 +1,6 @@
 # Blue Flame Brand · Work STYLE DESIGN SYSTEM
 
-## PART A — work_report Baseline (Universal Floor)
+## PART A — Category Baseline (General Minimum)
 
 Conclusion-first business reporting, benchmarked against top-tier business reviews and project progress briefings: every page scannable in 30 seconds, every number able to withstand drill-down — status backed by evidence, deviations attributed, asks spelled out.
 
@@ -28,7 +28,7 @@ Structure and discipline:
 
 Default baseline (PART B may override): progress / attainment / red-amber-green status use one unified lightweight component, drawn one way across the deck; each page has 1 theme + 2–4 supporting points, the conclusion graspable within 5 seconds; every metric carries its "so what" — cause, impact, or next action — no bare-number piles. Density anchor: per-page minimums for evidence modules, charts, and labeling habits follow this style's density-baseline section; this baseline imposes no uniform numbers.
 
-**Headline read-through test**: reading only the page titles across the deck should tell the complete story; if the read-through fails, the structure has not been established.
+**Title read-through test**: reading only the page titles across the deck should tell the complete story; if the read-through fails, the structure has not been established.
 
 ### Global Prohibitions (AI Default Patterns · Mandatory)
 
@@ -62,10 +62,10 @@ Source facts: 16:9 canvas (sample images 1467×825), left/right safe margins ~6%
 Source facts: modern sans-serif dominates absolutely, with narrow numerals carrying an industrial-instrument feel; table body text may switch wholesale to a serif face in the Song/Mincho manner, pairing against the sans-serif titles — the most distinctive type signature of this style. Titles use same-sentence mixed setting of "regular-weight statement + bold conclusion", about 2.3–2.5x body size; KPI big numbers 2–3.5x, units shrunk to about half on the same baseline; subtitle/body = 1x; module subheads ~1.2x medium; notes and sources 0.65–0.8x; the two-line cover title collides light and heavy weights. Decorative quotation marks use serif in the faintest color, as atmosphere only. No italics, no script, no display lettering; numbers receive no ornamental treatment.
 
 【Chart Language】
-- ⭐ Ring progress gauges (many pages): thick ring + dark track, one short tick at 12 o'clock reinforcing the instrument feel; big number + metric name at the ring's center, two lines of target/actual basis below; flame cyan = attained, amber = gap; at most 3 side by side per page.
-- ⭐ Single-series bar chart (trend pages): all bars the same flame cyan, small rounded caps, values labeled directly per bar; ~4 ultra-dark horizontal gridlines + one brighter axis baseline; vertical dashed lines split before/after phases, circled-number event callouts hug their bars, mapping one-to-one to left-column notes; no legend, no y-axis title.
-- ⭐ Horizontal progress bars (status pages): dark track + status-colored fill, the value or result written to the right of the bar, never on top of it; progress itself uses flame cyan, status lights use green/amber/red — progress and status are deliberately color-separated.
-- ⭐ Vertical-line-free matrix table (diagnosis pages): no fill, no vertical lines, no zebra striping; an ice-blue full-width rule on top, a dark rule closing the bottom; number columns aligned, status column as "dot + word", a fixed drill-down note column at far right; table body in serif, the actual column bolded as a vertical anchor.
+- Signature: Ring progress gauges (many pages): thick ring + dark track, one short tick at 12 o'clock reinforcing the instrument feel; big number + metric name at the ring's center, two lines of target/actual basis below; flame cyan = attained, amber = gap; at most 3 side by side per page.
+- Signature: Single-series bar chart (trend pages): all bars the same flame cyan, small rounded caps, values labeled directly per bar; ~4 ultra-dark horizontal gridlines + one brighter axis baseline; vertical dashed lines split before/after phases, circled-number event callouts hug their bars, mapping one-to-one to left-column notes; no legend, no y-axis title.
+- Signature: Horizontal progress bars (status pages): dark track + status-colored fill, the value or result written to the right of the bar, never on top of it; progress itself uses flame cyan, status lights use green/amber/red — progress and status are deliberately color-separated.
+- Signature: Vertical-line-free matrix table (diagnosis pages): no fill, no vertical lines, no zebra striping; an ice-blue full-width rule on top, a dark rule closing the bottom; number columns aligned, status column as "dot + word", a fixed drill-down note column at far right; table body in serif, the actual column bolded as a vertical anchor.
 - Invisible-table scorecard (comparison pages): labels left, values right, fine horizontal and vertical rules dividing zones; no header, no legend, no outer frame.
 - Three-phase roadmap (closing page): one full-length hairline + ice-blue hollow nodes; phase names above the nodes, milestones and entry gates below; a narrative route with no time scale.
 - Concentric-ring bullseye (attribution pages): double rings + multiple converging rays channeling left-side factors into the core number; a decorative convergence figure that encodes no proportions.

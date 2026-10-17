@@ -1,6 +1,6 @@
 # Cream Collage · Promotion STYLE DESIGN SYSTEM
 
-## PART A — Category Baseline (Universal Minimum Standard)
+## PART A — Category Baseline (General Minimum)
 
 A brand presentation that leads with emotion while keeping every piece of evidence auditable, benchmarked against top-tier agency annual reports, campaign retrospectives, and destination or product launch decks. Every slide must land one memorable creative idea while keeping every claim verifiable—bold in form, disciplined with numbers.
 

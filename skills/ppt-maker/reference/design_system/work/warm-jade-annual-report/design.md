@@ -1,6 +1,6 @@
 # Warm Jade Annual Report · Work STYLE DESIGN SYSTEM
 
-## PART A — Category Baseline (Universal Minimum)
+## PART A — Category Baseline (General Minimum)
 
 Lead with the conclusion in an operational performance report benchmarked against top-tier business reviews and project progress briefings. Every page in this deck must be scannable within 30 seconds, and every number must withstand drill-down scrutiny: status must be evidenced, variances attributed, and requests stated clearly.
 
@@ -26,9 +26,9 @@ Structure and discipline (distilled from benchmark-quality deliverables):
 8. Every number must include unit, period, and definition (GMV or revenue, order volume or sales value); label estimated values as internally defined examples.
 9. End with decisions and support required from management—list each item separately with the consequence of delay; never close with a thank-you page.
 
-Default baseline (distilled from the layout skill; PART B may override): use one consistent lightweight component language for progress, attainment, and red/amber/green status throughout the deck; each page carries 1 topic + 2–4 supporting points, with the conclusion clear within 5 seconds; every metric must be accompanied by a “So what?”—the reason, impact, or next action—rather than left as a bare number.
+Default baseline (内部设计沉淀; PART B may override): use one consistent lightweight component language for progress, attainment, and red/amber/green status throughout the deck; each page carries 1 topic + 2–4 supporting points, with the conclusion clear within 5 seconds; every metric must be accompanied by a “So what?”—the reason, impact, or next action—rather than left as a bare number.
 
-**Sequential-title test**: Read only the slide titles from beginning to end; they should tell the complete story. If they do not flow, the structure has not been established.
+**Title read-through test**: Read only the slide titles from beginning to end; they should tell the complete story. If they do not flow, the structure has not been established.
 
 Density anchor: the specific minimum for each style (evidence modules per page, chart count, annotation conventions) follows the 【Density Baseline】 reverse-engineered from that style’s source deck—this baseline imposes no universal number.
 
@@ -52,10 +52,10 @@ One-sentence style signature: a warm ivory ground, charcoal-black type with seri
 【Typography】Source-deck fact: titles, navigation, numeric labels, and table headers primarily use the sans-serif Tahoma; long-form body copy explicitly uses the serif Cambria, creating a “sans-serif heading + serif body” pairing that overrides PART A’s single-sans-serif default. Render with {latin: QuattrocentoSans, ea: MiSans} (sans titles/labels) and {latin: Unna, ea: 思源宋体} (serif body). Cambria body text at 8 pt is defined as 1x; module headings use Tahoma at 8–12 pt; standard page titles use Tahoma at 36–40 pt, approximately 4.5–5x; large figures/percentages are 24–28 pt, approximately 3–3.5x; footnotes are 6 pt, approximately 0.75x; cover titles are approximately 75 pt and reserved for special pages. Use sentence case for titles, with all caps permitted for short labels; keep years, percentages, and units adjacent to their values, and right-align table numbers by column. When adapting to other languages, preserve these weight and scale relationships, prioritizing the readability of 8 pt body copy in a 960×540 preview.
 
 【Chart Language】Chart types actually used include donut-share charts, multi-year trends combining gray bars with a black line, horizontal or vertical stacked bars, multi-year financial tables with grouping rules, two-column side-by-side data tables, and a small number of ESG charts with broken axes/hatched target bars.
-⭐ Donut chart (recurring): place two donuts side by side, use amber to highlight one primary share, and assign black/dark gray/light gray to the remaining shares; place labels outside the rings and connect them with fine leader lines. Use only for conclusions about composition/breakdown.
-⭐ Composite bars (recurring): show one stacked bar for each of two periods or years, write values directly within each segment, and place a compact color legend below; use for comparing regional, category, or channel mix.
-⭐ Financial tables (high frequency): fill the entire current-period or total column with `#A09B93`, using white text or bold type; distinguish group headings and subtotals with horizontal rules and bold weight, not zebra striping. Use for statements and notes.
-⭐ Target comparison chart (occasional): place an axis break between the actual bar and the long-range target bar, with the target bar rendered in a light hatched fill; use only when the scale difference is excessive, and do not extend it into a deck-wide chart convention.
+Signature: Donut chart (recurring): place two donuts side by side, use amber to highlight one primary share, and assign black/dark gray/light gray to the remaining shares; place labels outside the rings and connect them with fine leader lines. Use only for conclusions about composition/breakdown.
+Signature: Composite bars (recurring): show one stacked bar for each of two periods or years, write values directly within each segment, and place a compact color legend below; use for comparing regional, category, or channel mix.
+Signature: Financial tables (high frequency): fill the entire current-period or total column with `#A09B93`, using white text or bold type; distinguish group headings and subtotals with horizontal rules and bold weight, not zebra striping. Use for statements and notes.
+Signature: Target comparison chart (occasional): place an axis break between the actual bar and the long-range target bar, with the target bar rendered in a light hatched fill; use only when the scale difference is excessive, and do not extend it into a deck-wide chart convention.
 
 【Signature Components】The three-fine-line menu mark is fixed at the top left, appears no more than once per page, and serves only as a navigation anchor. The top section label, centered report name, bottom-left page number, and bottom-right small organization text form a micro header/footer system whose reserved positions must not be occupied by content. Multi-column body layouts repeatedly use approximately 1 px vertical separators, while tables use fine horizontal rules in the same color to establish rhythm between groups. An amber conclusion bar/large-number block carries only one decisive metric and is limited to 1 block per page; it must never become a wall of cards. Photography is a hard constraint: retain full-frame or right-half lifestyle/product photography on covers and section openers, and commonly place one image at the bottom of a column on event pages; never replace these image zones with gradients, abstract color blocks, or icons. Thin-line circular icons may appear sparingly before risk/ESG metrics, with each icon explaining only one metric.
 

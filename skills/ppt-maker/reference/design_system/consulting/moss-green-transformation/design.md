@@ -1,6 +1,6 @@
 # Moss Green Transformation · Consulting STYLE DESIGN SYSTEM
 
-## PART A — Category Baseline (General Minimum Standard)
+## PART A — Category Baseline (General Minimum)
 
 A professional, information-dense consulting presentation benchmarked against leading strategy firms (McKinsey/BCG), with a premium editorial aesthetic.
 
@@ -26,9 +26,9 @@ Structure and discipline (distilled from work we consider best-in-class):
 8. Open with a one-page executive-summary overview followed by a numbered, paginated agenda; close with numbered conclusions (claims, not summaries) and an implications page divided by audience type (such as policymakers/operators/buyers), with each column ending in concrete actions.
 9. Every number must include its unit, time range, and measurement basis; express uncertainty through observable monitoring indicators, not hedging language.
 
-Default baseline (distilled from the layout skill; PART B may override): Content pages use dense, multi-column layouts and contain at least one complex chart or one multi-row, multi-column data table. Never use “one oversized sentence + vast empty space” as a content page. Construct framework diagrams (strategy maps/2×2/driver trees) with fine, crisp vector lines rather than stacked color blocks. Tables use thin borders with no heavy fills. Limit each page to ≤2 primary hues.
+Default baseline (内部设计沉淀; PART B may override): Content pages use dense, multi-column layouts and contain at least one complex chart or one multi-row, multi-column data table. Never use “one oversized sentence + vast empty space” as a content page. Construct framework diagrams (strategy maps/2×2/driver trees) with fine, crisp vector lines rather than stacked color blocks. Tables use thin borders with no heavy fills. Limit each page to ≤2 primary hues.
 
-**Title Read-Through Test**: Reading only the titles across the deck should communicate the complete story; if they do not flow coherently, the structure is not working.
+**Title read-through test**: Reading only the titles across the deck should communicate the complete story; if they do not flow coherently, the structure is not working.
 
 > Priority note: This section defines the minimum baseline for consulting use cases. Where the signature system below (PART B) conflicts with it, the signature system takes precedence—especially for background, color, and typography. The typography and color guidance above serves only as a default where the signature system is silent.
 
@@ -53,7 +53,7 @@ One-sentence style signature: A moss-green-to-mint data narrative on a dark char
 
 【Typography】Only page images are available in the source, so the font families cannot be verified. Chinese titles, body text, and tables all have a sans-serif appearance (render with {latin: Liter, ea: MiSans}); titles are bold and body text is regular. English section labels are all caps with expanded letter spacing. Body text = 1x, title ≈2.6–3x, large figures ≈3.4–4x, subtitle ≈0.8x, and footnote ≈0.6x. Titles may span two lines but must preserve a complete assertion. Set P1/P2/P3, Q1–Q4, and 01/02/03 in clean, regular Latin letters and numerals; keep percentages and units tight to the figure, and render key values in bold bright green or light green.
 
-【Chart Language】Observed chart types: horizontal stacked bars, three-column information cards, a maturity table, a pilot–value two-column layout, and a quarterly roadmap table. ⭐ Signature treatments: Place percentages directly inside stacked-bar segments and pair them with 3 numbered interpretations on the right. Use dot-matrix levels in the maturity table, with burgundy limited to a few cells in the gap column. On the pilot page, stack P1–P3 vertically on the left and enlarge 3 value figures on the right. In the roadmap, use segmented green bands for phases, then populate a Q1–Q4 grid. Place labels directly within bars, phase bands, or cells; never rely on the legend alone. Tables use thin borders with charcoal/transparent backgrounds.
+【Chart Language】Observed chart types: horizontal stacked bars, three-column information cards, a maturity table, a pilot–value two-column layout, and a quarterly roadmap table. Signature treatments: Place percentages directly inside stacked-bar segments and pair them with 3 numbered interpretations on the right. Use dot-matrix levels in the maturity table, with burgundy limited to a few cells in the gap column. On the pilot page, stack P1–P3 vertically on the left and enlarge 3 value figures on the right. In the roadmap, use segmented green bands for phases, then populate a Q1–Q4 grid. Place labels directly within bars, phase bands, or cells; never rely on the legend alone. Tables use thin borders with charcoal/transparent backgrounds.
 
 【Signature Components】1) Section kicker: one per content page at the top left—a short green bar, all-caps English, shown only once. 2) Thin divider below the subtitle: a hard boundary between the title area and the evidence area. 3) Deep-green evidence blocks: three-column cards, pilot strips, conclusion boxes, or bottom synthesis strips, with square corners and thin borders; use no more than 3 at the same hierarchy level on one page. 4) Conclusion strip/box: at most once per content page, positioned at the bottom or below the right column, and closed with a one-sentence so-what. 5) Source line and bottom-right page number: retain on every page at the smallest font size. Use the geometric glow on covers only occasionally, confined to the empty area on the right.
 

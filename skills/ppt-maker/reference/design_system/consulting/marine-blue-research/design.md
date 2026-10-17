@@ -1,6 +1,6 @@
 # Marine Blue Research · Consulting STYLE DESIGN SYSTEM
 
-## PART A — Category Baseline (Universal Minimum Standard)
+## PART A — Category Baseline (General Minimum)
 
 Professional, information-dense consulting presentations benchmarked against the style of leading strategy consulting firms (McKinsey/BCG), with a premium editorial aesthetic.
 
@@ -28,7 +28,7 @@ Structure and Discipline (distilled from deliverables we regard as benchmarks):
 
 Default baseline (derived from the layout skill; PART B may override): Content slides use information-dense, multi-column layouts and must contain at least one complex chart or one multi-row, multi-column data table. Never use "one oversized sentence + a vast empty area" as a content slide. Build framework diagrams (strategy maps/2×2/driver trees) with fine, crisp vector lines rather than stacked color blocks. Limit each slide to ≤2 primary hues.
 
-**Title Read-Through Test**: Reading only the slide titles in sequence should tell the complete story; if they do not flow coherently, the structure has not been established.
+**Title read-through test**: Reading only the slide titles in sequence should tell the complete story; if they do not flow coherently, the structure has not been established.
 
 > Priority note: This section defines the minimum baseline for consulting contexts. Where the signature system below (PART B) conflicts with it, the signature system takes precedence—especially for background, color palette, and typography. The typography/color guidance above applies only as a default when the signature system is silent.
 

@@ -1,6 +1,6 @@
 # Deep Blue Atlas · Academic STYLE DESIGN SYSTEM
 
-## PART A — academic Baseline (Universal Floor)
+## PART A — Category Baseline (General Minimum)
 
 Academic presentations benchmarked against top-tier research talks and thesis defenses (NeurIPS/CHI/SIGGRAPH main-track caliber): clarity of argument outranks decoration; the whole deck must read as one reproducible scientific claim, not marketing collateral. Academic register throughout — the disciplined vocabulary of research questions, hypotheses, evidence, significance, contributions, and limitations; no marketing or business-speak mixed in.
 
@@ -51,11 +51,11 @@ Source facts: a modern sans-serif character throughout — even stroke widths, f
 
 【Chart Language】
 Only types that actually appear in the samples:
-- ⭐ Single-series line chart: light-gray horizontal grid, no legend, node values labeled directly, one in-chart sentence of annotation.
-- ⭐ Three-line academic wide table: only two deep-blue rules, below the header and at the foot — no vertical lines, no outer frame, no zebra striping; key-difference cells switch to cyan, variable differences legible without a legend.
-- ⭐ Orthogonal decision tree: diamond decision nodes + right-angle polylines + small terminal arrows, branch labels placed along the lines; leaf nodes = deep-blue bold name + status word (red = inapplicable, cyan = applicable) + gray explanation.
-- ⭐ Segmented timeline: thick deep-blue main axis + short ticks; excluded phases switch to gray dashed lines with axis-break jogs; cyan dots mark key instants, vertical leader lines connect annotations.
-- ⭐ Confidence-interval plot (simplified forest plot): deep-blue interval lines + end caps + cyan point estimates + gray reference dashes + a red ex-ante threshold line.
+- Signature: Single-series line chart: light-gray horizontal grid, no legend, node values labeled directly, one in-chart sentence of annotation.
+- Signature: Three-line academic wide table: only two deep-blue rules, below the header and at the foot — no vertical lines, no outer frame, no zebra striping; key-difference cells switch to cyan, variable differences legible without a legend.
+- Signature: Orthogonal decision tree: diamond decision nodes + right-angle polylines + small terminal arrows, branch labels placed along the lines; leaf nodes = deep-blue bold name + status word (red = inapplicable, cyan = applicable) + gray explanation.
+- Signature: Segmented timeline: thick deep-blue main axis + short ticks; excluded phases switch to gray dashed lines with axis-break jogs; cyan dots mark key instants, vertical leader lines connect annotations.
+- Signature: Confidence-interval plot (simplified forest plot): deep-blue interval lines + end caps + cyan point estimates + gray reference dashes + a red ex-ante threshold line.
 - Mini interval scale: fine line with ticks at both ends, baseline value in gray at left, criterion value in deep-blue bold at right, flanking metric rows and logic rows.
 - Horizontal process chain: cyan-numbered steps joined by thin arrows, with one looping bracket line allowed to express retrospective iteration.
 Shared discipline: labels placed directly, no legend dependence; one main figure per page — never pile up multiple independent charts.
