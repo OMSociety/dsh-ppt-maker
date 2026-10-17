@@ -10,7 +10,7 @@
  * Harness Client 包（`dsh-agent-preset/skills/cordis-plugin-development/references/practices.md`），
  * 图标几何因此复制进了 `client/icons.tsx`。`@deepseek-ai/*` 仍留在 external 里是**守卫**：
  * 万一将来有人 import 了宿主包，它不会被打进来静默变成两份，而是变成一条 require，
- * 由 `tests/client-bundle.guard.ts` 的种子表核对当场变红。
+ * 由 `tests/client-bundle.guard.test.ts` 的种子表核对当场变红。
  *
  * 但 external 只挡得住「命中列表的包」：一个不在列表里的第三方包会被 esbuild **静默内联**
  * 进产物（require 表不变、体积只多几百字节，测试全绿），所以守卫测试另外用 esbuild 的

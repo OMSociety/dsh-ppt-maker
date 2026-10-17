@@ -15,7 +15,7 @@ check_fonts.py — 字体可用性检查（本地导出用）
   python check_fonts.py --fonts "MiSans" "Georgia"
   python check_fonts.py <deck.pptd> --list-missing   # 只列出缺失（供用户安装）
 """
-import os, sys, re, argparse, json
+import os, sys, re, argparse
 import yaml
 
 # 规范名 -> 实装名（与 reference/local-fonts.md 保持一致）

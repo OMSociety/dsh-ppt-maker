@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""check_fonts.py unit tests.
+"""check_fonts.py 单元测试。
 
-Covers the pure functions (mapping, name normalization, matching, font
-collection). The registry read in ``installed_families()`` is Windows-only and
-deliberately not exercised here — it is covered indirectly by the CLI smoke
-test in the skill's manual validation, not by unit tests.
+覆盖纯函数（规范名映射、名称归一、匹配、字体收集）。``installed_families()``
+里的注册表读取是 Windows 专有路径，这里刻意不直接跑——它由注册表合并用例
+（桩掉 winreg）与技能自带的手工 CLI 冒烟覆盖。
 """
 import importlib.util
 import sys
@@ -103,7 +102,7 @@ class CollectFontsTests(unittest.TestCase):
             fonts = MODULE.collect_fonts(str(deck))
         self.assertEqual(fonts, {"MiSans", "思源宋体 CN", "站酷文艺体", "Georgia"})
 
-    def test_missing_manifest_returns_empty(self):
+    def test_empty_fonts_returns_empty(self):
         with tempfile.TemporaryDirectory() as name:
             # No theme.textStyles, no inline fontFamily -> empty set.
             deck = Path(name) / "empty.pptd"

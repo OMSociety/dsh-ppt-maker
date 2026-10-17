@@ -44,6 +44,7 @@ export const MAX_ASSET_BYTES = 5 * 1024 * 1024
  * @property {(cwd: string, options: object) => Promise<object>} editProject
  * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} undoProject
  * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} redoProject
+ * @property {(cwd: string, dir: string) => Promise<{ canUndo: boolean, canRedo: boolean }>} projectUndoState
  * @property {(cwd: string, dir: string) => Promise<object>} listProjectHistory
  * @property {(cwd: string, dir: string, revision: number) => Promise<object | null>} readHistorySnapshot
  * @property {(cwd: string, dir: string, targetRevision: number) => Promise<object>} restoreProject
@@ -52,18 +53,6 @@ export const MAX_ASSET_BYTES = 5 * 1024 * 1024
  * @property {(cwd: string, dir: string, report: unknown) => Promise<void>} writeExportReport
  * @property {new (...args: unknown[]) => Error & { status?: number }} ProjectError
  */
-
-/* ------------------------------------------------------------------ *
- * libreoffice-kit：/thumb 默认用 createConverter；测试里可经 deps.createConverter 换桩
- * ------------------------------------------------------------------ */
-
-let lazyLibreOfficeKit = null
-
-async function libreofficeKit() {
-  if (lazyLibreOfficeKit) return lazyLibreOfficeKit
-  lazyLibreOfficeKit = await import('@deepseek-ai/libreoffice-kit')
-  return lazyLibreOfficeKit
-}
 
 /* ------------------------------------------------------------------ *
  * @deepseek-ai/dsh-native-command：导出产物的「打开方式 / 默认打开 / 显示文件位置」。
@@ -229,14 +218,39 @@ function projectOf(ss, sessionId, cwd, key) {
  *   resolveCwd: (sessionId: string) => string | null,
  *   log?: (msg: string) => void,
  *   core: CoreSurface,
- *   createConverter?: () => Promise<{ renderImages(req: object): Promise<object>, dispose(): Promise<void> }>,
  *   nativeCommand?: { canOpenNativePath(): boolean, nativeFileApplications(p: string, s?: AbortSignal): Promise<Array<{ id: string, name: string, default: boolean, icon: string | null }>>, openNativeAssociatedPath(p: string, s?: AbortSignal): Promise<unknown>, openNativeFileApplication(p: string, app: string, s?: AbortSignal): Promise<unknown>, revealNativePath(p: string, s?: AbortSignal): Promise<unknown> },
  *   sessionStore?: typeof sessionStore,
  * }} deps
  */
-export function createApiHandler({ resolveCwd, log = () => {}, core, createConverter, nativeCommand: nativeOverride, sessionStore: storeOverride } = {}) {
-  if (!core || typeof core.editProject !== 'function' || typeof core.loadProject !== 'function') {
-    throw new Error('createApiHandler 需要 deps.core（{ loadProject, editProject, undoProject, redoProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError }）')
+
+/** 路由处理器实际调用的 core 成员：任何一项缺席都在装配期报 500，而不是等某条路由
+ *  跑到一半抛 TypeError（`listProjectHistory is not a function` 那一类事故）。 */
+const REQUIRED_CORE = [
+  'loadProject',
+  'editProject',
+  'undoProject',
+  'redoProject',
+  'projectUndoState',
+  'listProjectHistory',
+  'readHistorySnapshot',
+  'restoreProject',
+  'buildProjectDeck',
+  'saveProjectPptx',
+  'writeExportReport',
+  'ProjectError',
+]
+
+export function createApiHandler({ resolveCwd, log = () => {}, core, nativeCommand: nativeOverride, sessionStore: storeOverride } = {}) {
+  if (!core || typeof core !== 'object') {
+    const err = new Error(`createApiHandler 需要 deps.core（${REQUIRED_CORE.join(', ')}）`)
+    err.status = 500
+    throw err
+  }
+  const missing = REQUIRED_CORE.filter((name) => typeof core[name] !== 'function')
+  if (missing.length > 0) {
+    const err = new Error(`createApiHandler 的 deps.core 缺少函数：${missing.join(', ')}`)
+    err.status = 500
+    throw err
   }
   const { editProject, loadProject, undoProject, redoProject, projectUndoState, listProjectHistory, readHistorySnapshot, restoreProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError } = core
   const ss = storeOverride || sessionStore
@@ -256,8 +270,6 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
     }
     return { sessionId, cwd }
   }
-
-  const thumbDir = (abs, revision) => path.join(abs, '.thumb-cache', `r${String(revision).padStart(4, '0')}`)
 
   return async function handle(req, res) {
     if (!sameOrigin(req)) return fail(res, 403, '拒绝跨站请求')
@@ -286,13 +298,11 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
                 pageCount: loaded.deck.pages.length,
                 checksumMismatch: loaded.checksumMismatch,
               }
-              // 撤销/重做可用性（工作台工具栏按钮的 disabled 态）——可选注入，
-              // 测试桩没给 projectUndoState 时静默退化为「都不可用」。
-              if (typeof projectUndoState === 'function') {
-                const undoState = await projectUndoState(cwd, hit.dir)
-                manifest.canUndo = undoState.canUndo
-                manifest.canRedo = undoState.canRedo
-              }
+              // 撤销/重做可用性（工作台工具栏按钮的 disabled 态）。projectUndoState 属
+              // REQUIRED_CORE，装配期已校验过是函数。
+              const undoState = await projectUndoState(cwd, hit.dir)
+              manifest.canUndo = undoState.canUndo
+              manifest.canRedo = undoState.canRedo
             } catch {
               manifest = null
             }
@@ -338,47 +348,6 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
         return json(res, 200, { ok: true, path: pagePath, page, revision: loaded.manifest.revision })
       }
 
-      if (route === 'GET /thumb') {
-        const { sessionId, cwd } = sessionOf({}, url)
-        const hit = projectOf(ss, sessionId, cwd, String(url.searchParams.get('key') || ''))
-        const relDir = path.relative(cwd, path.resolve(cwd, hit.dir)).replace(/\\/g, '/')
-        const abs = path.resolve(cwd, hit.dir)
-        const page = Number(url.searchParams.get('page') || '')
-        const revQ = Number(url.searchParams.get('rev') || '')
-        if (!Number.isInteger(page) || page < 1) return fail(res, 400, 'page 必须是 ≥1 的整数')
-        if (!Number.isInteger(revQ) || revQ < 0) return fail(res, 400, 'rev 必须是 ≥0 的整数')
-        const cacheDir = thumbDir(abs, revQ)
-        const cached = path.join(cacheDir, `page-${page}.png`)
-        try {
-          const bytes = await fsp.readFile(cached)
-          res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-cache' })
-          return res.end(bytes)
-        } catch {
-          /* 没命中 → 现渲染 */
-        }
-        const pipeline = await buildProjectDeck(cwd, relDir)
-        const { bytes } = await saveProjectPptx(pipeline)
-        const tmpRoot = path.join(abs, '.thumb-cache')
-        const tmp = await fsp.mkdtemp(path.join(tmpRoot, 'tmp-'))
-        const inputPath = path.join(tmp, 'deck.pptx')
-        const outDir = path.join(tmp, 'out')
-        await fsp.writeFile(inputPath, bytes)
-        const conv = await (createConverter ? createConverter() : (await libreofficeKit()).createConverter())
-        try {
-          const result = await conv.renderImages({ inputPath, outputDir: outDir, pages: [page], dpi: 96 })
-          const img = result.images && result.images[0]
-          if (!img) return fail(res, 404, `页 ${page} 渲染不出来`)
-          const out = await fsp.readFile(img.path)
-          await fsp.mkdir(cacheDir, { recursive: true })
-          await fsp.writeFile(cached, out)
-          res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-cache' })
-          return res.end(out)
-        } finally {
-          try { await conv.dispose() } catch { /* dispose must not throw */ }
-          await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {})
-        }
-      }
-
       /* ── 版本历史：列表 / 快照预览（只读） ─────────────────────────── */
 
       if (route === 'GET /history') {
@@ -409,7 +378,7 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, createConve
         if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) return fail(res, 400, `越界：${src}`)
         const ext = path.extname(norm).toLowerCase()
         if (!norm.startsWith('media/')) return fail(res, 400, `素材必须在 media/ 下：${src}`)
-        if (!['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'].includes(ext)) {
+        if (!['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'].includes(ext)) {
           return fail(res, 400, `扩展名不在白名单：${ext || '(无)'}`)
         }
         let bytes

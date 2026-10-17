@@ -10,8 +10,7 @@
  *  - /export 两种口径：默认回 pptx 二进制流；`save:true` 落到工程目录 export/ 并回相对路径
  *  - openRequest TTL 60s
  *
- * 用 vitest（沿用 tests/ 口径），不走真实 libreoffice-kit（get /thumb 时经
- * deps.createConverter 注入桩）。
+ * 用 vitest（沿用 tests/ 口径）；core 直接用 src/core 的真实实现，没有替身。
  */
 import { createServer, type Server } from 'node:http'
 import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises'
@@ -362,7 +361,7 @@ describe('host 路由', () => {
       body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] },
     })
 
-    // 默认口径：二进制流 + attachment（客户端 exportPptx 依赖这个）
+    // 默认口径：二进制流 + attachment（工作台导出后由 /export/open-menu 打开成品）
     const bin = await api(`${API_PREFIX}/export`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

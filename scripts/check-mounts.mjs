@@ -35,7 +35,7 @@ function check(label, fn) {
 
 const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
 const patchYml = readFileSync(path.join(root, 'cordis.patch.yml'), 'utf8')
-const nameMatch = /name:\s*([A-Za-z0-9@/_-]+)/.exec(patchYml)
+const nameMatch = /^\s*name:\s*([A-Za-z0-9@/_-]+)/m.exec(patchYml)
 
 check('cordis.patch.yml 声明的 bundle name 与 package.json name 一致', () => {
   if (!nameMatch) throw new Error('cordis.patch.yml 未写出 name 字段')

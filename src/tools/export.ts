@@ -1,6 +1,6 @@
 /**
  * ppt_export — build the project and write a .pptx:
- * { ok, path, revision, check: { pass, blockerCount } }.
+ * { ok, path, revision, check: { pass, blockerCount } | { skipped: true } }.
  *
  * The rule-layer review runs by default and blockers abort the export;
  * `skipCheck: true` bypasses the gate (spec §11). On success the export
@@ -39,13 +39,21 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
         check: {
           type: 'object',
           additionalProperties: true,
-          properties: { pass: { type: 'boolean' }, blockerCount: { type: 'integer' } }
+          properties: {
+            pass: { type: 'boolean' },
+            blockerCount: { type: 'integer' },
+            skipped: { type: 'boolean' }
+          }
         }
       }),
       render: renderSummary((r) => {
         const p = r.path as string | undefined
-        const check = r.check as { pass?: boolean; blockerCount?: number } | undefined
-        return `已导出 ${p ?? ''}（质检 ${check?.pass === true ? '通过' : `阻断 ${check?.blockerCount ?? 0} 项`}）`
+        const check = r.check as { pass?: boolean; blockerCount?: number; skipped?: boolean } | undefined
+        const verdict =
+          check?.skipped === true
+            ? '未质检'
+            : `质检 ${check?.pass === true ? '通过' : `阻断 ${check?.blockerCount ?? 0} 项`}`
+        return `已导出 ${p ?? ''}（${verdict}）`
       })
     },
     execute: async (args, exec) => {
@@ -157,7 +165,7 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
                 warnings: saved.fontEmbed.warnings
               }
             : { mode: 'off' as const, facesEmbedded: [], facesEmbeddedCount: 0, skipped: [], skippedCount: 0, rawBytes: bytes.byteLength, finalBytes: bytes.byteLength, warnings: [] },
-          check: { pass: true, blockerCount: 0 }
+          check: skipCheck === true ? { skipped: true } : { pass: true, blockerCount: 0 }
         }
       } catch (err) {
         return toolError(err)

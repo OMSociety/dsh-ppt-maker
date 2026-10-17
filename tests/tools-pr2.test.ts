@@ -233,7 +233,7 @@ describe('ppt_patch', () => {
 
     expect(result.ok).toBe(true)
     expect(typeof result.out).toBe('string')
-    // L1 passthrogh 的判据是不可建模部件**全部保留**（lostParts 必须为空），
+    // L1 passthrough 的判据是不可建模部件**全部保留**（lostParts 必须为空），
     // unchangedParts 是保留下来部件的计数。
     expect(result.lostParts).toEqual([])
     expect(typeof result.unchangedParts).toBe('number')

@@ -16,7 +16,6 @@ interface ToolResult {
 
 let cwd: string
 let defs: Map<string, ToolDef>
-let disposed: number
 
 function makeCtx(cwdDir: string) {
   defs = new Map()
@@ -54,13 +53,9 @@ function makeCtx(cwdDir: string) {
           if (i >= 0) handlers.get(event)!.splice(i, 1)
         }
       },
+      // 假宿主不跑 teardown：注销路径由 tests/lazy-tools.test.ts 覆盖。
       effect: (fn: () => void | (() => void)) => {
-        const cleanup = fn()
-        if (typeof cleanup === 'function') {
-          const original = cleanup
-          // wrap so teardown counts
-          void original
-        }
+        fn()
       }
     }
   }
@@ -90,7 +85,6 @@ async function fileExists(rel: string): Promise<boolean> {
 
 beforeEach(async () => {
   cwd = await mkdtemp(path.join(tmpdir(), 'ppt-e2e-'))
-  disposed = 0
 })
 
 afterEach(async () => {

@@ -128,8 +128,9 @@ def _style_from_name(raw):
 def system_fonts():
     """系统可用字体：[(family, path, weight, italic)]。
 
-    Windows 先读字体注册表拿真实族名与字重（"微软雅黑 Bold & Microsoft YaHei UI Bold"
-    → 族 `微软雅黑`、weight 700）；注册表读不到时退到目录扫描（族名由文件名推断）。
+    Windows 先读字体注册表拿真实族名与字重（HKLM 与 HKCU 都读；"微软雅黑 Bold &
+    Microsoft YaHei UI Bold" → 族 `微软雅黑`、weight 700）；注册表读不到时退到
+    目录扫描（族名由文件名推断）。
     同族同时保留常规与粗体，供调用方按需挑选。
     """
     global _SYSTEM_FONTS
@@ -137,27 +138,34 @@ def system_fonts():
         entries = []
         try:
             import winreg
-            k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                               r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
-            i = 0
-            while True:
+            key_path = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+            # HKLM（全机）+ HKCU（当前用户）合并：用户级安装的字体只登记在 HKCU。
+            for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
                 try:
-                    name, val, _t = winreg.EnumValue(k, i)
+                    k = winreg.OpenKey(root, key_path)
                 except OSError:
-                    break
-                raw = re.sub(r"\s*\([^)]*\)\s*$", "", str(name)).strip().lower()
-                fn = os.path.basename(str(val))
-                path = next((os.path.join(d, fn) for d in FONT_DIRS
-                             if fn and os.path.isfile(os.path.join(d, fn))), None)
-                if raw and path:
-                    fam, weight, italic = _style_from_name(raw)
-                    file_weight, file_italic = _styles(fn)
-                    if weight is None:
-                        weight = file_weight
-                    italic = italic or file_italic
-                    entries.append((fam, path, weight, italic))
-                i += 1
-            winreg.CloseKey(k)
+                    if root == winreg.HKEY_LOCAL_MACHINE:
+                        raise
+                    continue
+                i = 0
+                while True:
+                    try:
+                        name, val, _t = winreg.EnumValue(k, i)
+                    except OSError:
+                        break
+                    raw = re.sub(r"\s*\([^)]*\)\s*$", "", str(name)).strip().lower()
+                    fn = os.path.basename(str(val))
+                    path = next((os.path.join(d, fn) for d in FONT_DIRS
+                                 if fn and os.path.isfile(os.path.join(d, fn))), None)
+                    if raw and path:
+                        fam, weight, italic = _style_from_name(raw)
+                        file_weight, file_italic = _styles(fn)
+                        if weight is None:
+                            weight = file_weight
+                        italic = italic or file_italic
+                        entries.append((fam, path, weight, italic))
+                    i += 1
+                winreg.CloseKey(k)
         except Exception:
             entries = []
         if not entries:
@@ -228,9 +236,11 @@ def font_file_for(name, bold):
 # ---- 静默降级清单：凡未按 spec 渲染的元素/字段都记一条，结束统一打印 ----
 DROPPED = []
 _NOTE_SEEN = set()
+# 当前页码（1 起）：去重键带上它，同一个 elementId 在多页出现时才不会被并成一条。
+_PAGE_NO = 0
 
 def _note(element_type, element_id, reason):
-    key = (str(element_type), str(element_id), reason)
+    key = (_PAGE_NO, str(element_type), str(element_id), reason)
     if key in _NOTE_SEEN:
         return
     _NOTE_SEEN.add(key)
@@ -449,6 +459,8 @@ def draw_text(draw, el, theme, scale, colors, ox, oy):
     return
 
 def render_page(page, theme, colors, size, scale, page_no):
+    global _PAGE_NO
+    _PAGE_NO = page_no
     w, h = size
     W, H = int(w * scale), int(h * scale)
     img = Image.new("RGB", (W, H), "#FFFFFF")
@@ -547,6 +559,16 @@ def render_page(page, theme, colors, size, scale, page_no):
     img.save(out)
     return out, img
 
+def _scale_arg(text):
+    """--scale 只收正整数：0 与负数会让画布尺寸退化，在 argparse 阶段就拒绝。"""
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"scale 必须是正整数（收到 {text!r}）")
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"scale 必须是正整数（收到 {value}）")
+    return value
+
 def main():
     global manifest, outdir
     DROPPED.clear()
@@ -554,7 +576,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("manifest")
     ap.add_argument("-o", "--output")
-    ap.add_argument("--scale", type=int, default=2)
+    ap.add_argument("--scale", type=_scale_arg, default=2)
     args = ap.parse_args()
     manifest = os.path.abspath(args.manifest)
     base = os.path.dirname(manifest)
@@ -585,8 +607,8 @@ def main():
         ovp = os.path.join(outdir, "overview.jpg")
         ov.save(ovp, quality=92)
         print("overview", ovp)
-    for tp, eid, reason in DROPPED:
-        print(f"dropped: {tp}/{eid}: {reason}", file=sys.stderr)
+    for page_no, tp, eid, reason in DROPPED:
+        print(f"dropped: p{page_no} {tp}/{eid}: {reason}", file=sys.stderr)
     print(f"dropped total: {len(DROPPED)}", file=sys.stderr)
 
 if __name__ == "__main__":

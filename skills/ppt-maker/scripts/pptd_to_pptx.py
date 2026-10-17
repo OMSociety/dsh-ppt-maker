@@ -8,7 +8,7 @@ pptd_to_pptx.py — 本地 .pptd -> .pptx 转换器（纯本地版）
   python pptd_to_pptx.py <deck.pptd> [-o <out.pptx>]
     -o 缺省：输出到项目目录下同名 .pptx（不覆盖已有文件，除非 --force）
 
-支持的元素: text / shape(常见几何形) / line / image / table；icon 与 chart 静默跳过，image 只插本地存在的文件，未知 shapeName 退化为矩形。
+支持的元素: text / shape(常见几何形) / line / image / table；icon 与 chart 记录到 dropped 并打 stderr，image 只插本地存在的文件，未知 shapeName 退化为矩形。
 """
 import os, sys, re, argparse, html
 import yaml
@@ -95,9 +95,12 @@ def find_shape(name):
 # ---- 静默降级清单：凡未按 spec 渲染的元素/字段都记一条，结束统一打印 ----
 DROPPED = []
 _NOTE_SEEN = set()
+# 当前页码（1 起）：表格单元格/形状填充这类 _note 调用深在辅助函数里，拿不到页
+# 上下文；由 main 的页循环写入，去重键带上它，同一 elementId 在多页出现才不会被并成一条。
+_PAGE_NO = 0
 
 def _note(element_type, element_id, reason):
-    key = (str(element_type), str(element_id), reason)
+    key = (_PAGE_NO, str(element_type), str(element_id), reason)
     if key in _NOTE_SEEN:
         return
     _NOTE_SEEN.add(key)
@@ -549,8 +552,10 @@ def add_text(cell_or_tf, content, theme):
             f.color.rgb = rgb(c)
 
 def main():
+    global _PAGE_NO
     DROPPED.clear()
     _NOTE_SEEN.clear()
+    _PAGE_NO = 0
     ap = argparse.ArgumentParser()
     ap.add_argument("manifest")
     ap.add_argument("-o", "--output")
@@ -569,6 +574,7 @@ def main():
     if not pages:
         sys.exit("pages 列表必须非空：deck 至少要有一页")
     for pi, rel in enumerate(pages):
+        _PAGE_NO = pi + 1
         page = yaml.safe_load(open(os.path.join(base, rel), encoding="utf-8"))
         if page.get("notes"):
             _note("page", str(pi), "speaker notes not supported in local track")
@@ -680,8 +686,8 @@ def main():
     prs.save(out)
     print("OK ->", os.path.abspath(out))
     print("slides:", len(prs.slides._sldIdLst))
-    for tp, eid, reason in DROPPED:
-        print(f"dropped: {tp}/{eid}: {reason}", file=sys.stderr)
+    for page_no, tp, eid, reason in DROPPED:
+        print(f"dropped: p{page_no} {tp}/{eid}: {reason}", file=sys.stderr)
     print(f"dropped total: {len(DROPPED)}", file=sys.stderr)
 
 if __name__ == "__main__":

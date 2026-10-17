@@ -76,7 +76,10 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "platform": "web"
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
     }
   },
   "scripts": {
@@ -88,7 +91,7 @@
     "prepack": "node scripts/clean-pycache.mjs"
   },
   "engines": {
-    "node": ">=18",
+    "node": ">=22.19.0",
     "dsh": ">=0.2.0-rc.2 <0.3.0-0"
   },
   "allowScripts": {

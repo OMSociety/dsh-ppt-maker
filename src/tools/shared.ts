@@ -1,5 +1,5 @@
 /**
- * Shared plumbing for the five ppt_* tools.
+ * Shared plumbing for the eleven ppt_* tools.
  *
  * Raw JSON-Schema registration only (plan §2: `ctx.tools.register({name,
  * description, parameters, output, execute})`) — no `defineTool` import, the

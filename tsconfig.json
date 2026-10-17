@@ -10,8 +10,8 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    // tests/ 里的宿主路由（plugin/host/*.mjs）是 plain JS，不写 .d.ts；
-    // 关掉这条才让 TS7016 别响——生产代码（src/）不受影响（src 自己全部是 .ts）。
+    // tests/ 会 import plugin/host/*.mjs（plain JS，没有 .d.ts 声明）；
+    // noImplicitAny:false 才让 TS7016 别响——生产代码（src/）全是 .ts，不受影响。
     "noImplicitAny": false,
     "declaration": false,
     "noEmit": true
