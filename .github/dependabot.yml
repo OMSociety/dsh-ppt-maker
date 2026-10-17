@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # 运行时依赖分三类：引擎与字体链是精确钉版（升级要跑语料对拍与字体测试族，
+  # AGENTS.md 有记录），人工决策；宿主家族 @deepseek-ai/* 区间随宿主版本走，
+  # 人工决策；其余 ^ 浮动的传输/文档依赖与 dev 工具链纳入月度巡检，
+  # 一次 PR 合并（dependabot PR 不跑本仓测试，合并前照常跑验收链）。
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      dev-tooling:
+        patterns: ['*']
+    ignore:
+      - dependency-name: '@deepseek-ai/*'
+      - dependency-name: '@office-kit/*'
+      - dependency-name: 'fontkit'
+      - dependency-name: 'subset-font'
+      # 客户端 bundle require 的是宿主 React 18 种子模块，@types/react 19 的
+      # 类型假定 React 19 运行时——major 必须人工评估（同 dsh-fishpai 的口径）。
+      - dependency-name: '@types/react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
