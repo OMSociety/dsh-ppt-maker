@@ -3,9 +3,11 @@
  * (`skills/ppt-maker/reference/design_system/<family>/<theme>/design.md`).
  *
  * A directory only counts as a theme when its design.md actually reads — the
- * catalog never lists half-shipped folders.
+ * catalog never lists half-shipped folders. An empty or unreadable catalog
+ * throws, so `ppt_themes` reports a broken install instead of "0 themes".
  */
 import { readdir, readFile } from 'node:fs/promises'
+import type { Dirent } from 'node:fs'
 import path from 'node:path'
 
 export interface ThemeInfo {
@@ -22,12 +24,18 @@ export interface ThemeInfo {
 export async function listThemes(packageRoot: string, designSystem?: string): Promise<ThemeInfo[]> {
   const root = path.join(packageRoot, 'skills', 'ppt-maker', 'reference', 'design_system')
   const out: ThemeInfo[] = []
-  const families = await readdir(root, { withFileTypes: true }).catch(() => [] as import('node:fs').Dirent[])
+  let families: Dirent[]
+  try {
+    families = await readdir(root, { withFileTypes: true })
+  } catch (err) {
+    // A missing catalog means a broken install, not "no themes" — say so instead
+    // of handing the tool an empty list that reads like a valid answer.
+    throw new Error(`主题目录不可读（插件安装不完整？）：${root}：${(err as Error).message}`)
+  }
   for (const family of families) {
     if (!family.isDirectory()) continue
-    if (designSystem !== undefined && family.name !== designSystem) continue
     const familyDir = path.join(root, family.name)
-    const themes = await readdir(familyDir, { withFileTypes: true }).catch(() => [] as import('node:fs').Dirent[])
+    const themes = await readdir(familyDir, { withFileTypes: true }).catch(() => [] as Dirent[])
     for (const entry of themes) {
       if (!entry.isDirectory()) continue
       const designFile = path.join(familyDir, entry.name, 'design.md')
@@ -47,5 +55,9 @@ export async function listThemes(packageRoot: string, designSystem?: string): Pr
       })
     }
   }
-  return out.sort((a, b) => a.designSystem.localeCompare(b.designSystem) || a.theme.localeCompare(b.theme))
+  if (out.length === 0) {
+    throw new Error(`主题目录里没有任何可读的 design.md（插件安装不完整？）：${root}`)
+  }
+  const filtered = designSystem === undefined ? out : out.filter((theme) => theme.designSystem === designSystem)
+  return filtered.sort((a, b) => a.designSystem.localeCompare(b.designSystem) || a.theme.localeCompare(b.theme))
 }

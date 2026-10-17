@@ -180,6 +180,17 @@ export async function readSnapshotState(projectDir: string, revision: number): P
  * Write side
  * ------------------------------------------------------------------ */
 
+/**
+ * The one file-write primitive of the project layer: temp file + rename, so a
+ * reader never observes a half-written deck/page/manifest. Snapshot dirs are
+ * already atomic as a whole (`writeSnapshotDir` renames the directory).
+ */
+export async function writeAtomic(target: string, content: string): Promise<void> {
+  const tmp = `${target}.tmp-${process.pid}`
+  await writeFile(tmp, content, 'utf8')
+  await rename(tmp, target)
+}
+
 async function writeSnapshotDir(dir: string, state: SnapshotState, meta: SnapshotMeta): Promise<void> {
   const tmp = `${dir}.tmp-${process.pid}-${Date.now()}`
   await rm(tmp, { recursive: true, force: true })
@@ -359,7 +370,7 @@ export async function listFilesRecursive(root: string, prefix = ''): Promise<str
  * verification happens in the caller).
  */
 export async function materializeSnapshot(projectDir: string, state: SnapshotState): Promise<void> {
-  await writeFile(path.join(projectDir, 'deck.pptd'), state.deck, 'utf8')
+  await writeAtomic(path.join(projectDir, 'deck.pptd'), state.deck)
   const pagesRoot = path.join(projectDir, 'pages')
   await mkdir(pagesRoot, { recursive: true })
   for (const existing of await listFilesRecursive(pagesRoot)) {
@@ -369,6 +380,6 @@ export async function materializeSnapshot(projectDir: string, state: SnapshotSta
   for (const [rel, text] of state.pages) {
     const target = path.join(projectDir, rel)
     await mkdir(path.dirname(target), { recursive: true })
-    await writeFile(target, text, 'utf8')
+    await writeAtomic(target, text)
   }
 }

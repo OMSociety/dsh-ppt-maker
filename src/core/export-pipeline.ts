@@ -92,12 +92,46 @@ export async function saveProjectPptx(pipeline: PipelineResult): Promise<{ bytes
 }
 
 /** Media loader: project-relative path or http(s) URL → bytes. */
-async function loadMediaBytes(projectDir: string, src: string): Promise<Uint8Array> {
-  if (/^https?:\/\//i.test(src)) {
-    const res = await fetch(src)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return new Uint8Array(await res.arrayBuffer())
+const MEDIA_FETCH_TIMEOUT_MS = 30_000
+const MEDIA_FETCH_MAX_BYTES = 50 * 1024 * 1024
+
+/**
+ * Remote media is attacker-influenced (a tool argument or a hand-edited deck),
+ * so the body is capped while streaming — buffering first would let a hostile
+ * or misconfigured URL exhaust memory before the size check runs.
+ */
+async function fetchMediaBytes(src: string): Promise<Uint8Array> {
+  const tooLarge = () => new Error(`远端素材超过 ${MEDIA_FETCH_MAX_BYTES} 字节上限：${src}`)
+  const res = await fetch(src, { signal: AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS) })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const declared = Number(res.headers.get('content-length'))
+  if (Number.isFinite(declared) && declared > MEDIA_FETCH_MAX_BYTES) throw tooLarge()
+  if (!res.body) throw new Error(`远端素材没有响应体：${src}`)
+
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > MEDIA_FETCH_MAX_BYTES) {
+      await reader.cancel()
+      throw tooLarge()
+    }
+    chunks.push(value)
   }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes
+}
+
+async function loadMediaBytes(projectDir: string, src: string): Promise<Uint8Array> {
+  if (/^https?:\/\//i.test(src)) return fetchMediaBytes(src)
   const abs = path.resolve(projectDir, src)
   const rel = path.relative(projectDir, abs)
   if (rel.startsWith('..') || path.isAbsolute(rel)) {

@@ -808,7 +808,7 @@ function applyBackgroundChain(
   } else if (src.imageBytes) {
     const partName = `ppt/media/bg-${slideIndex}-${src.level}.png`
     media.push({ bytes: src.imageBytes, ext: '.png', partName })
-    page.background = { type: 'image', src: `media/${partName.split('/').pop()}` }
+    page.background = { type: 'image', src: `media/${partName.split('/').pop()}`, partName }
   }
   if (src.level !== 'slide') {
     report.degraded.push({
@@ -1126,7 +1126,7 @@ export function mapReverseModel(
           }
         }
       : {}),
-    export: { fontEmbed: 'subset', transition: 'fade', animations: 'auto' },
+    export: { fontEmbed: 'subset', animations: 'auto' },
     pages: pages.map((_, i) => `pages/${slideIndexLabel(i + 1)}.page`),
     source: {
       path: options.sourcePath,

@@ -106,8 +106,9 @@ export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}):
     })
   }
 
-  // Text overflow via pptx-preview (default heuristic measurer; approximate
-  // results are still useful as blockers only when the overflow is gross).
+  // Text overflow via pptx-preview (default heuristic measurer). Overflow is a
+  // blocker only when it is gross; everything else is a warning so that an
+  // approximate measurement can never hard-block an otherwise valid export.
   const audits = auditTextLayout(pres, { reportSoftWraps: options.reportSoftWraps === true })
   for (const issue of audits) {
     const page = issue.slideIndex + 1
@@ -115,7 +116,7 @@ export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}):
     const gross = issue.kind === 'soft-wrap' ? issue.extraLines >= 2 : issue.overflowPx >= 4
     issues.push({
       page,
-      severity: issue.approximate && !gross ? 'warning' : 'blocker',
+      severity: gross ? 'blocker' : 'warning',
       category: textAuditCategory(issue),
       ...(issue.shapeName !== null ? { elementId: issue.shapeName } : {}),
       description: describeTextAudit(issue),

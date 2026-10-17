@@ -803,7 +803,6 @@ function applyTableCells(
     }
   }
 
-  const { getTableCell } = tableApi
   const lastRow = rows.length - 1
   for (let r = 0; r < rows.length; r++) {
     const lastCol = rows[r].length - 1
@@ -901,8 +900,6 @@ function applyCellBorders(
   }
 }
 
-const tableApi = { getTableCell }
-
 /* ------------------------------------------------------------------ *
  * Chart (minimal: bar/column/line/area/pie via ComboChartSpec / PieChartSpec)
  * ------------------------------------------------------------------ */
@@ -931,7 +928,7 @@ function buildChart(
 
   const spec = chartSpecOf(element, data as { cols: string[]; rows: Array<Array<number | string | null>> }, series, resolver, ctx, where)
   if (!spec) return null
-  const shape = addSlideChartSafe(slide, { spec: spec as ChartSpec, x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h) })
+  const shape = addSlideChart(slide, { spec: spec as ChartSpec, x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h) })
   applyCommonGeometry(shape, element as ElementBase, ctx, where)
   return shape
 }
@@ -1001,8 +998,6 @@ function numOrNull(value: number | string | null | undefined): number | null {
   if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value)
   return null
 }
-
-const addSlideChartSafe = addSlideChart
 
 /* ------------------------------------------------------------------ *
  * SVG path → CustomGeometryInput (custom shapes, spec §5 Shape.custom)
@@ -1088,8 +1083,14 @@ function svgPathToCustomGeometry(
         ctx.warnings.push(`${where}：SVG 命令 ${op} 暂不支持，已中断路径解析`)
         break
       } else if (op === 'A') {
-        // rx ry rot large sweep x y — consume and skip
-        i += 7
+        // rx ry rot large sweep x y — the arc itself is skipped, but the
+        // current point must still move to its endpoint so relative commands
+        // that follow stay anchored correctly.
+        num(); num(); num(); num(); num()
+        const x = num()
+        const y = num()
+        cx = rel ? cx + x : x
+        cy = rel ? cy + y : y
       } else {
         break
       }
@@ -1314,7 +1315,9 @@ function applyDeckTheme(pres: PresentationData, theme: Theme | undefined, warnin
   const slots: Record<string, string> = {}
   for (const key of THEME_COLOR_SLOTS) {
     const value = colors[key]
+    if (value === undefined) continue
     if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) slots[key] = value
+    else warnings.push(`主题色 ${key} 不是 #RRGGBB，已被忽略：${JSON.stringify(value)}`)
   }
   if (Object.keys(slots).length > 0) {
     try {
@@ -1420,10 +1423,12 @@ export function createOfficeKitEngine(): DeckEngine {
         if (typeof page.notes === 'string' && page.notes !== '') setSlideNotes(slide, page.notes)
         if (profile === 'reverse' && page.hidden === true) setSlideHidden(slide, true)
 
-        // Transitions: page-level record wins; deck-level fade fills the rest.
+        // Transitions: page-level record wins. Reverse decks only write the
+        // transitions the source actually had — a page without one stays
+        // without one, instead of being dressed up with a deck-level fade.
         if (transitionMode !== 'none') {
-          if (profile === 'reverse' && page.transition) {
-            if (applyTransition(slide, page.transition, ctx, pageLabel)) stats.transitionPages++
+          if (profile === 'reverse') {
+            if (page.transition && applyTransition(slide, page.transition, ctx, pageLabel)) stats.transitionPages++
           } else {
             const curated =
               transitionMode === 'auto'

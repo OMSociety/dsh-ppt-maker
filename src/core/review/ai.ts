@@ -94,6 +94,8 @@ export type AiReviewResult =
       model: string
       pages: number[]
       issues: AiIssue[]
+      /** 非阻断的调用层提示（例如窄校验丢弃的条数）。 */
+      warnings: string[]
       promptVersion: string
     }
   | {
@@ -116,6 +118,26 @@ export interface AiReviewDeps {
 }
 
 export const AI_REVIEW_PROMPT_VERSION = 'ai-review/v1'
+
+/** Hard cap for one AI review call: a stalled stream must degrade, not hang the check. */
+const AI_REVIEW_TIMEOUT_MS = 120_000
+
+function timeoutSignal(parent: AbortSignal | undefined, timeoutMs: number): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error(`AI 质检调用超时（${timeoutMs}ms）`)), timeoutMs)
+  const onAbort = (): void => controller.abort(parent?.reason)
+  if (parent) {
+    if (parent.aborted) controller.abort(parent.reason)
+    else parent.addEventListener('abort', onAbort, { once: true })
+  }
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      clearTimeout(timer)
+      parent?.removeEventListener('abort', onAbort)
+    }
+  }
+}
 
 const VALID_SEVERITIES = new Set(['suggestion', 'polish'])
 
@@ -375,25 +397,32 @@ export async function runAiReview(input: AiReviewInput, deps: AiReviewDeps): Pro
   })
 
   // 4. 调模型（temperature 0，官方 auto-review 同款），解析窄校验。
-  const raw = await readTextStream(
-    deps.llm.stream({
-      provider,
-      model,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content }],
-      temperature: 0,
-      ...(input.signal !== undefined ? { signal: input.signal } : {})
-    })
-  )
+  const timeout = timeoutSignal(input.signal, AI_REVIEW_TIMEOUT_MS)
+  let raw: string
+  try {
+    raw = await readTextStream(
+      deps.llm.stream({
+        provider,
+        model,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content }],
+        temperature: 0,
+        signal: timeout.signal
+      })
+    )
+  } finally {
+    timeout.dispose()
+  }
 
   const { issues, dropped } = parseAiIssues(raw, new Set(input.pages))
-  void dropped // 坏条目静默丢弃；dropped 计数留给调用方需要时加 warning
+  const warnings = dropped > 0 ? [`AI 建议有 ${dropped} 条未通过窄校验，已丢弃`] : []
   return {
     performed: true,
     provider,
     model,
     pages: input.pages,
     issues,
+    warnings,
     promptVersion: AI_REVIEW_PROMPT_VERSION
   }
 }

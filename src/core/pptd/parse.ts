@@ -23,7 +23,9 @@ import {
   ANIMATION_IN_OUT,
   ANIMATION_OPTION_APPLICABILITY,
   ANIMATION_ORIENTATIONS,
+  ANIMATION_SCALE_DIRECTIONS,
   ANIMATION_SHAPES,
+  ANIMATION_SPIN_DIRECTIONS,
   ANIMATION_SPOKES,
   ANIMATION_TEXT_BUILDS,
   ANIMATION_TRIGGERS,
@@ -409,6 +411,42 @@ export function validatePage(page: Page, options: PageValidationOptions = {}): I
   return issues
 }
 
+/** Placeholder defaults must mirror officekit's buildPlaceholder (§11). */
+const PLACEHOLDER_DEFAULT_FILL = '#E5E7EB'
+const PLACEHOLDER_DEFAULT_LABEL_COLOR = '#4B5563'
+/** WCAG 3:1 — placeholder labels are large-ish decorative text, not body copy. */
+const PLACEHOLDER_MIN_CONTRAST = 3
+
+function srgbChannel(value: number): number {
+  const c = value / 255
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+}
+
+/** WCAG relative luminance of `#RRGGBB`; null when the value is a `$key`/`scheme:` ref or malformed. */
+function hexLuminance(color: unknown): number | null {
+  if (typeof color !== 'string') return null
+  const match = /^#([0-9a-fA-F]{6})$/.exec(color.trim())
+  if (!match) return null
+  const hex = match[1]
+  const channels = [0, 2, 4].map((offset) => srgbChannel(parseInt(hex.slice(offset, offset + 2), 16)))
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+}
+
+/** Label-vs-fill contrast of a placeholder, using the renderer's defaults for omitted fields. */
+function placeholderContrast(element: Record<string, unknown>): number | null {
+  const fill = isRecord(element.fill) ? element.fill : undefined
+  // A gradient/image fill has no single background color to measure against.
+  if (fill !== undefined && fill.type !== 'solid') return null
+  const background = typeof fill?.color === 'string' ? fill.color : PLACEHOLDER_DEFAULT_FILL
+  const labelStyle = isRecord(element.labelStyle) ? element.labelStyle : undefined
+  const foreground =
+    typeof labelStyle?.color === 'string' ? labelStyle.color : PLACEHOLDER_DEFAULT_LABEL_COLOR
+  const bg = hexLuminance(background)
+  const fg = hexLuminance(foreground)
+  if (bg === null || fg === null) return null
+  return (Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05)
+}
+
 function validateElement(element: unknown, ctx: { profile: Profile; path: string; seen: Set<string> }): Issue[] {
   const { profile, path } = ctx
   const issues: Issue[] = []
@@ -485,6 +523,16 @@ function validateElement(element: unknown, ctx: { profile: Profile; path: string
         blocker(ERROR_CODES.PlaceholderFieldError, `placeholder.originalType 不在类别表内（${PLACEHOLDER_ORIGINAL_TYPES.join(' / ')}）`, `${path}#originalType`, {
           actual: originalType
         })
+      )
+    }
+    const contrast = placeholderContrast(element)
+    if (contrast !== null && contrast < PLACEHOLDER_MIN_CONTRAST) {
+      issues.push(
+        warning(
+          ERROR_CODES.PlaceholderContrastWarning,
+          `占位标签与底色对比度 ${contrast.toFixed(2)}:1，低于 ${PLACEHOLDER_MIN_CONTRAST}:1`,
+          `${path}#labelStyle`
+        )
       )
     }
   }
@@ -566,6 +614,24 @@ export function validateAnimations(
       issues.push(blocker(ERROR_CODES.AnimationOptionValueError, 'delayMs 必须 >= 0', `${path}#delayMs`, { actual: anim.delayMs }))
     }
 
+    // Reverse dialect must spell duration out: the importer writes null when
+    // the source did not declare one, so a missing key means the producer
+    // forgot it rather than "the source had none".
+    if (
+      profile === 'reverse' &&
+      effectName !== null &&
+      !ANIMATION_DURATION_FORBIDDEN.includes(effectName) &&
+      anim.durationMs === undefined
+    ) {
+      issues.push(
+        warning(
+          ERROR_CODES.AnimationDurationRequiredWarning,
+          `${effectName} 未写 durationMs：逆向方言要求显式给出时长（源未声明时写 null）`,
+          `${path}#durationMs`
+        )
+      )
+    }
+
     issues.push(...validateAnimationOptions(anim, path, effectName))
     issues.push(...validateAnimationSequence(anim, index, animations, path))
 
@@ -634,6 +700,26 @@ function validateAnimationOptions(anim: Animation, path: string, effectName: str
   }
   if (anim.spokes !== undefined && !(ANIMATION_SPOKES as readonly number[]).includes(Number(anim.spokes))) {
     issues.push(blocker(ERROR_CODES.AnimationOptionValueError, 'spokes 取值限 1 / 2 / 3 / 4 / 8', `${path}#spokes`, { actual: anim.spokes }))
+  }
+  if (
+    anim.spinDirection !== undefined &&
+    !(ANIMATION_SPIN_DIRECTIONS as readonly string[]).includes(String(anim.spinDirection))
+  ) {
+    issues.push(
+      blocker(ERROR_CODES.AnimationOptionValueError, 'spinDirection 取值必须是 clockwise / counterclockwise', `${path}#spinDirection`, {
+        allowed: ANIMATION_SPIN_DIRECTIONS
+      })
+    )
+  }
+  if (
+    anim.scaleDirection !== undefined &&
+    !(ANIMATION_SCALE_DIRECTIONS as readonly string[]).includes(String(anim.scaleDirection))
+  ) {
+    issues.push(
+      blocker(ERROR_CODES.AnimationOptionValueError, 'scaleDirection 取值必须是 both / horizontal / vertical', `${path}#scaleDirection`, {
+        allowed: ANIMATION_SCALE_DIRECTIONS
+      })
+    )
   }
   if (anim.spinDegrees !== undefined && (!isFiniteNumber(anim.spinDegrees) || anim.spinDegrees <= 0)) {
     issues.push(blocker(ERROR_CODES.AnimationOptionValueError, 'spinDegrees 必须 > 0', `${path}#spinDegrees`))
@@ -800,6 +886,8 @@ export function parseProject(deckText: string, pageEntries: PageEntry[]): Parsed
 
   const pages = new Map<string, Page>()
   const declared = new Set<string>(Array.isArray(deck?.pages) ? deck.pages.filter((p): p is string => typeof p === 'string') : [])
+  // Only declared pages are consumed; entries the deck does not list are ignored
+  // (the store never hands any over, so an orphan warning here could never fire).
   const provided = new Map(pageEntries.map((entry) => [entry.path.replace(/\\/g, '/'), entry.text]))
 
   for (const path of declared) {
@@ -816,12 +904,6 @@ export function parseProject(deckText: string, pageEntries: PageEntry[]): Parsed
     if (parsed.value) {
       pages.set(key, parsed.value)
       issues.push(...validatePage(parsed.value, { profile, path: key, themeKeys }))
-    }
-  }
-
-  for (const key of provided.keys()) {
-    if (!declared.has(key)) {
-      issues.push(warning(ERROR_CODES.SchemaError, `页文件未被 deck.pages 引用（孤儿页）：${key}`, key))
     }
   }
 
