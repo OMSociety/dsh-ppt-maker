@@ -6,7 +6,7 @@
  *  - fsType 带 NoSubset 位 → 直通不子集（许可要求）
  *  - fontEmbed=subset（默认） → subset-font（HarfBuzz WASM）子集 + 保底字符集
  *
- * 保底字符集：ASCII 可打印 + 常用中/英文标点 + 数字全半角 + 当前 deck 去重字集
+ * 保底字符集：ASCII 可打印 + 常用中/英文标点 + 全角/半角数字与字母 + 当前 deck 去重字集
  * （防空页/后补字符豆腐块；文档已声明「新增字符会出现豆腐块」）。
  *
  * 失败回退：subsetFont 抛错 → 返回原字体 + warning（镶嵌调用方记账）。
@@ -37,8 +37,10 @@ const MIN_CHARSET = (() => {
   // 常用中文标点
   out.push('　', '。', '，', '、', '；', '：', '？', '！', '「', '」', '『', '』', '（', '）', '《', '》', '【', '】',
     '—', '–', '…', '·', '〈', '〉')
-  // 全角数字与全角字母（少量）
+  // 全角数字（0xFF10-0xFF19）与全角字母（A-Z / a-z：0xFF21-0xFF3A、0xFF41-0xFF5A）
   for (let i = 0; i < 10; i++) out.push(String.fromCharCode(0xff10 + i))
+  for (let i = 0xff21; i <= 0xff3a; i++) out.push(String.fromCharCode(i))
+  for (let i = 0xff41; i <= 0xff5a; i++) out.push(String.fromCharCode(i))
   return out.join('')
 })()
 

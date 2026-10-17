@@ -209,6 +209,28 @@ describe('字体子系统 · usage 收集', () => {
     // 去重生效：'1' 只出现一次
     expect(usage.charset.split('1').length - 1).toBe(1)
   })
+
+  it('富文本 span 的 font-family 收进字体清单（按 regular 槽记）', () => {
+    const richPage: Page = {
+      elements: [
+        {
+          elementId: 'rt',
+          elementType: 'text',
+          bounds: [0, 0, 200, 40],
+          content: {
+            text:
+              '<p><span style="font-size:20px; font-family:Georgia">A</span>' +
+              '<span style=\'font-family:"Arial, 微软雅黑"\'>B</span></p>'
+          }
+        }
+      ]
+    }
+    const usage = collectFontUsage(deck, [richPage])
+    expect(usage.typefaces.get('Georgia')).toEqual(new Set(['regular']))
+    // 引号包住的逗号列表按 fontFamily:{latin, ea} 同口径拆开
+    expect(usage.typefaces.get('Arial')).toEqual(new Set(['regular']))
+    expect(usage.typefaces.get('微软雅黑')).toEqual(new Set(['regular']))
+  })
 })
 
 describe('字体子系统 · EOT 封装与四件套注入', () => {

@@ -1,18 +1,15 @@
 /**
  * embed.ts — OOXML 字体嵌入后处理（spike 六轮实测背书）
  *
- * 幂等四件套：
- *   1) [Content_Types].xml  加 per-part Override（幂等：已存在则跳）
- *   2) ppt/_rels/presentation.xml.rels  加 font Relationship（rId max+1 起分配）
+ * 每次调用都写一整套新部件：
+ *   1) [Content_Types].xml  加 per-part Override
+ *   2) ppt/_rels/presentation.xml.rels  加 font Relationship（rId 从现有 max+1 起分配）
  *   3) ppt/fonts/fontN.fntdata  写 EOT 封装字节（N 取现有最大 +1，逐 face 递增）
  *   4) ppt/presentation.xml   根属性 embedTrueTypeFonts / saveSubsetFonts +
  *      p:embeddedFontLst 条目（插 notesSz 之后 / defaultTextStyle 之前）
  *
- * 幂等口径：同一 fontPlan 跨版本再注入时 ——
- *   - Content_Types Override 按 PartName 查重（有则跳）
- *   - rels Relationship 按 (Target, Type) 查重（有则复用既有 rId，不新增）
- *   - fntdata 部件按「是否已有 rels 指向该 Target 且部件存在」判存（有则不重写）
- *   - embeddedFontLst 条目按 typeface 归并（同族复用，仅补缺槽）
+ * 非幂等：同一 face 再调一次会再写一套 fntdata 与 Relationship；调用方须保证一次导出
+ * 只调一次（口径见下方主入口注释）。要重嵌就从「未嵌字体」的原始产物重跑。
  *
  * 重打包防御：[Content_Types].xml 必须第一个 zip 条目（OPC 惯例）；
  * fntdata DEFLATE 6，其余 stored 原样回写（不重编码 XML 之外的任何字节）。
@@ -108,13 +105,12 @@ export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanE
     if (!parts[p]) throw new Error(`missing part: ${p}`)
   }
 
-  // 为每条 fontPlan 分配稳定的 partName + rId
+  // 为每条 fontPlan 分配 partName + rId
   interface Assignment {
     face: FontPlanEntry
     partName: string
     relTarget: string
     rid: string
-    isNew: boolean
   }
   const assignments: Assignment[] = []
 
@@ -134,11 +130,11 @@ export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanE
     const relTarget = `fonts/font${nextFontIdx}.fntdata`
     const partName = `ppt/${relTarget}`
     const rid = `rId${++maxRId}`
-    assignments.push({ face, partName, relTarget, rid, isNew: true })
+    assignments.push({ face, partName, relTarget, rid })
     nextFontIdx++
   })
 
-  // ---- 1) [Content_Types].xml：per-part Override（幂等：PartName 已存在则跳）----
+  // ---- 1) [Content_Types].xml：per-part Override（同名 PartName 不重复写）----
   {
     const doc = xmlDocOf(parts['[Content_Types].xml'])
     const root = rootOf(doc, '[Content_Types].xml')
@@ -156,11 +152,10 @@ export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanE
     parts['[Content_Types].xml'] = serialize(doc)
   }
 
-  // ---- 2) presentation.xml.rels：为新增 face 写 Relationship（既有复用）----
+  // ---- 2) presentation.xml.rels：为本轮 fontPlan 写 Relationship（逐 face 分配 rId）----
   {
     const relsRoot = rootOf(relsDoc, 'ppt/_rels/presentation.xml.rels')
     for (const a of assignments) {
-      if (!a.isNew) continue
       const rel = relsDoc.createElement('Relationship')
       rel.setAttribute('Id', a.rid)
       rel.setAttribute('Type', REL_TYPE_FONT)
@@ -171,11 +166,10 @@ export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanE
     parts['ppt/_rels/presentation.xml.rels'] = serialize(relsDoc)
   }
 
-  // ---- 3) 写 ppt/fonts/fontN.fntdata（EOT 封装；既有部件跳过重写）----
+  // ---- 3) 写 ppt/fonts/fontN.fntdata（EOT 封装）----
   const metaByTypeface = new Map<string, EotFontMeta>()
   const writtenParts: string[] = []
   for (const a of assignments) {
-    if (!a.isNew && parts[a.partName] !== undefined) continue
     const { eot, meta } = wrapEot(a.face.bytes)
     parts[a.partName] = eot
     writtenParts.push(a.partName)

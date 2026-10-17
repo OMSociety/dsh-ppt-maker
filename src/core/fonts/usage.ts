@@ -4,6 +4,7 @@
  * 覆盖范围：
  *  - deck.pptd.theme.textStyles[*].fontFamily（string 或 {latin, ea}）
  *  - pages/* 各元素 content.fontFamily（text/shape 内文本）
+ *  - content.text / richText 富文本里的 <span style="font-family:…">（按 regular 槽记）
  *  - table cell 的 textStyle 内联 fontFamily
  *  - chart 子组件 fontFamily（TitleConfig/LegendConfig/DataLabelConfig/AxisConfig.label 等）
  *  - 元素内联 textStyle.fontFamily（reverse 方言特有）
@@ -42,6 +43,50 @@ function slotFrom(bold: boolean | undefined, italic: boolean | undefined): FontS
   return 'regular'
 }
 
+/** 记一个 (字体, 槽位)；非 regular 也保底收 regular（合成仿粗/仿斜的依据） */
+function addFont(fonts: Map<string, Set<FontSlot>>, name: string, slot: FontSlot): void {
+  let slots = fonts.get(name)
+  if (!slots) {
+    slots = new Set()
+    fonts.set(name, slots)
+  }
+  slots.add(slot)
+  if (slot !== 'regular') slots.add('regular')
+}
+
+/* ------------------------------------------------------------------ *
+ * 富文本内联字体
+ * ------------------------------------------------------------------ */
+
+/** 起始 <span> 标签（PPTD 的内联样式只允许写在 span 上，见 reference/pptd.md「Inline styles」） */
+const SPAN_TAG_RE = /<span\b[^>]*>/gi
+/** 标签内的 style 属性（双引号或单引号） */
+const STYLE_ATTR_RE = /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i
+
+/**
+ * 收集富文本串里 <span style="font-family:…"> 声明的字体。
+ * 这层声明覆盖不到 content.fontFamily（元素级）上，漏收会导致该字体不被嵌入。
+ * span 的内联样式只允许 color / font-size / font-family / background-color，
+ * 没有粗斜体，因此一律按 regular 槽记。
+ */
+function scanRichTextFonts(html: string, fonts: Map<string, Set<FontSlot>>): void {
+  if (!/font-family/i.test(html)) return
+  for (const tag of html.match(SPAN_TAG_RE) ?? []) {
+    const attr = STYLE_ATTR_RE.exec(tag)
+    if (!attr) continue
+    for (const decl of (attr[1] ?? attr[2] ?? '').split(';')) {
+      const colon = decl.indexOf(':')
+      if (colon < 0) continue
+      if (decl.slice(0, colon).trim().toLowerCase() !== 'font-family') continue
+      // 值形如 "Arial, 微软雅黑"：去引号后按逗号拆（与 fontFamily:{latin, ea} 同口径）
+      for (const part of decl.slice(colon + 1).split(',')) {
+        const name = part.trim().replace(/^["']|["']$/g, '').trim()
+        if (name) addFont(fonts, name, 'regular')
+      }
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ *
  * 深扫描：theme → pages → cell → chart 子组件
  * ------------------------------------------------------------------ */
@@ -51,15 +96,8 @@ function scanStyle(style: Record<string, unknown>, into: Map<string, Set<FontSlo
   if (ff === undefined) return
   const tmp = new Set<string>()
   collectFontFamily(ff, tmp)
-  const bold = style.bold === true
-  const italic = style.italic === true
-  const slot = slotFrom(bold, italic)
-  for (const name of tmp) {
-    if (!into.has(name)) into.set(name, new Set())
-    into.get(name)!.add(slot)
-    // 嵌完带 bold/italic 的内容时，确保至少 regular 槽位也收（合成仿粗/仿斜的依据）
-    if (slot !== 'regular') into.get(name)!.add('regular')
-  }
+  const slot = slotFrom(style.bold === true, style.italic === true)
+  for (const name of tmp) addFont(into, name, slot)
 }
 
 function scanText(text: unknown, chars: Set<string>): void {
@@ -76,8 +114,12 @@ function scanElement(el: Record<string, unknown>, fonts: Map<string, Set<FontSlo
   if (el.content && typeof el.content === 'object') {
     const content = el.content as Record<string, unknown>
     scanStyle(content, fonts)
-    scanText(content.text, chars)
-    if (content.richText) scanText(typeof content.richText === 'string' ? content.richText : '', chars)
+    for (const field of ['text', 'richText'] as const) {
+      const html = content[field]
+      if (typeof html !== 'string') continue
+      scanText(html, chars)
+      scanRichTextFonts(html, fonts)
+    }
   }
   // textStyle 内联（reverse 方言元素级）
   if (el.textStyle && typeof el.textStyle === 'object') scanStyle(el.textStyle as Record<string, unknown>, fonts)

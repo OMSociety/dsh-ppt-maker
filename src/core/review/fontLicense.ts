@@ -8,6 +8,7 @@
  *      Restricted (0x0002) / BitmapOnly (0x0200) → blocker（导不出也用不上）
  *      Preview&Print (0x0004) → warning（目标机只读提示）
  *      NoSubset (0x0100) → warning（将整字体嵌入，体积大）
+ *      CFF 轮廓（OTTO）→ warning（EOT 只封装 glyf TTF，导出时该字体会被跳过嵌入）
  *  - 解析不到（缺字体）→ warning + 替代建议（ALTERNATIVES）
  *
  * 与 review/index.ts 集成：独立于「布局/结构」类，按每条 typeface 一条 issue。
@@ -26,11 +27,7 @@ export async function reviewFontLicenses(
 ): Promise<ReviewIssue[]> {
   const usage = collectFontUsage(deck, pages)
   const issues: ReviewIssue[] = []
-  // 每个 typeface 只取第一次见到的 slot 做检查（同一族的字幕格位许可位理应一致）
-  const seen = new Set<string>()
   for (const [typeface, slots] of usage.typefaces) {
-    if (seen.has(typeface)) continue
-    seen.add(typeface)
     const firstSlot: FontSlot = slots.has('regular') ? 'regular' : ([...slots][0] ?? 'regular')
 
     let face: Awaited<ReturnType<typeof resolveTypeface>> | null = null
@@ -94,6 +91,15 @@ export async function reviewFontLicenses(
         category: 'structure',
         description: `字体 ${typeface} 禁止子集化（No Subset）：将整字体嵌入（体积大）`,
         suggestion: lic.label
+      })
+    }
+    if (face.outline === 'CFF') {
+      issues.push({
+        page: 0,
+        severity: 'warning',
+        category: 'structure',
+        description: `字体 ${typeface} 为 CFF 轮廓（OTF）：EOT 只封装 glyf 轮廓的 TTF，导出时该字体会被跳过嵌入`,
+        suggestion: '改用同一字体的 TTF 版本，或把 deck.export.fontEmbed 设为 off 跳过嵌入'
       })
     }
   }

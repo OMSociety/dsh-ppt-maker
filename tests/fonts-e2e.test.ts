@@ -13,7 +13,7 @@
  * 字体字节本身能否被 PowerPoint 的 t2embed 收下，属 spike 期的 headless 裁决范围，
  * 结论记在 docs/DECISIONS.md；本测试只守结构面。
  */
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -33,7 +33,8 @@ const FONT_CANDIDATES = [
   'C:\\Windows\\Fonts\\arial.ttf'
 ].filter((p): p is string => typeof p === 'string' && p.length > 0)
 
-const TEST_FONT = FONT_CANDIDATES.find((p) => existsSync(p)) ?? null
+// 存在且非空：0 字节的占位文件能过 existsSync，但会在 fontkit 解析处炸掉。
+const TEST_FONT = FONT_CANDIDATES.find((p) => existsSync(p) && statSync(p).size > 0) ?? null
 
 /** 族名取字体 name 表（platform 3 / lang 0x409），与导出链路解析字体同一口径 */
 const TEST_FAMILY = TEST_FONT === null ? null : familyOf(TEST_FONT)
