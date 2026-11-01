@@ -1,6 +1,6 @@
 {
   "name": "dsh-ppt-maker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "DeepSeek Harness plugin that bundles the ppt-maker skill and the PPT tool surface: create, inspect, edit, undo and redo a PPTD project that exports to a locally generated .pptx.",
   "author": "OMSociety (https://github.com/OMSociety)",
