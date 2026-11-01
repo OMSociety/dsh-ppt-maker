@@ -62,6 +62,8 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 > **Dependencies:** the main pipeline is pure TypeScript with no Python; `@deepseek-ai/libreoffice-kit@0.1.2`, used by `ppt_render` and QA, is a hard dependency (about 183MB per platform, installed with the package). The Python scripts under `skills/ppt-maker/scripts/` are an escape hatch only — see the "Python escape hatch" section in SKILL.md.
 
+> **Platforms:** the engine ships per platform. Windows (x64/arm64) and macOS (x64/arm64) get native packages; Linux has none (no `libreoffice-kit-linux-*` on npm), so rendering and QA fall back to WASM. CI runs the same suite on `windows-latest` and `ubuntu-latest` (minus the font-embedding assertions) and both pass; exports are produced by the same code path, without a cross-platform byte comparison. macOS has no CI coverage yet.
+
 **Getting started**
 
 1. Say "make me a presentation" in the chat (or explicitly invoke the `ppt-maker` skill) → the eleven `ppt_*` tools come in

@@ -64,6 +64,8 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 > **依赖：**主链全 TS、无 Python；`ppt_render` 与质检用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。`skills/ppt-maker/scripts/` 下的 Python 脚本仅作逃生舱，见 SKILL.md「Python 逃生舱」。
 
+> **平台：**引擎按平台分发——Windows（x64/arm64）与 macOS（x64/arm64）用原生包，Linux 没有原生包（npm 上不存在 `libreoffice-kit-linux-*`），渲染与质检改走 WASM。CI 在 `windows-latest` 与 `ubuntu-latest` 上跑同一套用例（字体嵌入断言除外），两个平台都通过；导出产物同源，未做跨平台逐字节对比。macOS 目前没有 CI 覆盖。
+
 **装完怎么用**
 
 1. 对话里说「帮我做一份 PPT」（或显式 invoke `ppt-maker` 技能）→ 十一个 `ppt_*` 工具进场
