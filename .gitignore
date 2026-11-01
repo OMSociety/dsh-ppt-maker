@@ -4,6 +4,8 @@ __pycache__/
 node_modules/
 .preview/
 *.pptx
+# 语料例外：tests/corpus/ 下的脱敏 pptx 入库，其余 pptx 仍视作产物
+!tests/corpus/*.pptx
 *.pptd.bak
 # pnpm 本地装依赖的副产物（仓库锁文件口径是 package-lock.json）
 pnpm-lock.yaml
