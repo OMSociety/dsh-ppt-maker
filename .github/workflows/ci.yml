@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 按锁文件安装
+        run: npm ci --no-audit --no-fund
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 挂载面核对
+        run: npm run check:mounts
+
+      - name: 构建
+        run: npm run build
+
+      - name: 构建产物漂移核对
+        run: npm run check:build
+
+      - name: 全量测试
+        run: npx vitest run --no-file-parallelism
