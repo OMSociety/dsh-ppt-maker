@@ -110,7 +110,7 @@ npm run check:build
 NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ```
 
-全量 24 个测试文件 / 245 个用例，约 40s（高负载下 fonts-embed 单文件可到 85s）。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
+全量 24 个测试文件 / 245 个用例，约 40s（高负载下 fonts-embed 单文件可到 85s）。CI 跳过 `tests/fonts-embed.test.ts`（断言子集字体体积，依赖本机中文字体，云端 runner 上没有这些字体），其余 23 文件 / 229 用例在云端跑。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
 
 面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 11 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
