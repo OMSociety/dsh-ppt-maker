@@ -1,7 +1,7 @@
 # AGENTS.md — dsh-ppt-maker Agent 宪法
 
 适用范围：本仓库全部目录。这是接手开发的第一入口；对外说明见 [README.md](README.md)。
-最后更新：2026-10-16
+最后更新：2026-11-01
 
 ## 项目概览
 
@@ -10,12 +10,12 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 
 | 项 | 事实 |
 |---|---|
-| 语言 / 运行时 | TypeScript 5.9、ESM、Node >= 22.19（引擎 @office-kit/pptx 0.24.0 要 22.18、libreoffice-kit 0.1.2 要 22.19；本机实测 v24.16.0） |
+| 语言 / 运行时 | TypeScript 5.9、ESM、Node >= 22.19（引擎 @office-kit/pptx 0.24.0 要 22.18、libreoffice-kit 0.1.2 要 22.19） |
 | 构建 | 宿主半侧 tsup：`src/` → `lib/index.js`；客户端半侧 esbuild：`client/` → `lib/client.js` |
 | 测试 | vitest 3.2，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
 | 包管理 | npm，锁文件 `package-lock.json`；根目录的 `pnpm-lock.yaml` / `pnpm-workspace.yaml` 未入库，勿提交 |
 | 引擎（pin 死） | `@office-kit/pptx@0.24.0`、`@deepseek-ai/libreoffice-kit@0.1.2`（约 183MB，随包安装） |
-| 宿主契约 | `@deepseek-ai/dsh-*` peerDependencies，范围 `>=0.2.0-rc.2 <0.3.0-0` |
+| 宿主契约 | `@deepseek-ai/dsh-*` peerDependencies，范围 `>=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-rc.1 <0.3.0-0`；每条 peer 标 `optional`，让 npm 不做硬拒 |
 
 文档索引（按读序）：
 
@@ -29,22 +29,22 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 |---|---|
 | 安装依赖 | `npm install` |
 | 构建两类产物 | `npm run build` |
-| 全部测试 | `npm test`（先设 12GB 堆并串行跑，见下） |
+| 全部测试 | `npx vitest run`（先设 12GB 堆并串行跑，见下） |
 | 单文件测试 | `npx vitest run tests/host.test.ts` |
 | 类型检查（两个 tsconfig） | `npm run typecheck` |
 | 挂载面静态核对 | `npm run check:mounts` |
 | 构建产物漂移核对 | `npm run check:build`（须在 build 之后） |
 
-测试必须带大堆并串行跑，否则本机会 OOM 或让 vitest worker 请求超时（当时实测：默认堆下 234 个用例跑到一半 `FATAL ERROR: invalid table size`；8GB 堆并行跑完用例后仍偶发 `[vitest-worker]: Timeout calling "onTaskUpdate"`，让整轮以 exit 1 收尾）：
+测试要大堆并串行跑：堆不足时会在跑到一半报 `FATAL ERROR: invalid table size`；并行跑则可能用例全过后仍以 exit 1 收尾，报 `[vitest-worker]: Timeout calling "onTaskUpdate"`。旗标要直接交给 vitest——`npm test -- <旗标>` 会被 npm 12 当成自己的配置，报 `Unknown cli flag: --file-parallelism`：
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=12288 npm test -- --no-file-parallelism
+NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 npx vitest run tests/host.test.ts
 ```
 
-Windows PowerShell 里等价写法是先把环境变量设进当前会话，再跑 `npm test -- --no-file-parallelism`：`$env:NODE_OPTIONS='--max-old-space-size=12288'`。
+Windows PowerShell 里先设环境变量，再跑第二句：`$env:NODE_OPTIONS='--max-old-space-size=12288'`。
 
-全量测试还有第二个前置：`tests/corpus/*.pptx` 不在 git 里（被 `.gitignore` 的 `*.pptx` 排除），缺语料时语料测试直接 ENOENT。在没有这份语料的机器上，验收链只能跑到语料测试以外的部分；补齐办法见「已知风险区」那一行。
+`tests/corpus/*.pptx` 随仓库分发（`.gitignore` 的 `*.pptx` 为它开了 `!tests/corpus/*.pptx` 例外），干净克隆即可跑全量。`tests/corpus/sensitive-words.txt` 含来源专名，仍只在本机存在；缺它时红线用例标为 skipped。
 
 字体用例取系统已装中文字体（微软雅黑/等线/黑体/楷体），候选不在位时 skip+原因；PPT_TEST_FONT 仅 embed/e2e 生效。
 
@@ -95,24 +95,22 @@ Windows PowerShell 里等价写法是先把环境变量设进当前会话，再�
 - 禁止在 `src/` 里回落 `process.cwd()`。原因：会话 cwd 只能取 `exec.agent.session.id` → `ctx.sessions.get(id).header.cwd`，回落会把工程写进宿主进程目录；取不到就报错。
 - 禁止手改 `lib/index.js`、`lib/client.js`。原因：二者是 tsup / esbuild 产物，且 EOL 由 `.gitattributes` 钉死为 `lf`，重新落盘别转成 CRLF；要改先改 `src/` 或 `client/` 再 `npm run build`。
 - 禁止在 `client/` 里 import `@deepseek-ai/*` 宿主包。原因：浏览器模块表只有 9 项平台种子，多一个依赖整块面板不加载（守卫测试会红）。
-- 禁止把 `WorkBench/corpus/` 原始语料提交进仓库（含真实人名、机构、校徽）。`tests/corpus/` 只收脱敏变体，红线抽查在 `tests/corpus-roundtrip.test.ts`。
+- 禁止把未脱敏的原始语料提交进仓库（含真实人名、机构、校徽）；原始素材留在仓库之外。`tests/corpus/` 只收脱敏变体，改写与复查用 `scripts/desensitize-corpus.mjs`，红线抽查在 `tests/corpus-roundtrip.test.ts`。
 - 禁止未获用户确认就 push 远端。原因：推送时机由用户定（多 PR 一起推），本地提交不受限。
 
 ## 验收标准
 
-本仓没有 CI（无 `.github/workflows`），验收在本地跑。改动完成 = 下列全部通过：
+`.github/workflows/ci.yml` 在 windows-latest 上跑下面五步；本地验收同样是这五步，改动完成 = 全部通过：
 
 ```bash
 npm run typecheck
 npm run build
 npm run check:mounts
 npm run check:build
-NODE_OPTIONS=--max-old-space-size=12288 npm test -- --no-file-parallelism
+NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ```
 
-PowerShell 下最后一条改成分两句：先 `$env:NODE_OPTIONS='--max-old-space-size=12288'`，再 `npm test -- --no-file-parallelism`。
-
-跑之前确认 `tests/corpus/` 里 20 份语料在位。本机实测基线（2026-10-18）：typecheck 两个 tsconfig 均 0 错；build 后 `git status` 干净且 `check:build` 报「lib/ 与 git 一致」；全量 24 个测试文件 / 245 个用例通过，约 70s（高负载下 fonts-embed 单文件可到 85s，整轮约 2 分钟）。
+全量 24 个测试文件 / 245 个用例，约 40s（高负载下 fonts-embed 单文件可到 85s）。CI 跳过 `tests/fonts-embed.test.ts`（断言子集字体体积，依赖本机中文字体，云端 runner 上没有这些字体），其余 23 文件 / 229 用例在云端跑。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
 
 面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 11 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
@@ -120,13 +118,13 @@ PowerShell 下最后一条改成分两句：先 `$env:NODE_OPTIONS='--max-old-sp
 
 - 分支：`main` 是发布线，工作分支用 `feat/<主题>` 或 `fix/<主题>`（近例：`feat/history-qa-transitions`、`fix/right-rail-collapse-invisible`）。
 - Commit：Conventional Commits + 中文描述，scope 用改动所在的面：`engine` / `tools` / `host` / `workbench` / `fonts` / `reverse` / `docs` / `chore`，如 `feat(engine): …`、`fix(workbench): …`、`docs(readme): …`。
-- PR：无 CI，合并前在本地跑完上节五条。
+- PR：以 `.github/workflows/ci.yml` 的结果为准，合并前本地再跑一遍「验收标准」那五步。
 
 ## 已知风险区
 
 | 路径 | 风险 | 改动前后置动作 |
 |---|---|---|
-| `tests/corpus/*.pptx` | 20 份语料被 `.gitignore` 的 `*.pptx` 排除，**一份都不在 git 里**：新克隆上语料测试直接 ENOENT，只有本机有文件；文件名与用例里的语料名一律中性 | 要随包带语料就由维护者 `git add -f` 入库一次；生成与脱敏管线在本机暂存区 `WorkBench/corpus-build/`，不在仓库里，换机只能重做 |
+| `tests/corpus/*.pptx` | 20 份语料随仓库分发，文件名与用例名一律中性；能倒推到具体会议的字面量（地点、日期、届次）已换成占位 | 新增或替换语料：先补 `scripts/desensitize-corpus.mjs` 的 `RULES` 再跑，跑完用 `--check` 复查为 0 命中，最后跑 `npx vitest run tests/corpus-roundtrip.test.ts` |
 | `tests/host-contract.test.ts` | 硬断言工具名集合、注册数与 `output.schema` 的关键词子集 | 加删工具或改 schema 后必跑 |
 | `src/index.ts` | `core: {...}` 接线漏传函数 → 运行时 `is not a function` | 改后 `npm run build`；`tests/host-bundle.test.ts` 是哨兵 |
 | `src/tools/*.ts` | 缺 `output` schema → 宿主拒收、被吞成 warn，工具静默全灭 | 每个工具都要 output schema；跑 `tests/tools-e2e.test.ts` |
@@ -141,7 +139,7 @@ PowerShell 下最后一条改成分两句：先 `$env:NODE_OPTIONS='--max-old-sp
 | 症状（可检索片段） | 处理 |
 |---|---|
 | `FATAL ERROR: invalid table size` / `Allocation failed - JavaScript heap out of memory` | 设 12GB 堆再跑：`$env:NODE_OPTIONS='--max-old-space-size=12288'` |
-| `[vitest-worker]: Timeout calling "onTaskUpdate"`（用例其实全过，却以 exit 1 收尾） | 本机高负载下 worker RPC 超时，非用例失败：加 `--no-file-parallelism` 或加大堆重跑 |
+| `[vitest-worker]: Timeout calling "onTaskUpdate"`（用例其实全过，却以 exit 1 收尾） | 高负载下 worker RPC 超时，非用例失败：加 `--no-file-parallelism` 或加大堆重跑 |
 | `Test timed out in 20000ms` | 重文件（fonts-embed / tools-e2e / qa-ledger / fonts-resolver）单独跑 `npx vitest run tests/<文件>`；全局超时在 `vitest.config.ts` |
 | `[check-build] lib/ 有未提交漂移` | `npm run build`，把两个产物一起提交 |
 | `[check-mounts] … 不一致` | 对齐 `cordis.patch.yml` 的 name 与 `package.json` 的 name、`dsh` 段，再 build |
