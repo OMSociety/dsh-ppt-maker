@@ -43,7 +43,8 @@
     "cordis.patch.yml",
     "README.md",
     "README_en.md",
-    "LICENSE"
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "peerDependencies": {
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.2 <0.3.0-0",
@@ -80,7 +81,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-sidebar-right"
       ]
-    }
+    },
+    "manifestVersion": 1
   },
   "scripts": {
     "build": "tsup && node scripts/build-client.mjs",
@@ -95,6 +97,6 @@
     "dsh": ">=0.2.0-rc.2 <0.3.0-0"
   },
   "allowScripts": {
-    "esbuild@0.27.7": true
+    "esbuild": true
   }
 }
