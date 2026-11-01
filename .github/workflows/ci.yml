@@ -10,7 +10,11 @@ permissions:
 
 jobs:
   verify:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
       NODE_OPTIONS: --max-old-space-size=12288
@@ -36,6 +40,9 @@ jobs:
 
       - name: 构建产物漂移核对
         run: npm run check:build
+
+      - name: 发布物清单
+        run: npm run check:pack
 
       # fonts-embed 断言子集字体体积，依赖本机中文字体；云端 runner 取不到，单独在本机跑
       - name: 全量测试（字体嵌入用例除外）

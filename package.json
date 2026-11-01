@@ -110,7 +110,8 @@
     "check:mounts": "node scripts/check-mounts.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json",
-    "prepack": "node scripts/clean-pycache.mjs"
+    "prepack": "node scripts/clean-pycache.mjs",
+    "check:pack": "node scripts/check-pack.mjs"
   },
   "engines": {
     "node": ">=22.19.0",
