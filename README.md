@@ -1,8 +1,8 @@
 <p align="center"><strong>中文</strong> · <a href="README_en.md">English</a></p>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" alt="PPT 创客" width="160">
-  <h1>PPT 创客 dsh-ppt-maker</h1>
+<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT 创客"><br>PPT 创客 dsh-ppt-maker</h1>
+
   <p>创建 / 编辑 / 逆向 / 质检 / 导出 PPT 的 DeepSeek Harness 插件，本地纯 TS 引擎直出最终 .pptx。</p>
   <p>模型用十一个 <code>ppt_*</code> 工具干活，你在右侧栏工作台里同看同改——双击文字就地编辑、拖拽调页序、导出后一键打开成品。</p>
 

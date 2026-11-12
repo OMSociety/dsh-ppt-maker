@@ -1,8 +1,8 @@
 <p align="center"><a href="README.md">中文</a> · <strong>English</strong></p>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" alt="PPT Maker" width="160">
-  <h1>PPT Maker (dsh-ppt-maker)</h1>
+<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT Maker"><br>PPT Maker (dsh-ppt-maker)</h1>
+
   <p>A DeepSeek Harness plugin for creating, editing, reverse-engineering, checking and exporting presentations — a local, pure-TypeScript engine builds the final .pptx directly.</p>
   <p>The model works through eleven <code>ppt_*</code> tools while you follow along and edit in the right-hand workbench — double-click to edit text in place, drag to reorder pages, and open the exported file with one click.</p>
 
