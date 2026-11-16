@@ -15,7 +15,7 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 | 测试 | vitest 3.2，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
 | 包管理 | npm，锁文件 `package-lock.json`；根目录的 `pnpm-lock.yaml` / `pnpm-workspace.yaml` 未入库，勿提交 |
 | 引擎（pin 死） | `@office-kit/pptx@0.24.0`、`@deepseek-ai/libreoffice-kit@0.1.2`（约 183MB，随包安装） |
-| 宿主契约 | `@deepseek-ai/dsh-*` peerDependencies，范围 `>=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-rc.1 <0.3.0-0`；每条 peer 标 `optional`，让 npm 不做硬拒 |
+| 宿主契约 | 面板与工具依赖的宿主包由 DSH 运行时提供：`package.json` 不写 `engines.dsh`，peer 只列运行期 import 的宿主包名（`@deepseek-ai/dsh-native-command`，区间 `*`，标 `optional`） |
 
 文档索引（按读序）：
 
