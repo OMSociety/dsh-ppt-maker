@@ -1,0 +1,33 @@
+# 由 design.md（PART B）手工提炼。design.md 明确 16:9 不沿用源绝对字号与倍率，不写 fontSize。
+# 每页只用黄/蓝两个彩色；黄仅在特殊页可铺整幅。无正/负红绿：符号直接写 $ink，$primary 不编码涨跌。
+# 表格仅以无边框列表出现，无可声明的表样式 → 不写 tableStyles。
+name: Aqua Charity Report · Promotion STYLE DESIGN SYSTEM
+colors:
+  background: '#FAF7F0'   # 标准版面暖白
+  frame: '#FFFFFF'        # 外框画廊白边；兼暗图上反白字
+  panel: '#F8EED3'        # 静态数据版面奶油色
+  mapbg: '#DDE9F6'        # 地图版面浅蓝底
+  ink: '#222520'          # 正文/标题；正负符号直接用它
+  primary: '#FFC907'      # 水鸭黄主强调：特殊页/侧栏可满铺，标准页限短线、关键词、描边数字；图表黄阶首色
+  accent: '#5493D3'       # 支持蓝：地图优先区域高亮；图表蓝阶首色
+  mapbase: '#CCDFF2'      # 地图基底浅蓝（兼蓝阶最浅色）
+  yellow2: '#FFD951'      # 黄阶
+  yellow3: '#FFE99C'
+  blue2: '#76A9DC'        # 蓝阶
+  blue3: '#98BEE5'
+  blue4: '#A7CDF2'
+  dark: '#1A1A1A'         # 图上暗文字带（45%–65% 左侧静场，文字限 $frame/$primary）
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }             # 内页标题/正文用无衬线主力（Proxima Nova 层级）
+    color: $ink
+    bold: true                                           # 模块题/引文为粗体全大写无衬线+加宽字距
+  display:
+    fontFamily: { latin: Oranienbaum, ea: 思源宋体 }      # 展示衬线：仅封面与章节页陈述（Kazimir Text 层级）
+    color: $ink
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 脚注/页码/方法注明显后退

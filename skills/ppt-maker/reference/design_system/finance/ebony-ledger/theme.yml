@@ -1,0 +1,22 @@
+# 由 design.md（PART B）手工提炼。design.md 明确「16:9 不沿用源稿绝对字号与倍率」，故 textStyles 不写 fontSize。
+# 双字体对：衬线标题/结论数字 + 无衬线正文/标签。positive 即 primary（文档明确），#A95228 不是负向色。
+name: Ebony Ledger · Finance STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 纯白底
+  ink: '#000000'          # 正文与标题；黑色只承载文字、基线、顶部横条
+  primary: '#4C9F8B'      # 主强调青绿：当期值、主情景、胜出项（单图 ≤1/3）；兼任 positive
+  deep: '#1B5E5C'         # 辅助深青：次要系列/期初值
+  conclusion: '#A95228'   # 赤陶结论色：倍数、箭头、短竖 tick（绝不做大色块，非负向）
+  muted: '#CACED7'        # 结构灰：历史值系列、低强调
+  panel: '#E4E4E4'        # 浅灰：注释板、区间带
+  negative: '#C39D78'     # 需要正负编码时的负向色（兼第 4 系列）
+textStyles:
+  title:
+    fontFamily: { latin: Unna, ea: 思源宋体 }   # 衬线标题（SanomatTT-Light 层级，轻字重）
+    color: $ink
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }    # 无衬线正文/图例/轴标/页脚
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted         # 脚注/轴标/页脚明显后退

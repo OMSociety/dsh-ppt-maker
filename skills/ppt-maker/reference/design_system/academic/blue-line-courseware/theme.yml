@@ -1,0 +1,29 @@
+# 由 design.md（PART B 签名系统）手工提炼的机器可读主题；色值与字号均取自 design.md，未编造。
+# 字号为 design.md「16:9 adaptation」声明值（区间取中值）：body 18–22→20、titles 42–54→48、section titles 72–84→78。
+name: Blue-Line Courseware · Academic STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 页面底色
+  ink: '#202124'          # 正文与线稿；negative/unaffected 状态也用它（文档明确不另设红色）
+  primary: '#4285F4'      # 标题、顶部规则线、编号、关键数字、主面板（每页至多一个大蓝块）
+  deepblue: '#0059BA'     # 强结果面板专用
+  accent: '#24C2E0'       # 青色：次选面板、图表次要系列
+  lightblue: '#ADCCFA'    # 说明性背景
+  panel: '#D8DBE0'        # 对比/禁用/装饰性背景，图表中表“未发生”
+  muted: '#9AA0A6'        # 页眉与低强调标签
+  positive: '#34A853'     # 正向/干预标记（图表干预点虚线）
+textStyles:
+  title:
+    fontSize: 48
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary       # 标题用主蓝；字重 Medium（文档明确标题不用 Bold）
+  display:
+    fontSize: 78          # section/cover 大标题
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary
+  body:
+    fontSize: 20
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted         # 脚注/来源行（14pt 为 A4 源稿实测，960×540 未声明，不编造字号）

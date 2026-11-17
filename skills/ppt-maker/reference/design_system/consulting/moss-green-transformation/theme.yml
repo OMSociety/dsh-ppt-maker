@@ -1,0 +1,35 @@
+# 由 design.md（PART B）手工提炼。深色主题：炭黑底 + 苔绿→薄荷数据叙事。
+# design.md 只给相对倍率（body=1x、title 2.6–3x 等），未给绝对 pt，故 textStyles 不写 fontSize。
+name: Moss Green Transformation · Consulting STYLE DESIGN SYSTEM
+colors:
+  background: '#2C2C2C'   # 炭黑满铺（覆盖 PART A 白底，approx.）
+  ink: '#F3F3F3'          # 标题/正文主色、表头文字、关键数字（approx.）
+  muted: '#B7B7B7'        # 次级文字：副标题、脚注、轴标签（approx.）
+  primary: '#36AA7E'      # 主强调亮绿：选中条段、正值、阶段、状态指示
+  structure: '#125E42'    # 深绿：节标签/表头短条、阶段带
+  panel: '#0A3021'        # 深绿证据卡/结论框（细边约束，≤1/3 内容区）
+  baseline: '#345A4D'     # 基线系列（与亮绿配对表对比/未选态）
+  accent: '#86C5AA'       # 浅绿：少量高亮数字（approx.）
+  negative: '#C05172'     # 酒红：差距/预警点（仅例外痕量，approx.）
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+    bold: true            # 标题粗体、正文 regular
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted         # 来源行/脚注（最小字号）
+tableStyles:
+  default:
+    # 表格用细边框 + 炭黑/透明底；表头深绿短条（#125E42）+ 浅文字
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $muted }, null ]
+    firstRowStyle:
+      bold: true
+      fill: { type: solid, color: $structure }
+      color: $ink

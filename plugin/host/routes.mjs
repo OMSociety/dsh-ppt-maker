@@ -48,9 +48,10 @@ export const MAX_ASSET_BYTES = 5 * 1024 * 1024
  * @property {(cwd: string, dir: string) => Promise<object>} listProjectHistory
  * @property {(cwd: string, dir: string, revision: number) => Promise<object | null>} readHistorySnapshot
  * @property {(cwd: string, dir: string, targetRevision: number) => Promise<object>} restoreProject
- * @property {(cwd: string, dir: string) => Promise<object>} buildProjectDeck
- * @property {(pipeline: object) => Promise<{ bytes: Uint8Array, fontEmbed: object | null }>} saveProjectPptx
- * @property {(cwd: string, dir: string, report: unknown) => Promise<void>} writeExportReport
+ * @property {(cwd: string, dir: string, options?: object) => Promise<object>} releaseProject
+ * @property {(cwd: string, dir: string, options?: object) => Promise<object>} checkProject
+ * @property {(cwd: string, dir: string, report: unknown) => Promise<void>} writeQaReport
+ * @property {(cwd: string, dir: string) => Promise<string>} computeProjectFingerprint
  * @property {new (...args: unknown[]) => Error & { status?: number }} ProjectError
  */
 
@@ -234,9 +235,10 @@ const REQUIRED_CORE = [
   'listProjectHistory',
   'readHistorySnapshot',
   'restoreProject',
-  'buildProjectDeck',
-  'saveProjectPptx',
-  'writeExportReport',
+  'releaseProject',
+  'checkProject',
+  'writeQaReport',
+  'computeProjectFingerprint',
   'ProjectError',
 ]
 
@@ -252,7 +254,7 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, nativeComma
     err.status = 500
     throw err
   }
-  const { editProject, loadProject, undoProject, redoProject, projectUndoState, listProjectHistory, readHistorySnapshot, restoreProject, buildProjectDeck, saveProjectPptx, writeExportReport, ProjectError } = core
+  const { editProject, loadProject, undoProject, redoProject, projectUndoState, listProjectHistory, readHistorySnapshot, restoreProject, releaseProject, checkProject, writeQaReport, computeProjectFingerprint, ProjectError } = core
   const ss = storeOverride || sessionStore
 
   function sessionOf(source, url) {
@@ -333,6 +335,8 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, nativeComma
           pages: loaded.deck.pages.map((rel) => ({ path: rel })),
           issues: loaded.issues,
           checksumMismatch: loaded.checksumMismatch,
+          plan: loaded.plan ?? null,
+          brief: loaded.brief ?? null,
         })
       }
 
@@ -346,6 +350,15 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, nativeComma
         const page = loaded.pages.get(pagePath.replace(/\\/g, '/'))
         if (!page) return fail(res, 404, `页不存在：${pagePath}`)
         return json(res, 200, { ok: true, path: pagePath, page, revision: loaded.manifest.revision })
+      }
+
+      if (route === 'GET /plan') {
+        // 规划契约：brief.md 与 plan.yml 都是 loadProject 顺带读的，路由只透传。
+        const { sessionId, cwd } = sessionOf({}, url)
+        const key = String(url.searchParams.get('key') || '')
+        const { dir } = projectOf(ss, sessionId, cwd, key)
+        const loaded = await loadProject(cwd, dir)
+        return json(res, 200, { ok: true, brief: loaded.brief ?? null, plan: loaded.plan ?? null })
       }
 
       /* ── 版本历史：列表 / 快照预览（只读） ─────────────────────────── */
@@ -378,7 +391,7 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, nativeComma
         if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) return fail(res, 400, `越界：${src}`)
         const ext = path.extname(norm).toLowerCase()
         if (!norm.startsWith('media/')) return fail(res, 400, `素材必须在 media/ 下：${src}`)
-        if (!['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'].includes(ext)) {
+        if (!['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'].includes(ext)) {
           return fail(res, 400, `扩展名不在白名单：${ext || '(无)'}`)
         }
         let bytes
@@ -464,27 +477,43 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, nativeComma
         return saveMedia({ abs, key, body, res })
       }
 
+      if (route === 'POST /check') {
+        const { sessionId, cwd } = sessionOf(body, url)
+        const key = String(body.key || '')
+        const { dir } = projectOf(ss, sessionId, cwd, key)
+        // 面板质检与 ppt_check 同一条规则链（checkProject），不含 AI 视觉层；
+        // 落账口径与工具侧一致：fingerprint 绑定「质检那一刻的工程内容」。
+        const result = await checkProject(cwd, dir, { withMissingFonts: true })
+        const fingerprint = await computeProjectFingerprint(cwd, dir)
+        await writeQaReport(cwd, dir, {
+          tool: 'panel-check',
+          pass: result.pass,
+          issueCount: result.issues.length,
+          blockerCount: result.issues.filter((i) => i.severity === 'blocker').length,
+          issues: result.issues,
+          pages: null,
+          ai: null,
+          fingerprint,
+        })
+        return json(res, 200, { ok: true, pass: result.pass, issues: result.issues, fingerprint })
+      }
+
       if (route === 'POST /export') {
         const { sessionId, cwd } = sessionOf(body, url)
         const key = String(body.key || '')
         const { dir, abs } = projectOf(ss, sessionId, cwd, key)
-        const pipeline = await buildProjectDeck(cwd, dir)
-        const { bytes, fontEmbed } = await saveProjectPptx(pipeline)
-        const buffer = Buffer.from(bytes)
-        // 面板导出（body.save）落到工程目录 export/ 并回相对路径：桌面外壳的下载没有
-        // 可回读的落点，磁盘上的文件 + 可见路径才是「点了就有反应」的确定性口径。
+        // v2 统一发布管线：面板导出与 ppt_export 同一条 releaseProject——
+        // QA 指纹门禁（未检/过期 409 由 catch 映射）+ postflight 回读校验 + sha256 落账。
         const saveToProject = body.save === true
-        await writeExportReport(cwd, dir, {
-          kind: saveToProject ? 'panel-export' : 'browser-export',
-          at: new Date().toISOString(),
-          revision: pipeline.revision,
-          bytes: buffer.length,
-          fontEmbed: fontEmbed ?? null,
-          issues: pipeline.issues ?? pipeline.buildWarnings ?? null,
+        const rel = await releaseProject(cwd, dir, {
+          reportExtra: { kind: saveToProject ? 'panel-export' : 'browser-export' }
         })
-        ss.markSeenRevision(sessionId, key, pipeline.revision)
+        const buffer = Buffer.from(rel.bytes)
+        ss.markSeenRevision(sessionId, key, rel.revision)
         if (saveToProject) {
-          const filename = `${safeFileStem(key)}-r${pipeline.revision}.pptx`
+          // 面板导出（body.save）落到工程目录 export/ 并回相对路径：桌面外壳的下载没有
+          // 可回读的落点，磁盘上的文件 + 可见路径才是「点了就有反应」的确定性口径。
+          const filename = `${safeFileStem(key)}-r${rel.revision}.pptx`
           const outDir = path.join(abs, 'export')
           await fsp.mkdir(outDir, { recursive: true })
           const absolutePath = path.join(outDir, filename)
@@ -494,8 +523,10 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, nativeComma
             filename,
             relativePath: path.posix.join(String(dir).replace(/\\/g, '/'), 'export', filename),
             absolutePath,
-            revision: pipeline.revision,
+            revision: rel.revision,
             bytes: buffer.length,
+            sha256: rel.sha256,
+            postflight: rel.postflight,
           })
         }
         res.writeHead(200, {

@@ -1,0 +1,37 @@
+# 由 design.md（PART B）手工提炼；全部色值为文档中 pixel-sampled approx. 值。
+# design.md 只给相对倍率（body=1x、标题 2.1–2.5x 等）、未给 960×540 绝对 pt，故 textStyles 不写 fontSize。
+name: Deep Blue Atlas · Academic STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 纯白画布（>90% 面积），无深色页
+  ink: '#203D74'          # 深蓝莓文字与线稿同色（“deep blue is for text and lines”），文档未设独立黑色
+  primary: '#203D74'      # 主结构深蓝：页标题、正文强调、表头、关键数字、图表主线、节点与箭头
+  secondary: '#2C477A'    # 次级深蓝：小节副标题与二级结构线
+  accent: '#49B7D0'       # 青色：副标题、两位导航数字、选中态、点估计；兼任 positive 语义（本风格不用绿）
+  muted: '#7F899E'        # 解释性文字、轴标签、辅助注释
+  subtle: '#B5C0D0'       # 页码、次要注释、弱化信息、细参考线
+  line: '#D9DEE7'         # 分隔线、表格细线、行列边界
+  grid: '#E7ECF1'         # 图表横向网格线、最弱结构线
+  negative: '#E94B3B'     # 不适用/排除态、事前阈值线（痕量）
+  warning: '#FD9F66'      # 提醒橙：需关注但非负面的异常（比红更痕量）
+textStyles:
+  title:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $primary       # 页标题 regular/medium 字重，靠字号建立权威（非粗体）
+  body:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $muted         # 注释/轴标签/图例式标注
+tableStyles:
+  default:
+    # 签名三线表：仅表头下与表尾两条深蓝横线；无竖线、无外框、无斑马纹
+    cellStyle:
+      fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+      color: $ink
+    firstRowStyle:
+      bold: true
+      color: $primary
+      border: [ null, null, { style: solid, width: 1.5, color: $primary }, null ]
+    lastRowStyle:
+      border: [ null, null, { style: solid, width: 1.5, color: $primary }, null ]

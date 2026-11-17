@@ -1,0 +1,23 @@
+# 由 design.md（PART B）手工提炼。源画布 960×540 但只给倍率（标题 2.2–2.8x、大数 3.8–4.5x、脚注 0.65–0.75x），
+# 未给绝对 pt，不写 fontSize。无正/负色语义（需要时红蓝仅配文字标签使用）。
+# 字体：design.md 只声明「Render with MiSans（标题 Bold）；英文标题可用 Archivo Black」，
+# 正文未给 latin 配套 → body/caption 用字符串形态 'MiSans'（不编造 latin）。
+name: Cream Collage · Promotion STYLE DESIGN SYSTEM
+colors:
+  background: '#F3E8D4'   # 奶油纸底（approx.，整页连续）
+  ink: '#171717'          # 近黑：正文/标题/轴/页码（approx.）；图表第三系列
+  primary: '#F05A39'      # 番茄红主强调：斜切锚点、关键数字、节点（≤1/3 版面）；图表第一系列
+  accent: '#2657D7'       # 钴蓝次强调：次级内容、路径面板、区间数字；图表第二系列
+  pink: '#E9A7B3'         # 粉：仅封面几何装饰/收尾 CTA 页，不外溢
+  green: '#D9F04A'        # 荧光黄绿：仅封面几何装饰与收尾页行动按钮，不外溢
+textStyles:
+  title:
+    fontFamily: { latin: Archivo Black, ea: MiSans }   # 重标题（英文 Archivo Black 经 customFonts）
+    color: $ink
+    bold: true
+  body:
+    fontFamily: MiSans
+    color: $ink
+  caption:
+    fontFamily: MiSans
+    color: $ink           # 脚注/页码 0.65–0.75x

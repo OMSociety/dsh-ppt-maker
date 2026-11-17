@@ -30,6 +30,7 @@ import {
 } from '../project/store.js'
 import { checksumOf } from '../project/store.js'
 import { stringifyDeck } from '../pptd/parse.js'
+import { SCHEMA_VERSION } from '../pptd/schema-v2.js'
 import { stringify as yamlStringify } from 'yaml'
 import type { ImportReport, ReverseMapResult, ReverseWriteResult } from './types.js'
 
@@ -104,7 +105,7 @@ export async function writeReverseProject(
   //    path. Deck mutation is atomic (tmp + rename); manifest.checksum stays
   //    stale here and is corrected by bumpManifestChecksum, which editProject
   //    then re-reads before stamping its own revision.
-  const emptyDeck = { ...mapped.deck, pages: [] }
+  const emptyDeck = { ...mapped.deck, schema: SCHEMA_VERSION, pages: [] }
   const deckPath = path.join(absDir, 'deck.pptd')
   const tmpDeck = `${deckPath}.tmp-${process.pid}`
   await writeFile(tmpDeck, stringifyDeck(emptyDeck), 'utf8')
@@ -134,6 +135,15 @@ export async function writeReverseProject(
   //    writing it after editProject is safe.
   const reportPath = path.join(absDir, 'import.report.yml')
   await writeFile(reportPath, yamlStringify(mapped.report), 'utf8')
+
+  // 6. 源存档（spec §10）：原始 pptx 字节原样落 source/original.pptx。
+  //    导出管线的「未改页整页恢复」读这份存档；它不参与 manifest.checksum，
+  //    也不随编辑变化——originalSha1 是「整轮导入的原子单位」。
+  if (mapped.sourceBytes && mapped.sourceBytes.length) {
+    const sourceDir = path.join(absDir, 'source')
+    await mkdir(sourceDir, { recursive: true })
+    await writeFile(path.join(sourceDir, 'original.pptx'), Buffer.from(mapped.sourceBytes))
+  }
 
   return {
     projectDir: absDir,

@@ -1,0 +1,39 @@
+# 由 design.md（PART B）手工提炼。字号：源画布 21.986×12.368in，只给倍率（题 2.3–2.6x、大数 4–7x、
+# 页眉/脚注 0.65–0.75x、章节题 4.5–5.5x）→ 不写 fontSize。字体源不可考（文字已转曲），按文档给 render 对。
+# 关键短语用深色而非加粗强调；春绿 <10% 版面、绝不铺底；negative 仅谨慎锚定。
+name: Moon White Imagery · Work STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 月白底（内容页 70%–95%）
+  dark: '#141414'         # 偶发纯色收尾页（全篇限 1 页）
+  ink: '#99AAA0'          # 灰绿：正文解释文字
+  muted: '#D6DDD9'        # 更浅：非关键注
+  heading: '#002A12'      # 深林绿：标题、关键标签、深数据系列；审计关键元素（结论/目标/差异/行动）必用
+  primary: '#1ECF77'      # 春绿主强调：仅点亮当期主体/核心数字/一个主系列；兼任 positive
+  panelgreen: '#F2F4EF'   # 浅绿对比指标区
+  panelwarm: '#FDF8E0'    # 暖白对比指标区
+  bignumber: '#474F58'    # 大号中性数字
+  series1: '#3D5D48'      # 图表灰绿系列（主对象由 $primary 覆盖）
+  series2: '#7D9385'
+  series3: '#A2B2A7'
+  series4: '#B9C8BE'
+  negative: '#F3001C'     # 负向锚定（谨慎少用；语义继承 PART A）
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $heading       # sentence case，不用全大写；强调靠深色而非加粗
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted         # 页眉/脚注 0.65–0.75x
+tableStyles:
+  default:
+    # 稀疏矩阵表：无竖线、细横线；轴与网格极淡
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $muted }, null ]
+    firstRowStyle:
+      bold: true
+      color: $heading

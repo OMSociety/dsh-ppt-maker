@@ -19,6 +19,10 @@ import {
   findShapesOutsideCanvas,
   getShapeFillColorResolved,
   getShapeName,
+  getShapeParagraphCount,
+  getShapeRunCount,
+  getShapeRunFormatEffective,
+  getShapeRunText,
   getShapeText,
   getSlideShapes,
   getSlides,
@@ -26,7 +30,7 @@ import {
   validatePresentation
 } from '@office-kit/pptx'
 import type { PresentationData, SlideData, SlideShapeData } from '@office-kit/pptx'
-import { auditTextLayout, type TextAuditIssue } from '@office-kit/pptx-preview'
+import { auditTextLayout, type TextAuditIssue, type TextMeasurer } from '@office-kit/pptx-preview'
 
 export interface ReviewIssue {
   page: number
@@ -87,6 +91,11 @@ export interface ReviewOptions {
   contrastThreshold?: number
   /** Report soft-wrap findings (opt-in; body text wraps are normally fine). */
   reportSoftWraps?: boolean
+  /**
+   * 真实字形量测器（buildFontkitMeasurer 产物）。给了它，文字溢出判定用
+   * 真实字体字形宽度；缺省退回启发式量测（reviewDeck 纯函数定位不变）。
+   */
+  measureText?: TextMeasurer
 }
 
 export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}): ReviewResult {
@@ -106,10 +115,14 @@ export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}):
     })
   }
 
-  // Text overflow via pptx-preview (default heuristic measurer). Overflow is a
-  // blocker only when it is gross; everything else is a warning so that an
-  // approximate measurement can never hard-block an otherwise valid export.
-  const audits = auditTextLayout(pres, { reportSoftWraps: options.reportSoftWraps === true })
+  // Text overflow via pptx-preview. Overflow is a blocker only when it is
+  // gross; everything else is a warning so that an approximate measurement can
+  // never hard-block an otherwise valid export. A caller-supplied fontkit
+  // measurer (options.measureText) replaces the default heuristic one.
+  const audits = auditTextLayout(pres, {
+    reportSoftWraps: options.reportSoftWraps === true,
+    ...(options.measureText ? { measureText: options.measureText } : {})
+  })
   for (const issue of audits) {
     const page = issue.slideIndex + 1
     if (pageFilter && !pageFilter.has(page)) continue
@@ -150,21 +163,24 @@ export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}):
       })
     }
 
-    // Contrast: shape fill vs deck body text color. Only solid-filled shapes
-    // with text are meaningful targets; the check is deliberately conservative.
+    // Contrast: per-run text color vs shape fill. The deck body color is the
+    // fallback when a run carries no explicit color; per-run colors override
+    // it. Only solid-filled shapes with text are meaningful targets; the check
+    // is deliberately conservative (no gradient/image fill analysis).
     const bodyColor = bodyTextColorOf(slide)
-    if (bodyColor) {
-      for (const shape of shapesWithText(slide)) {
-        const fill = getShapeFillColorResolved(pres, shape)
-        if (!fill) continue
-        const ratio = contrastRatio(bodyColor, fill)
+    for (const shape of shapesWithText(slide)) {
+      const fill = getShapeFillColorResolved(pres, shape)
+      if (!fill) continue
+      for (const run of runColorsOf(pres, shape, bodyColor)) {
+        if (!run.color) continue
+        const ratio = contrastRatio(run.color, fill)
         if (ratio !== null && ratio < threshold) {
           issues.push({
             page,
             severity: 'warning',
             category: 'contrast',
             elementId: getShapeName(shape),
-            description: `文字与形状填充对比度 ${ratio.toFixed(2)}（阈值 ${threshold}）`,
+            description: `文字与形状填充对比度 ${ratio.toFixed(2)}（阈值 ${threshold}）：${run.text.slice(0, 24)}`,
             suggestion: '加深文字颜色或减淡填充色'
           })
         }
@@ -203,4 +219,46 @@ function hasText(shape: SlideShapeData): boolean {
   } catch {
     return false
   }
+}
+
+interface RunColorSample {
+  text: string
+  color: string | null
+}
+
+/**
+ * Enumerate (paragraph, run) pairs of a shape and resolve each run's effective
+ * text color. The deck body color is the fallback when a run carries no
+ * explicit color; runs with neither are skipped by the caller.
+ */
+function runColorsOf(pres: PresentationData, shape: SlideShapeData, bodyColor: string | null): RunColorSample[] {
+  const out: RunColorSample[] = []
+  let paragraphs = 0
+  try {
+    paragraphs = getShapeParagraphCount(shape)
+  } catch {
+    return out
+  }
+  for (let p = 0; p < paragraphs; p += 1) {
+    let runs = 0
+    try {
+      runs = getShapeRunCount(shape, p)
+    } catch {
+      continue
+    }
+    for (let r = 0; r < runs; r += 1) {
+      let text = ''
+      let color: string | null = null
+      try {
+        text = getShapeRunText(shape, p, r)
+        const fmt = getShapeRunFormatEffective(pres, shape, p, r)
+        color = typeof fmt?.color === 'string' && fmt.color.trim() !== '' ? fmt.color : null
+      } catch {
+        continue
+      }
+      if (text.trim() === '') continue
+      out.push({ text: text.trim(), color: color ?? bodyColor })
+    }
+  }
+  return out
 }

@@ -116,16 +116,16 @@ describe('宿主入口', () => {
     apply(ctxWithGet)
     expect(defs.size).toBe(0)
     revealTools(withGet.fire)
-    expect(defs.size).toBe(11)
+    expect(defs.size).toBe(13)
     expect(getNames.filter((n) => n === 'llm' || n === 'attachments')).toEqual([])
     // 无 get 的宿主（默认 makeCtx）：同样必须全量注册，不抛。
     const plain = makeCtx(cwd)
     apply(plain.ctx)
     revealTools(plain.fire)
-    expect(defs.size).toBe(11)
+    expect(defs.size).toBe(13)
   })
 
-  it('apply 常驻只注册 1 个技能；invoke ppt-maker 技能成功后懒展开 11 个工具', () => {
+  it('apply 常驻只注册 1 个技能；invoke ppt-maker 技能成功后懒展开 13 个工具', () => {
     const { ctx, skillDefs, fire } = makeCtx(cwd)
     apply(ctx)
     expect(skillDefs).toHaveLength(1)
@@ -149,8 +149,10 @@ describe('宿主入口', () => {
       'ppt_import',
       'ppt_open',
       'ppt_patch',
+      'ppt_plan',
       'ppt_redo',
       'ppt_render',
+      'ppt_svg',
       'ppt_themes',
       'ppt_undo'
     ])
@@ -216,11 +218,38 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     expect((redone.redoneOps as string[]).length).toBe(3)
     expect(await fileExists('deck/pages/01.page')).toBe(true)
 
-    // export（质检通过 → 产物落盘 + exportReport 落账）
+    // 导出前置门禁（v2）：未质检 → QaReportMissing 409
+    const tooEarly = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
+    expect(tooEarly).toMatchObject({ ok: false, error: { code: 'QaReportMissing', status: 409 } })
+
+    // check（规则质检：无 blocker → qaReport 落账 + 指纹绑定）
+    const checked = await call('ppt_check', { dir: 'deck' })
+    expect(checked.ok).toBe(true)
+    expect(checked.pass).toBe(true)
+
+    // export（质检指纹匹配 → 产物落盘 + exportReport 落账 + postflight 通过）
     const exported = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
     expect(exported.ok).toBe(true)
     expect(await fileExists('deck/out.pptx')).toBe(true)
     expect((exported.check as { pass: boolean }).pass).toBe(true)
+    expect(typeof exported.sha256).toBe('string')
+    expect((exported.postflight as { ok: boolean; slides: number })).toMatchObject({ ok: true, slides: 1 })
+
+    // 质检后又有改动 → 指纹 stale，导出被拒
+    const afterEdit = await call('ppt_edit', {
+      dir: 'deck',
+      baseRevision: redone.revision as number,
+      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: 'stale 测试' } }]
+    })
+    expect(afterEdit.ok).toBe(true)
+    const staleExport = await call('ppt_export', { dir: 'deck', out: 'deck/out2.pptx' })
+    expect(staleExport).toMatchObject({ ok: false, error: { code: 'StaleQaReport', status: 409 } })
+
+    // skipCheck 可绕门禁（postflight 仍执行）
+    const skipped = await call('ppt_export', { dir: 'deck', out: 'deck/out2.pptx', skipCheck: true })
+    expect(skipped.ok).toBe(true)
+    expect((skipped.check as { skipped: boolean }).skipped).toBe(true)
+    expect((skipped.postflight as { ok: boolean }).ok).toBe(true)
 
     // render（最终 pptx → PNG 预览）
     const rendered = await call('ppt_render', { dir: 'deck' })
@@ -228,11 +257,6 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     const images = rendered.images as Array<{ page: number; path: string }>
     expect(images.length).toBe(1)
     expect(await fileExists(images[0].path)).toBe(true)
-
-    // check（规则质检：无 blocker）
-    const checked = await call('ppt_check', { dir: 'deck' })
-    expect(checked.ok).toBe(true)
-    expect(checked.pass).toBe(true)
   })
 
   it('错误路径：缺会话 / 越界目录 / 工程不存在', async () => {

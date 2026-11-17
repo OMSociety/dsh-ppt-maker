@@ -1,0 +1,38 @@
+# 由 design.md（PART B）手工提炼。叙事页底为全幅摄影（必要时 #000000 压暗），白底只属数据页。
+# 字号：源画布 720×405pt（body 12–14/标题 20/里程碑数 28/脚注 8–10），design.md 未给 960×540 等效值，不写 fontSize。
+# 正负值默认 $ink（属某系列时保留系列色，靠 +/− 或括号解释）；禁红绿涨跌。
+name: Silver Gray Luxury Magazine · Promotion STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 数据页白底（叙事页为满幅摄影）
+  ink: '#252525'          # 白底正文/标题（无独立标题色）；正负值默认色
+  black: '#000000'        # 图表系列黑、数据页 1pt 顶/底黑线、摄影压暗层
+  reverse: '#FFFFFF'      # 摄影上反白字
+  primary: '#9D5A37'      # 铜棕主强调：主系列、关键数字、单一结论（≤15% 版面）
+  muted: '#A6A6A6'        # 次要系列/行带/结构灰
+  panel: '#E7E6E6'        # 浅灰：行带与结构
+  gold: '#CC9900'         # 暖金小面积高亮（椭圆数字徽章）
+  goldalt: '#D79740'      # 暖金备选（与 gold 同角色二选一）
+  seriesdark: '#585858'   # 图表深灰系列
+  appendixband: '#CCEDFF' # 附录表交替行带（绝不用于叙事页）
+textStyles:
+  title:
+    fontFamily: { latin: Unna, ea: 思源宋体 }        # 衬线标题与大判断（Georgia 层级）
+    color: $ink
+  body:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }  # 无衬线正文/数据/解读（Tahoma 层级）
+    color: $ink
+  caption:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $ink           # 页码/脚注（附录表另有 Times New Roman，仅限附录区，不列入）
+tableStyles:
+  appendix:
+    # 仅附录表：#CCEDFF 交替行带 + 细黑线；此语言不进正文图表
+    cellStyle:
+      fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $black }, null ]
+    firstRowStyle:
+      bold: true
+    bodyStyles:
+      - fill: { type: solid, color: $appendixband }
+      - {}

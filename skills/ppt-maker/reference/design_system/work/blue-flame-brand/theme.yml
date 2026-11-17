@@ -1,0 +1,47 @@
+# 由 design.md（PART B）手工提炼，全部色值为文档 approx. 采样值。深夜运营作战室暗色体系。
+# 字号：只给倍率（标题 2.3–2.5x、KPI 2–3.5x、注 0.65–0.8x），样本画布 1467×825 无绝对 pt → 不写 fontSize。
+# design.md 未给 render 字体对（只说现代无衬线为主、表体可整体换宋/明朝风衬线）→ textStyles 不写 fontFamily（不编造）。
+# 绿/红仅状态灯语义（on-track/delayed），「达成」永远用焰青 primary，禁止绿表达成。
+name: Blue Flame Brand · Work STYLE DESIGN SYSTEM
+colors:
+  background: '#06070B'   # 近黑蓝正文页底（approx.）；图表区无独立填充
+  darkbg: '#020307'       # 封面/收尾页再深一级（approx.）
+  ink: '#C6CCD3'          # 正文（approx.）
+  heading: '#F7F8FA'      # 冷白：主标题/关键断言（approx.）
+  muted: '#969DA3'        # 次级说明（approx.）
+  faint: '#6E757B'        # 页脚/弱注（approx.）
+  ghost: '#414548'        # 最弱氛围层：仅装饰引号（approx.）
+  primary: '#1FB9D5'      # 焰青品牌锚：唯一主图表色、进度填充、达成状态（正文区禁大色块）
+  ice: '#B8ECF9'          # 冰蓝最亮数据层：大数字、环内值、表格顶部规则线、里程碑节点、决策卡描边
+  midcyan: '#4FA0BB'      # 中青：引线、路径连接等结构暗示
+  lightcyan: '#88D3E8'    # 浅青：仅封面 eyebrow
+  warning: '#DFA93C'      # 琥珀：预警/未达/风险/延期后果专用，绝不做装饰
+  statusgreen: '#58CA8F'  # 状态绿：仅状态灯/联动进度条（on-track）
+  statusred: '#D96A56'    # 珊瑚红：仅状态灯/联动进度条（delayed）
+  line: '#1A222C'         # 结构线
+  track: '#141B23'        # 轨道底
+  cardline: '#214A59'     # 卡片描边深青
+  axis: '#536780'         # 轴基线
+  phasedash: '#527490'    # 阶段虚线
+  mist1: '#050A1E'        # 装饰雾团深海军蓝（低透明椭圆，画布边缘裁切）
+  mist2: '#06191D'        # 装饰雾团深青
+textStyles:
+  title:
+    color: $heading       # 「常规字重陈述 + 加粗结论」同句混排（混排由内容侧行内实现）
+  display:
+    color: $ice           # KPI 大数字/环内值（单位同基线缩小约一半）
+  body:
+    color: $ink
+  caption:
+    color: $faint         # 注/来源 0.65–0.8x
+tableStyles:
+  default:
+    # 无竖线矩阵表：无填充无斑马；顶部冰蓝全宽规则线、底部深色规则线收口；状态列「点+词」
+    cellStyle:
+      color: $ink
+    firstRowStyle:
+      bold: true
+      color: $heading
+      border: [ { style: solid, width: 1.5, color: $ice }, null, null, null ]
+    lastRowStyle:
+      border: [ null, null, { style: solid, width: 1, color: $line }, null ]

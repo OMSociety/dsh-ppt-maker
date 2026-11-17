@@ -1,0 +1,26 @@
+# 由 design.md（PART B）手工提炼。强调色按章节轮换：每章只从 chaptergreen/chapterpink/chapterblue/
+# chapterred/chapterteal/chapteryellow 中选一个，故不设单一 primary/accent（页内至多一个彩色色相）。
+# 无正/负专色：正负均用 #000000 文字配 +/−（#DD5A50 不得自动读作负向）。
+# 字号：源画布 1920×1080（body 20/模块题 30/大数 50/章节题 200/脚注 12pt），design.md 未给 960×540 等效值，不写 fontSize。
+name: Silk Yellow Magazine · Promotion STYLE DESIGN SYSTEM
+colors:
+  background: '#E5E3DD'   # 暖灰底；深底页反白字也用它
+  ink: '#000000'          # 正文/标题（浅底上）；兼整列反白底色块
+  panel: '#FFFFFF'        # 照片上的阅读面板（方角不透明）
+  chaptergreen: '#E2FDBE' # 章节强调色候选（每章六选一）
+  chapterpink: '#F9B3A7'
+  chapterblue: '#6E8EBE'
+  chapterred: '#DD5A50'
+  chapterteal: '#99BBBD'
+  chapteryellow: '#FFD200'
+textStyles:
+  title:
+    fontFamily: { latin: Archivo Black, ea: MiSans }   # 标题/章节展示字（Archivo Black 经 customFonts；中文 MiSans Bold）
+    color: $ink
+    bold: true
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 脚注/页码/侧栏 0.6x（Heavy 层级靠字重与全大写区分）

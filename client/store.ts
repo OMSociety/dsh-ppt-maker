@@ -12,7 +12,7 @@
  * S6 先空的字段（`selection` / `pagesAst` / `draft`）也是**真字段**：S7–S9 的组件挂上来
  * 就不再动 store 的形状，只往里填值。
  */
-import { api, ConflictError, type StatePayload } from './api'
+import { api, ConflictError, type StatePayload, type PlanPayload } from './api'
 
 export interface Toast {
   id: number
@@ -49,6 +49,10 @@ export interface PptState {
   deck: { profile?: string; title?: string; size: [number, number]; pages: string[]; source?: unknown } | null
   /** 活动工程 deck 的页文件清单（GET /project 的 deck.pages，顺序即页序）。 */
   deckPages: string[]
+  /** 规划契约：plan.yml；null = 还没写。 */
+  plan: PlanPayload | null
+  /** 规划契约：brief.md 原文；null = 还没写。 */
+  brief: string | null
   /** 当前页的文件内容（GET /page 拉起来的单页 AST；Store 只存「已经请求过」的那一份）。 */
   currentPageData: unknown | null
   /** 判断「currentPageData 是不是 lastSeenRevision 时的那一份」：错了就该重拉。 */
@@ -85,6 +89,8 @@ function initialState(sessionId: string): PptState {
     manifest: null,
     deck: null,
     deckPages: [],
+    plan: null,
+    brief: null,
     currentPageData: null,
     currentPageRevision: -1,
     lastSeenRevision: -1,
@@ -209,6 +215,8 @@ export function createPptStore(sessionId: string) {
         manifest: res.manifest,
         deck: res.deck,
         deckPages: Array.isArray(res.deck?.pages) ? res.deck.pages : [],
+        plan: res.plan ?? null,
+        brief: res.brief ?? null,
         currentPageData: null,
         currentPageRevision: -1,
         lastSeenRevision: res.revision,
@@ -594,6 +602,8 @@ export function createPptStore(sessionId: string) {
         patch({
           deck: res.deck,
           deckPages: Array.isArray(res.deck?.pages) ? res.deck.pages : [],
+          plan: res.plan ?? null,
+          brief: res.brief ?? null,
         })
       } catch {
         /* 同步失败静默：页清单短暂停在旧值，下次写盘后重拉 */

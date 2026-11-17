@@ -1,7 +1,7 @@
 /**
  * Line 元素的 points + curve → SVG path d（纯函数，可单测）。
  *
- * PPTD Line 契约（reference/pptd.md §Line）：
+ * PPTD Line 契约（docs/pptd-spec.md §6.3）：
  *   points: "x1,y1 x2,y2 ..."（viewBox 坐标系；首末点过线，中间点是贝塞尔控制点）
  *   curve:  sharp = 折线连接；round / smooth = 贝塞尔平滑
  */

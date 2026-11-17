@@ -18,6 +18,8 @@ import * as React from 'react'
 import { backgroundToCss, borderToCss, fillToCss, resolveTextStyle, type ThemeLike } from '../render/resolve'
 import { pathFromPoints } from '../render/points'
 import { sanitizeHtml } from '../render/sanitize'
+import { TableView } from './TableView'
+import { ChartView } from './ChartView'
 
 export interface PptdElement {
   elementId?: string
@@ -37,6 +39,10 @@ export interface PptdElement {
 export interface PptdPage {
   background?: unknown
   elements?: PptdElement[]
+  /** svg 页（整页编译轨）。pageType==='svg' 时 elements 恒为空数组。 */
+  pageType?: string
+  /** svg 页的源引用（media/svg/*.svg），预览直接 <img> 渲染。 */
+  svgSource?: { ref: string; viewBox?: [number, number] }
   [key: string]: unknown
 }
 
@@ -84,6 +90,9 @@ export function PptdView({ page, size, theme, resolveMedia, overlay, className }
   const [w, h] = size
   const bgCss = backgroundToCss(page?.background, theme, resolveMedia)
   const elements = Array.isArray(page?.elements) ? (page!.elements as PptdElement[]) : []
+  const isSvgPage = page?.pageType === 'svg'
+  const svgRef = isSvgPage && page?.svgSource?.ref ? page.svgSource.ref : null
+  const svgUrl = svgRef && resolveMedia ? resolveMedia(svgRef) : svgRef
 
   return (
     <div ref={wrapRef} className={`pptd-viewport${className ? ` ${className}` : ''}`}>
@@ -100,9 +109,26 @@ export function PptdView({ page, size, theme, resolveMedia, overlay, className }
           background: bgCss ?? '#FFFFFF',
         }}
       >
-        {elements.map((el, i) => (
-          <ElementView key={el.elementId ?? i} el={el} theme={theme} resolveMedia={resolveMedia} />
-        ))}
+        {isSvgPage ? (
+          svgUrl ? (
+            // SVG 页：源 SVG 直接整页铺底，所见即最终编译的输入。
+            <img
+              src={svgUrl}
+              alt=""
+              draggable={false}
+              style={{ position: 'absolute', inset: 0, width: w, height: h, display: 'block' }}
+              className="pptd-svg-page"
+            />
+          ) : (
+            <div style={{ position: 'absolute', inset: 0, ...placeholderBox() }}>
+              <span style={placeholderLabel()}>SVG 页：缺少 svgSource.ref</span>
+            </div>
+          )
+        ) : (
+          elements.map((el, i) => (
+            <ElementView key={el.elementId ?? i} el={el} theme={theme} resolveMedia={resolveMedia} />
+          ))
+        )}
         {overlay}
       </div>
     </div>
@@ -148,8 +174,24 @@ function ElementView({
       return <LineView el={el} style={style} theme={theme} />
     case 'image':
       return <ImageView el={el} style={style} resolveMedia={resolveMedia} />
+    case 'table': {
+      const content = (el.content ?? {}) as Record<string, unknown>
+      return (
+        <div style={style} data-element-type={type}>
+          <TableView content={content} theme={theme} />
+        </div>
+      )
+    }
+    case 'chart': {
+      const content = (el.content ?? {}) as Record<string, unknown>
+      return (
+        <div style={style} data-element-type={type}>
+          <ChartView content={content} theme={theme} />
+        </div>
+      )
+    }
     default:
-      // table / chart / icon / smartArt / placeholder 等：灰底占位（与逆向引擎 placeholder 口径一致）。
+      // icon / smartArt / placeholder 等：灰底占位（与逆向引擎 placeholder 口径一致）。
       return (
         <div style={{ ...style, ...placeholderBox() }} data-element-type={type}>
           <span style={placeholderLabel()}>{placeholderText(type)}</span>

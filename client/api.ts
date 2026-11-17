@@ -81,6 +81,26 @@ export interface ProjectPayload {
   pages: Array<{ path: string }>
   issues?: unknown[]
   checksumMismatch?: boolean
+  /** 规划契约：plan.yml 解析结果；未写为 null。 */
+  plan?: PlanPayload | null
+  /** 规划契约：brief.md 原文；未写为 null。 */
+  brief?: string | null
+}
+
+/** plan.yml 的单页条目（与 src/core/pptd/schema-v2.ts 的 PlanPage 对齐）。 */
+export interface PlanPagePayload {
+  page: string
+  title?: string
+  type?: 'native' | 'svg'
+  svgRef?: string
+  intent?: string
+  module?: string
+}
+
+export interface PlanPayload {
+  version?: number
+  status?: 'draft' | 'confirmed'
+  pages: PlanPagePayload[]
 }
 
 export interface PagePayload {

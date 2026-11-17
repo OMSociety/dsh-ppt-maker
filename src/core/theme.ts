@@ -9,6 +9,7 @@
 import { readdir, readFile } from 'node:fs/promises'
 import type { Dirent } from 'node:fs'
 import path from 'node:path'
+import { parse as parseYaml } from 'yaml'
 
 export interface ThemeInfo {
   /** Design-system family, e.g. `academic`. */
@@ -19,6 +20,8 @@ export interface ThemeInfo {
   name: string | null
   /** Project-relative path of design.md (forward slashes). */
   path: string
+  /** True when the sibling theme.yml (machine-readable palette/fonts) parses. */
+  executable: boolean
 }
 
 export async function listThemes(packageRoot: string, designSystem?: string): Promise<ThemeInfo[]> {
@@ -51,7 +54,8 @@ export async function listThemes(packageRoot: string, designSystem?: string): Pr
         designSystem: family.name,
         theme: entry.name,
         name,
-        path: path.relative(packageRoot, designFile).replace(/\\/g, '/')
+        path: path.relative(packageRoot, designFile).replace(/\\/g, '/'),
+        executable: (await loadThemeYaml(packageRoot, family.name, entry.name)) !== null
       })
     }
   }
@@ -60,4 +64,28 @@ export async function listThemes(packageRoot: string, designSystem?: string): Pr
   }
   const filtered = designSystem === undefined ? out : out.filter((theme) => theme.designSystem === designSystem)
   return filtered.sort((a, b) => a.designSystem.localeCompare(b.designSystem) || a.theme.localeCompare(b.theme))
+}
+
+/**
+ * Load the machine-readable half of a theme (`theme.yml`): deck-level
+ * `colors` / `textStyles` / `tableStyles` distilled from design.md. Returns
+ * null when the file is absent or unparseable — a theme without theme.yml
+ * stays selectable (design.md still guides style) but writes no deck.theme.
+ */
+export async function loadThemeYaml(
+  packageRoot: string,
+  designSystem: string,
+  theme: string
+): Promise<Record<string, unknown> | null> {
+  const file = path.join(packageRoot, 'skills', 'ppt-maker', 'reference', 'design_system', designSystem, theme, 'theme.yml')
+  let raw: unknown
+  try {
+    raw = parseYaml(await readFile(file, 'utf8'))
+  } catch {
+    return null
+  }
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
+  const record = raw as Record<string, unknown>
+  if (!record.colors && !record.textStyles && !record.tableStyles) return null
+  return record
 }

@@ -52,6 +52,9 @@ import {
   type Profile,
   type Theme
 } from './schema.js'
+import { validateDeckSchemaVersion } from './plan.js'
+
+export { validateDeckSchemaVersion } from './plan.js'
 
 // Consumers of the parse layer (store, tools, escape hatch) work with these
 // document types — re-export so they never import schema.js directly.
@@ -221,6 +224,68 @@ export function validateDeckShape(deck: Record<string, unknown>, path: string): 
   }
 
   issues.push(...validateExportConfig(deck.export, `${path}#export`))
+  issues.push(...validateMasters(deck.masters, deck.profile, `${path}#masters`))
+  return issues
+}
+
+/** Spec §3.5 — masters/layouts structural validation (generate dialect only). */
+function isBoundsQuad(value: unknown): boolean {
+  return Array.isArray(value) && value.length === 4 && value.every((n) => typeof n === 'number' && Number.isFinite(n))
+}
+
+function validateMasters(raw: unknown, profile: unknown, path: string): Issue[] {
+  if (raw === undefined) return []
+  if (profile === 'reverse') {
+    return [blocker(ERROR_CODES.ProfileViolationError, 'masters 仅生成方言；逆向工程用源存档整页恢复（§10.4）', path)]
+  }
+  if (!Array.isArray(raw)) return [blocker(ERROR_CODES.SchemaError, 'masters 必须是数组', path)]
+  const issues: Issue[] = []
+  const layoutNames = new Set<string>()
+  const masterNames = new Set<string>()
+  const kinds = new Set(['title', 'body', 'content', 'picture', 'chart', 'table'])
+  raw.forEach((m, mi) => {
+    const at = `${path}[${mi}]`
+    if (!isRecord(m)) {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'master 必须是对象', at))
+      return
+    }
+    if (typeof m.name !== 'string' || m.name === '') {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'master.name 必填且非空', `${at}.name`))
+    } else if (masterNames.has(m.name)) {
+      issues.push(blocker(ERROR_CODES.SchemaError, `master.name 重复：${m.name}`, `${at}.name`))
+    } else masterNames.add(m.name)
+    if (!Array.isArray(m.layouts) || m.layouts.length === 0) {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'master.layouts 必填且至少 1 个', `${at}.layouts`))
+      return
+    }
+    for (const [li, l] of (m.layouts as unknown[]).entries()) {
+      const lat = `${at}.layouts[${li}]`
+      if (!isRecord(l)) {
+        issues.push(blocker(ERROR_CODES.SchemaError, 'layout 必须是对象', lat))
+        continue
+      }
+      if (typeof l.name !== 'string' || l.name === '') {
+        issues.push(blocker(ERROR_CODES.SchemaError, 'layout.name 必填且非空', `${lat}.name`))
+      } else if (layoutNames.has(l.name)) {
+        issues.push(blocker(ERROR_CODES.SchemaError, `layout.name 全 deck 重复：${l.name}`, `${lat}.name`))
+      } else layoutNames.add(l.name)
+      if (l.placeholders !== undefined) {
+        if (!Array.isArray(l.placeholders)) {
+          issues.push(blocker(ERROR_CODES.SchemaError, 'placeholders 必须是数组', `${lat}.placeholders`))
+        } else {
+          for (const [pi, ph] of (l.placeholders as unknown[]).entries()) {
+            const pat = `${lat}.placeholders[${pi}]`
+            if (!isRecord(ph) || typeof ph.kind !== 'string' || !kinds.has(ph.kind)) {
+              issues.push(blocker(ERROR_CODES.SchemaError, `placeholder.kind 必须在 ${[...kinds].join('/')} 内`, `${pat}.kind`))
+            }
+            if (!isRecord(ph) || !isBoundsQuad((ph as { bounds?: unknown }).bounds)) {
+              issues.push(blocker(ERROR_CODES.SchemaError, 'placeholder.bounds 必须是 [x,y,w,h] 四数', `${pat}.bounds`))
+            }
+          }
+        }
+      }
+    }
+  })
   return issues
 }
 
@@ -352,6 +417,8 @@ export interface PageValidationOptions {
    * dialect bans `$key` outright (R2/R4), so the set is irrelevant there.
    */
   themeKeys?: Set<string>
+  /** Spec §3.5 — layout names offered by deck.masters (generate dialect). */
+  layoutNames?: Set<string>
 }
 
 export function validatePage(page: Page, options: PageValidationOptions = {}): Issue[] {
@@ -375,6 +442,46 @@ export function validatePage(page: Page, options: PageValidationOptions = {}): I
   }
 
   if (page.transition !== undefined) issues.push(...validatePageTransition(page.transition, `${path}#transition`))
+
+  // Spec §3.5 — generate-dialect layoutRef must resolve against deck.masters.
+  if (profile === 'generate' && page.layoutRef?.name && options.layoutNames) {
+    if (!options.layoutNames.has(page.layoutRef.name)) {
+      issues.push(
+        blocker(ERROR_CODES.UnknownLayoutError, `版式 ${page.layoutRef.name} 在 deck.masters 中不存在`, `${path}#layoutRef.name`, {
+          available: [...options.layoutNames]
+        })
+      )
+    }
+  }
+
+  // Spec §4.2 — svg pages carry a design source instead of an element list.
+  const isSvgPage = page.pageType === 'svg'
+  if (isSvgPage) {
+    if (profile !== 'generate') {
+      issues.push(blocker(ERROR_CODES.ProfileViolationError, 'pageType: svg 仅生成方言可用', `${path}#pageType`))
+    }
+    const src = page.svgSource as Record<string, unknown> | undefined
+    if (!src || typeof src.ref !== 'string' || src.ref.length === 0) {
+      issues.push(
+        blocker(ERROR_CODES.SchemaError, 'pageType: svg 的页必须给 svgSource.ref（media/svg/<file>.svg）', `${path}#svgSource`)
+      )
+    } else if (!isSafeRelativePath(src.ref) || !src.ref.startsWith('media/svg/') || !src.ref.toLowerCase().endsWith('.svg')) {
+      issues.push(
+        blocker(ERROR_CODES.SchemaError, 'svgSource.ref 必须是 media/svg/ 下以 .svg 结尾的相对路径', `${path}#svgSource.ref`, { actual: src.ref })
+      )
+    }
+    if (Array.isArray(page.elements) && page.elements.length > 0) {
+      issues.push(
+        blocker(ERROR_CODES.SchemaError, 'pageType: svg 的页 elements 必须为空数组（设计源在 svgSource.ref）', `${path}#elements`)
+      )
+    }
+    if (page.animations !== undefined && Array.isArray(page.animations) && page.animations.length > 0) {
+      issues.push(
+        blocker(ERROR_CODES.SchemaError, 'pageType: svg 的页不支持页内 animations（编译器阶段不支持）', `${path}#animations`)
+      )
+    }
+    return issues
+  }
 
   if (!Array.isArray(page.elements)) {
     issues.push(blocker(ERROR_CODES.SchemaError, 'elements 必填，且为元素数组', `${path}#elements`))
@@ -879,10 +986,25 @@ export function parseProject(deckText: string, pageEntries: PageEntry[]): Parsed
   const deckResult = parseDeckText(deckText)
   issues.push(...deckResult.issues)
   const deck = deckResult.value
+
+  // Spec §2.0 — schema gate runs before everything else; a v1 (or foreign) deck
+  // reports `UnsupportedSchemaError` and skips all further rule validation so
+  // the caller sees one decisive blocker instead of a cascade of schema violations.
+  if (deck) {
+    const schemaIssues = validateDeckSchemaVersion(deck as unknown as Record<string, unknown>)
+    issues.push(...schemaIssues)
+    if (schemaIssues.some((i) => i.level === 'blocker')) {
+      return { deck, pages: new Map(), issues, profile: deck.profile ?? DEFAULT_PROFILE }
+    }
+  }
+
   const profile: Profile = deck ? profileOf(deck) : DEFAULT_PROFILE
 
   if (deck) issues.push(...validateDeck(deck, { profile }))
   const themeKeys = deck ? themeKeysOf(deck.theme) : undefined
+  const layoutNames = deck && Array.isArray(deck.masters)
+    ? new Set(deck.masters.flatMap((m) => (Array.isArray(m.layouts) ? m.layouts.map((l) => l.name).filter((n): n is string => typeof n === 'string') : [])))
+    : undefined
 
   const pages = new Map<string, Page>()
   const declared = new Set<string>(Array.isArray(deck?.pages) ? deck.pages.filter((p): p is string => typeof p === 'string') : [])
@@ -903,7 +1025,7 @@ export function parseProject(deckText: string, pageEntries: PageEntry[]): Parsed
     issues.push(...parsed.issues)
     if (parsed.value) {
       pages.set(key, parsed.value)
-      issues.push(...validatePage(parsed.value, { profile, path: key, themeKeys }))
+      issues.push(...validatePage(parsed.value, { profile, path: key, themeKeys, layoutNames }))
     }
   }
 

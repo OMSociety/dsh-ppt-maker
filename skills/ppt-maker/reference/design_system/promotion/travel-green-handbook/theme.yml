@@ -1,0 +1,25 @@
+# 由 design.md（PART B）手工提炼。正文/标题/深色色块/正负值统一河蓝 #246B81（ink 兼任主品牌色，不单列 primary）；
+# 章节辅助色每章六选一（lightblue 可铺底；burgundy/yellowgreen/purple/warmgray/orange 各属一个主题节）。
+# 无红绿正负对：正负均用 $ink 配「＋/－」文字判断。design.md 明确 16:9 不保留源绝对字号与倍率，不写 fontSize。
+name: Travel Green Handbook · Promotion STYLE DESIGN SYSTEM
+colors:
+  background: '#EFEBE5'   # 灰米纸底（不得换成纯白；纯白只留给样本底/图内留白）
+  ink: '#246B81'          # 河蓝：正文/标题统一色，兼深色色块、正负值（配 ＋/－）、新图表第一系列
+  accent: '#F8AA98'       # 珊瑚主强调：章节色块或少量关键信息
+  lightblue: '#B0D0D9'    # 章节辅助色候选：浅蓝（可铺背景；解剖图引线色；新图表系列）
+  burgundy: '#A13846'     # 章节辅助色候选：酒红
+  yellowgreen: '#DCD060'  # 章节辅助色候选：黄绿
+  purple: '#948EC1'       # 章节辅助色候选：紫
+  warmgray: '#DAD0C8'     # 章节辅助色候选：暖灰
+  orange: '#F2B84C'       # 章节辅助色候选：橙（新图表第三系列）
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }          # 无衬线标题/结构（Marr Sans Semibold/Bold 层级）
+    color: $ink
+    bold: true
+  body:
+    fontFamily: { latin: SortsMillGoudy, ea: 思源宋体 }  # 衬线叙事正文（Capitaine Regular 层级）
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 脚注/页码明显后退

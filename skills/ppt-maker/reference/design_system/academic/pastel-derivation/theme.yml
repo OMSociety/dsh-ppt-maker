@@ -1,0 +1,28 @@
+# 由 design.md（PART B）手工提炼。design.md 只给 1920×1080 源稿的绝对 pt（body 40、heading 74）
+# 与相对倍率，未给 960×540 等效值，故 textStyles 不写 fontSize。
+name: Pastel Derivation · Academic STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 正文页底色（封面/章节页才可用低对比渐变）
+  ink: '#172C34'          # 全部标题与可读文字
+  primary: '#0064E0'      # 电蓝：仅用于标题中一个关键动作短语
+  accent: '#0085FD'       # 注解蓝：箭头、链接、新引入变量、图内标注；兼任 positive 信号
+  magenta: '#C32E8F'      # 辅助品红：与蓝成对的逆运算/源项/限制短语；兼任 negative 信号
+  panel: '#F1F4F7'        # 浅灰：定理/结论/条件背景框（≤25% 面积）、路线条当前阶段背板
+  almond: '#FCEEDC'       # 杏仁色：几何/分布/轨迹“沙盒”
+  blush: '#FEF2E8'        # 封面/章节页渐变角色（左上，approx.）
+  mist: '#DBEDFE'         # 封面/章节页渐变角色（右上，approx.）
+  mintbg: '#DEF8E9'       # 封面/章节页渐变角色（右下，approx.）
+  series1: '#1F77B4'      # 图表系列色（文档固定四色系）
+  series2: '#FF7F0E'
+  series3: '#2CA02C'
+  series4: '#D62728'
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # headings Medium，单个关键短语可 Bold（不重设整行粗体）
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $accent        # 页底引用用亮蓝（bright-blue citations）

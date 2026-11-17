@@ -1,0 +1,29 @@
+# 由 design.md（PART B）手工提炼。design.md 明确「16:9 不沿用源稿绝对字号与倍率」，故 textStyles 不写 fontSize。
+# 调色板无灰色，muted 缺席；正/负色文档未形成稳定增量（继承 PART A 通用约定），不列入。
+name: Prospect Annual · Finance STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 正文页底
+  ink: '#000533'          # 深藏蓝：正文与正文页标题；封面/章节页可整页满铺
+  primary: '#1EFF8F'      # 霓虹薄荷绿：章节展示字、箭头砖、关键列
+  accent: '#A29AFF'       # 冷薰衣草紫：章节展示字、折线、装饰方块
+  lavenderlight: '#C7C2FF'  # 紫稀释档：引文面板/次要列
+  lavenderpale: '#DAD7FF'   # 紫最浅档：引文面板/次要列
+  mintpanel: '#A5FFD2'    # 结论面板
+  focuspanel: '#D2FFE9'   # 整块焦点面板
+  tocgreen: '#78FFBC'     # 目录页特例满铺
+  featurebg: '#FBFFCC'    # 专题页特例底色
+  featureyellow: '#FFE900'  # 专题页配套黄
+  series1: '#001AFF'      # 图表首选系列蓝
+  seriesyellow: '#FFE380' # 堆叠需要时追加
+  seriesolive: '#998C00'  # 堆叠需要时追加
+textStyles:
+  title:
+    fontFamily: { latin: Anton, ea: MiSans }   # 超浓缩粗黑标题（Anton 经 customFonts；中文 MiSans Bold）
+    color: $ink
+    bold: true
+  body:
+    fontFamily: { latin: Inter, ea: MiSans }   # Inter 正文/图表（经 customFonts；备选 Liter）
+    color: $ink
+  caption:
+    fontFamily: { latin: Inter, ea: MiSans }
+    color: $ink           # 脚注明显后退（调色板无灰，沿用 ink）

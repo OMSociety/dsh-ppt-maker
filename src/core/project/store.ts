@@ -29,6 +29,8 @@ import {
   type Page,
   type Presentation
 } from '../pptd/parse.js'
+import { SCHEMA_VERSION, SVG_MEDIA_DIR, SVG_PAGE_TYPE } from '../pptd/schema-v2.js'
+import { PLAN_FILE, crossCheckPlan, parsePlanText, stringifyPlan, validatePlan, type Plan } from '../pptd/plan.js'
 import {
   appendSnapshot,
   hashMediaDir,
@@ -203,6 +205,10 @@ export interface LoadedProject {
   deck: Presentation
   /** Project-relative path -> parsed page. */
   pages: Map<string, Page>
+  /** plan.yml contents, when the project has one (planning contract). */
+  plan: Plan | null
+  /** brief.md raw text, when the project has one (planning contract). */
+  brief: string | null
   manifest: Manifest
   issues: Issue[]
   /** Non-null when the on-disk checksum does not match the manifest (external edit). */
@@ -237,6 +243,17 @@ export async function loadProject(cwd: string, dir: string): Promise<LoadedProje
     throw new ProjectError('DeckParseFailed', 'deck.pptd 无法解析', { status: 409, detail: parsed.issues })
   }
 
+  let plan: Plan | null = null
+  try {
+    const planText = await readFile(path.join(abs, PLAN_FILE), 'utf8')
+    const planParsed = parsePlanText(planText)
+    plan = planParsed.plan
+    parsed.issues.push(...planParsed.issues)
+    if (plan) parsed.issues.push(...crossCheckPlan(plan, parsed.deck))
+  } catch {
+    // plan.yml absent — planning contract is optional at the schema level
+  }
+
   const pages = new Map<string, string>()
   for (const entry of pageEntries) pages.set(entry.path, entry.text)
   const checksumMismatch = checksumOf(deckText, pages) !== manifest.checksum
@@ -248,7 +265,13 @@ export async function loadProject(cwd: string, dir: string): Promise<LoadedProje
       message: '磁盘内容与 manifest.checksum 不一致（工程被工具层之外修改过）'
     })
   }
-  return { dir: abs, deck: parsed.deck, pages: parsed.pages, manifest, issues, checksumMismatch }
+  let brief: string | null = null
+  try {
+    brief = await readFile(path.join(abs, 'brief.md'), 'utf8')
+  } catch {
+    // brief.md absent — optional advisory file
+  }
+  return { dir: abs, deck: parsed.deck, pages: parsed.pages, plan, brief, manifest, issues, checksumMismatch }
 }
 
 /* ------------------------------------------------------------------ *
@@ -258,12 +281,19 @@ export async function loadProject(cwd: string, dir: string): Promise<LoadedProje
 interface ProjectModel {
   deck: Presentation
   pages: Map<string, Page>
+  /**
+   * plan.yml state. Loaded when present; set by the `update_plan` op.
+   * Not part of the undo snapshot or the manifest checksum — the plan is
+   * advisory project metadata, not deck content.
+   */
+  plan?: Plan | null
 }
 
 function cloneModel(model: ProjectModel): ProjectModel {
   return {
     deck: JSON.parse(JSON.stringify(model.deck)) as Presentation,
-    pages: new Map([...model.pages].map(([k, v]) => [k, JSON.parse(JSON.stringify(v)) as Page]))
+    pages: new Map([...model.pages].map(([k, v]) => [k, JSON.parse(JSON.stringify(v)) as Page])),
+    plan: model.plan === undefined || model.plan === null ? model.plan : (JSON.parse(JSON.stringify(model.plan)) as Plan)
   }
 }
 
@@ -289,6 +319,9 @@ async function writeModel(projectDir: string, model: ProjectModel): Promise<void
     const target = path.join(projectDir, rel)
     await mkdir(path.dirname(target), { recursive: true })
     await writeAtomic(target, stringifyPage(page))
+  }
+  if (model.plan) {
+    await writeAtomic(path.join(projectDir, PLAN_FILE), stringifyPlan(model.plan))
   }
 }
 
@@ -325,6 +358,7 @@ export async function createProject(cwd: string, options: CreateProjectOptions):
 
     const deck: Presentation = {
       profile: 'generate',
+      schema: SCHEMA_VERSION,
       ...(options.title !== undefined ? { title: options.title } : {}),
       size: options.size ?? DEFAULT_SIZE,
       ...(options.deckTheme !== undefined ? { theme: options.deckTheme } : {}),
@@ -369,6 +403,8 @@ export const OP_NAMES = [
   'add_element',
   'update_element',
   'remove_element',
+  'update_svg_source',
+  'update_plan',
   'page_add',
   'page_delete'
 ] as const
@@ -421,6 +457,31 @@ function nextPagePath(model: ProjectModel): string {
   throw new Error('页序号耗尽')
 }
 
+/**
+ * 逆向保真（spec §10.4）：编辑触碰内容字段时，清掉整页元素的 sourceRef。
+ *
+ * 导出侧的「未改页整页恢复」以 sourceRef 完整性判定「这一页自导入后没动过」；
+ * update_page / update_element 是顶层浅合并，patch 不改 sourceRef——若不主动
+ * 失效，改了文字仍会被误判为「未改」而从存档整页恢复，把用户的编辑冲掉。
+ * 因此内容字段（content/bounds/fill/…）一变，整页 sourceRef 全部抹掉：
+ * 该页回退逐页重建，其余未动页不受影响。纯溯源字段（sourceRef/originalName）
+ * 的 patch 不触发失效。
+ */
+const PROVENANCE_KEYS = new Set(['sourceRef', 'originalName'])
+
+function invalidatePageProvenance(page: Page, patch: Record<string, unknown>): void {
+  if (!pageHasSourceRef(page)) return
+  const touchesContent = Object.keys(patch).some((k) => !PROVENANCE_KEYS.has(k))
+  if (!touchesContent) return
+  for (const el of page.elements) {
+    if (el && typeof el === 'object') delete (el as Record<string, unknown>).sourceRef
+  }
+}
+
+function pageHasSourceRef(page: Page): boolean {
+  return page.elements.some((el) => el && typeof el === 'object' && (el as Record<string, unknown>).sourceRef !== undefined)
+}
+
 function applyOp(model: ProjectModel, raw: OpRecord, index: number): string {
   if (!raw || typeof raw !== 'object') throw opError(index, '?', 'op 必须是对象')
   const name = raw.op
@@ -463,6 +524,7 @@ function applyOp(model: ProjectModel, raw: OpRecord, index: number): string {
       const page = requirePage(model, index, name, key)
       const patch = raw.patch
       if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) throw opError(index, name, 'update_page 需要对象 patch（顶层浅合并）')
+      invalidatePageProvenance(page, patch as Record<string, unknown>)
       Object.assign(page, patch)
       return `update_page ${key}`
     }
@@ -499,6 +561,7 @@ function applyOp(model: ProjectModel, raw: OpRecord, index: number): string {
       if (!element) throw opError(index, name, `元素不存在：${key}#${raw.elementId}`)
       const patch = raw.patch
       if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) throw opError(index, name, 'update_element 需要对象 patch（顶层浅合并）')
+      invalidatePageProvenance(page, patch as Record<string, unknown>)
       Object.assign(element, patch)
       return `update_element ${key}#${raw.elementId}`
     }
@@ -510,6 +573,31 @@ function applyOp(model: ProjectModel, raw: OpRecord, index: number): string {
       page.elements = page.elements.filter((e) => e?.elementId !== raw.elementId)
       if (page.elements.length === before) throw opError(index, name, `元素不存在：${key}#${raw.elementId}`)
       return `remove_element ${key}#${raw.elementId}`
+    }
+    case 'update_svg_source': {
+      const key = pageKeyOf(raw.page)
+      const page = requirePage(model, index, name, key)
+      if (page.pageType !== SVG_PAGE_TYPE) throw opError(index, name, `页不是 svg 类型：${key}`)
+      const src = raw.source
+      if (typeof src !== 'object' || src === null || Array.isArray(src)) throw opError(index, name, 'update_svg_source 需要对象 source {ref, viewBox?}')
+      const ref = (src as { ref?: unknown }).ref
+      if (typeof ref !== 'string' || !isSafeRelativePath(ref) || !ref.startsWith(SVG_MEDIA_DIR + '/') || !ref.toLowerCase().endsWith('.svg')) {
+        throw opError(index, name, `source.ref 必须是 ${SVG_MEDIA_DIR}/ 下以 .svg 结尾的相对路径`)
+      }
+      page.svgSource = { ref, ...((src as { viewBox?: unknown }).viewBox !== undefined ? { viewBox: (src as { viewBox: [number, number] }).viewBox } : {}) }
+      return `update_svg_source ${key}→${ref}`
+    }
+    case 'update_plan': {
+      // plan.yml is advisory metadata: it goes through the same optimistic lock
+      // as page edits, but is excluded from undo snapshots and the manifest
+      // checksum (see ProjectModel.plan).
+      const plan = raw.plan
+      if (typeof plan !== 'object' || plan === null || Array.isArray(plan)) throw opError(index, name, 'update_plan 需要对象 plan {version?, status?, pages: []}')
+      const issues = validatePlan(plan, PLAN_FILE)
+      const blocker = issues.find((i) => i.level === 'blocker')
+      if (blocker) throw opError(index, name, `plan 校验失败：${blocker.message}`)
+      model.plan = plan as Plan
+      return `update_plan (${(plan as Plan).pages?.length ?? 0} pages)`
     }
     default:
       throw opError(index, name, `未实现的 op：${op}`)
@@ -548,7 +636,7 @@ export async function editProject(cwd: string, options: EditOptions): Promise<Ed
       })
     }
 
-    const model = cloneModel({ deck: loaded.deck, pages: loaded.pages })
+    const model = cloneModel({ deck: loaded.deck, pages: loaded.pages, plan: loaded.plan })
     const appliedOps: string[] = []
     for (let i = 0; i < options.ops.length; i++) {
       appliedOps.push(applyOp(model, options.ops[i], i))

@@ -26,6 +26,10 @@ describe('lib/index.js 宿主 bundle 与 src/index.ts 接线同步', () => {
       'buildProjectDeck',
       'saveProjectPptx',
       'writeExportReport',
+      'releaseProject',
+      'checkProject',
+      'writeQaReport',
+      'computeProjectFingerprint',
       'ProjectError',
     ]
     for (const marker of markers) {

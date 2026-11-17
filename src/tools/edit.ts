@@ -3,8 +3,8 @@
  *
  * Frozen contract (plan §2):
  *  - ops[] vocabulary: add_page / remove_page / move_page / update_page /
- *    page_duplicate / add_element / update_element / remove_element, plus the
- *    aliases page_add / page_delete.
+ *    page_duplicate / add_element / update_element / remove_element /
+ *    update_plan / update_svg_source, plus the aliases page_add / page_delete.
  *  - baseRevision mismatch → `{ ok: false, error: { code: 'RevisionMismatch',
  *    status: 409 } }`.
  *  - returns `{ ok, revision, appliedOps, warnings }`.
@@ -17,7 +17,7 @@ export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
     name: 'ppt_edit',
     description:
       '对 PPTD 工程应用一组编辑 op（原子批量：任一 op 失败整批不落盘）。' +
-      'op 词表（冻结）：add_page / remove_page / move_page / update_page / page_duplicate / add_element / update_element / remove_element' +
+      'op 词表：add_page / remove_page / move_page / update_page / page_duplicate / add_element / update_element / remove_element / update_plan / update_svg_source' +
       '（别名 page_add=add_page、page_delete=remove_page）。' +
       '带 baseRevision 做乐观锁：与 manifest.revision 不一致返回 409 RevisionMismatch。' +
       '返回 { ok, revision, appliedOps, warnings }。',

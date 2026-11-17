@@ -1,0 +1,41 @@
+# 由 design.md（PART B）手工提炼。源画布 13.333×7.5in = 960×540pt（与 PPTD 一致），字号直接采用声明 pt：
+# body Cambria 8pt=1x、module headings 8–12、page titles 36–40→38、large figures 24–28→26、footnotes 6、cover ~75（特例）。
+# 双字体对：无衬线标题/标签 + 衬线正文（PART A 单无衬线默认的显式覆盖）。无红绿涨跌：符号+灰阶+琥珀表达。
+name: Warm Jade Annual Report · Work STYLE DESIGN SYSTEM
+colors:
+  background: '#FBF9EE'   # 暖象牙底（大部分内容页）；摄影/深底上标题反白也用它
+  panel: '#FFFFFF'        # 连续白底：仅 ESG/数据表章节
+  ink: '#181716'          # 炭黑：正文与标题同色；图表黑系列
+  primary: '#FDC356'      # 蜂蜜琥珀：最新期/核心数字/结论条/小指标底（单块 ≤15% 内容区）
+  gray: '#A09B93'         # 浅灰：浅灰柱系列；财务表当期/合计列整列填充（配白字或加粗）
+  muted: '#6B625D'        # 深灰：深灰系列/次级文字
+  line: '#CCC5BE'         # 分隔细线（约 1px 竖分隔与表内横线）
+textStyles:
+  title:
+    fontSize: 38
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }   # 无衬线标题/导航/数字标签/表头（Tahoma 层级）
+    color: $ink
+  display:
+    fontSize: 26          # 大数字/百分比（封面题约 75pt 为特殊页特例）
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $ink
+  body:
+    fontSize: 8
+    fontFamily: { latin: Unna, ea: 思源宋体 }             # 衬线长文正文（Cambria 层级）
+    color: $ink
+  caption:
+    fontSize: 6
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $ink
+tableStyles:
+  default:
+    # 财务表：横线分组（组标题/小计靠横线与加粗区分，不用斑马纹）；
+    # 当期/合计列整列填 $gray 配白字或加粗（列选择属内容侧，此处不固化为 firstColumnStyle）
+    cellStyle:
+      fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $line }, null ]
+    firstRowStyle:
+      bold: true
+    lastRowStyle:
+      bold: true

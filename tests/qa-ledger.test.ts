@@ -1,6 +1,7 @@
 /**
- * 质检落账（manifest.qaReport）e2e：ppt_check 与 ppt_export 都把质检结果写进
- * 工程账本，阻断路径同样落账——「当初为什么没过」随 revision 可追溯。
+ * 质检落账（manifest.qaReport）e2e：ppt_check 把质检结果 + 工程指纹写进
+ * 工程账本；ppt_export 只读账本（指纹门禁）——质检未过 / 质检过期一律拒导出，
+ * 落账由检查侧产生，「当初为什么没过」随 revision 可追溯。
  */
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -128,15 +129,16 @@ describe('质检落账 manifest.qaReport', () => {
     expect(qa.revision).toBe(1)
     expect(qa.issues.some((i) => i.severity === 'blocker')).toBe(true)
 
-    // 2) ppt_export 被阻断：同样落账（pass:false，tool 标 ppt_export）
+    // 2) ppt_export 被门禁阻断：qaReport.pass=false → QaReportMissing 409；
+    //    导出侧不覆写账本（落账保持 ppt_check 的结论）
     const blocked = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
-    expect(blocked).toMatchObject({ ok: false, error: { code: 'ExportBlocked' } })
+    expect(blocked).toMatchObject({ ok: false, error: { code: 'QaReportMissing', status: 409 } })
     qa = await readQaReport()
-    expect(qa.tool).toBe('ppt_export')
+    expect(qa.tool).toBe('ppt_check')
     expect(qa.pass).toBe(false)
     expect(qa.blockerCount).toBeGreaterThanOrEqual(1)
 
-    // 3) 修掉出界 → check 通过 → export 通过：落账 pass:true，exportReport 带 check 摘要
+    // 3) 修掉出界 → check 通过 → export 通过：exportReport 带指纹化的 check 摘要
     const fixed = await call('ppt_edit', {
       dir: 'deck',
       baseRevision: 1,
@@ -152,20 +154,51 @@ describe('质检落账 manifest.qaReport', () => {
 
     const exported = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
     expect(exported.ok).toBe(true)
-    qa = await readQaReport()
-    expect(qa.tool).toBe('ppt_export')
-    expect(qa.pass).toBe(true)
     const manifest = JSON.parse(await readFile(path.join(cwd, 'deck', 'manifest.json'), 'utf8')) as {
-      exportReport?: { check?: { pass?: boolean; issueCount?: number } | null }
+      exportReport?: { check?: { pass?: boolean; fingerprint?: string } | null; sha256?: string; postflight?: { ok?: boolean } }
     }
     expect(manifest.exportReport?.check?.pass).toBe(true)
+    expect(typeof manifest.exportReport?.check?.fingerprint).toBe('string')
+    expect(manifest.exportReport?.postflight?.ok).toBe(true)
 
-    // 4) skipCheck 导出：exportReport.check 为 null，不伪造质检结论
+    // 4) skipCheck 导出：exportReport.check 标注 skipped，不伪造质检结论
     const skipped = await call('ppt_export', { dir: 'deck', out: 'deck/out2.pptx', skipCheck: true })
     expect(skipped.ok).toBe(true)
     const manifest2 = JSON.parse(await readFile(path.join(cwd, 'deck', 'manifest.json'), 'utf8')) as {
-      exportReport?: { check?: { pass?: boolean } | null }
+      exportReport?: { check?: { skipped?: boolean } | null }
     }
-    expect(manifest2.exportReport?.check ?? null).toBeNull()
+    expect(manifest2.exportReport?.check?.skipped).toBe(true)
+  })
+
+  it('只检部分页的落账不放行整份导出（QaCoverageIncomplete），全页重检后放行', async () => {
+    const { ctx, fire } = makeCtx(cwd)
+    apply(ctx)
+    revealTools(fire)
+
+    await call('ppt_create', { dir: 'deck', title: '覆盖门禁' })
+    // 两页、元素都在画布内（规则层无 blocker）
+    const edit = await call('ppt_edit', {
+      dir: 'deck',
+      baseRevision: 0,
+      ops: [
+        { op: 'add_page', page: 'pages/01.page', content: { elements: [] } },
+        { op: 'add_page', page: 'pages/02.page', content: { elements: [] } }
+      ]
+    })
+    expect(edit.ok).toBe(true)
+
+    // 只检第 1 页：pass=true 落账，但覆盖不全
+    const partial = await call('ppt_check', { dir: 'deck', pages: [1] })
+    expect(partial.ok).toBe(true)
+    expect(partial.pass).toBe(true)
+
+    const blocked = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
+    expect(blocked).toMatchObject({ ok: false, error: { code: 'QaCoverageIncomplete', status: 409 } })
+
+    // 全页重检后放行
+    const full = await call('ppt_check', { dir: 'deck' })
+    expect(full.pass).toBe(true)
+    const exported = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
+    expect(exported.ok).toBe(true)
   })
 })

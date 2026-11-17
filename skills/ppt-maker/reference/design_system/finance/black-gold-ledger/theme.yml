@@ -1,0 +1,44 @@
+# 由 design.md（PART B）手工提炼，全部色值为文档 pixel-sampled approx. 值。
+# 字号：design.md 明确给出 960×540 参考值（body 9–10pt、page titles 21pt、cover 36pt），区间取中值。
+# design.md 未给 render 字体对（仅描述「Source Han Sans 气质」），故 textStyles 不写 fontFamily，不编造。
+# 无红绿涨跌体系：金色=当期/关键值，铜棕=退出/风险，其余数据退入灰阶。
+name: Black Gold Ledger · Finance STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 白底证据页（约 3/4 页）
+  darkbg: '#151515'       # 炭黑底：仅摘要/收尾行动页（约 1/4，非纯黑）
+  ink: '#3D3C3A'          # 暖深灰：正文、主系列柱、表内关键数字
+  heading: '#0A0A0A'      # 墨黑：白页标题、顶部规则线、折线系列、黑色通栏
+  primary: '#D6A000'      # 唯一强金锚点：KPI 大数、当期端点、阈值胶囊（单页 <3%，一页一个金焦点）
+  copper: '#A86038'       # 铜棕：唯一辅助语义色，退出/风险相关金额（低频）
+  muted: '#606060'        # 次级灰：副标题依据行、图表说明、单位
+  gray2: '#A7A7A7'        # 辅助灰：次要系列、列标签、深底辅助文字
+  faint: '#B6B6B6'        # 脚注灰：来源、页码等最弱层
+  line: '#D6D6D6'         # 浅灰：历史/背景系列、表格细线、深底说明文字
+  divider: '#E9E9E9'      # 模块分隔线
+  panel: '#F0F0F0'        # 面板灰：水印大字、结论带、深底反白卡片
+  track: '#F3F3F3'        # 轨道灰：进度/构成条的浅轨道
+  darkline: '#302F2D'     # 深底页分隔线
+textStyles:
+  title:
+    fontSize: 21
+    color: $heading
+    bold: true            # 标题字重 700–800
+  display:
+    fontSize: 36          # 封面大标题
+    color: $heading
+    bold: true
+  body:
+    fontSize: 9.5
+    color: $ink           # 字重 400
+  caption:
+    color: $faint         # 来源/页码（约 0.7x，文档未给 960×540 绝对值）
+tableStyles:
+  default:
+    # 无竖线表：行间浅灰细线，末行前一条墨线（合计行）；无斑马纹
+    cellStyle:
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $line }, null ]
+    firstRowStyle:
+      bold: true
+    lastRowStyle:
+      border: [ { style: solid, width: 1, color: $heading }, null, null, null ]

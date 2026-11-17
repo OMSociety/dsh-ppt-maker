@@ -17,7 +17,7 @@
 | 2 | 技能 key | 随包名统一换新（不再叫 kimi-ppt）；cordis.patch.yml、plugin 硬编码、README、locale 同步改；提醒用户改 ~/.dsh/AGENTS.md 路由表 |
 | 3 | 版本号 | 新包生命周期统一从 1.0.0 起 |
 | 4 | peerDeps | 不声明宿主版本要求：不写 `engines.dsh`，peer 只列运行期 import 的宿主包名（`@deepseek-ai/dsh-native-command`，区间 `*`） |
-| 5 | 语言栈 | **全 TS**。python-pptx/Pillow 降级为「逃生舱」（处理库拒收的破损文件），不做主线 |
+| 5 | 语言栈 | **主线全 TS**。SVG 页面轨的转换器（vendored 自 ppt-master，Python）是唯一例外，作为编译桥经子进程调用；python-pptx/Pillow 同时保留为「逃生舱」（处理库拒收的破损文件） |
 | 6 | 引擎 | @office-kit/pptx **pin 0.24.0**（动画 95 preset、转场含 morph；0.x 单维护者，引擎接口化 + PPTD 不暴露库 API + 20 份语料双向对拍，三件套进 PR1 验收） |
 | 7 | 格式 | PPTD 自主化：不再跟踪 Moonshot 上游，pptd.md 成为自家契约，显式定义逆向方言（绝对几何超集） |
 | 8 | 质检 | **规则引擎为主**（pptx-preview 的 auditTextLayout/findShapesOutsideCanvas/findOverlappingShapePairs + 对比度 + missingFonts）阻断式；AI 多模态降级为按需深检（截图对象是 libreoffice-kit 渲染的成品页） |

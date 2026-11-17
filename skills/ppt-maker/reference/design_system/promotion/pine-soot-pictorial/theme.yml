@@ -1,0 +1,28 @@
+# 由 design.md（PART B）手工提炼。字号取 design.md「16:9 migration」在 960×540 的推荐值（区间取中值）：
+# body 16–17→16.5、body titles 66–72→69、cover titles 124–144→134、labels/nav 13–15→14。
+# 界面层只有黑白两色；红/品红仅封面右下角条纹一次性使用，正文页禁止；图表与正负色继承 PART A，不新增编码。
+name: Pine Soot Pictorial · Promotion STYLE DESIGN SYSTEM
+colors:
+  background: '#000101'   # 近黑底（渲染接近 #000000）：黑场与摄影负空间
+  ink: '#FFFFFF'          # 白字：正文/导航/页码/细线；标题同为白色（层级只靠字号字重）
+  primary: '#EF1722'      # 封面红条纹（仅封面一次，约占封面 1/5；正文页禁止）
+  accent: '#FD1AEE'       # 封面品红窄条（面积约为红条一半；正文页禁止）
+textStyles:
+  title:
+    fontSize: 69
+    fontFamily: { latin: Inter, ea: MiSans }   # Inter SemiBold 标题/标签（Inter 经 customFonts）
+    color: $ink
+    bold: true
+  display:
+    fontSize: 134         # 封面错位超大字
+    fontFamily: { latin: Inter, ea: MiSans }
+    color: $ink
+    bold: true
+  body:
+    fontSize: 16.5
+    fontFamily: { latin: Inter, ea: MiSans }
+    color: $ink
+  caption:
+    fontSize: 14          # 标签/导航（ALL CAPS，无独立脚注档）
+    fontFamily: { latin: Inter, ea: MiSans }
+    color: $ink

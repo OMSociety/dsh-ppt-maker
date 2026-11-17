@@ -1,14 +1,12 @@
 /**
  * PPTD schema — the self-owned contract.
  *
- * Normative source: `docs/pptd-spec.md`. The format is an incremental spec: the
- * fields defined there are written out in full, everything else is inherited
- * from the upstream snapshot at `skills/ppt-maker/reference/pptd.md` by named
- * inheritance clauses. Those inherited parts are deliberately *not* re-typed in
- * detail here — a loose index signature keeps such fields flowing through the
- * tool layer unchanged, which is what "PPTD is an agent-friendly, human
- * reviewable DSL" requires. The types below cover every decision point that
- * the tool layer reads, writes or validates.
+ * Normative source: `docs/pptd-spec.md` — the full self-contained contract.
+ * Fields the tool layer does not read, write or validate are deliberately
+ * *not* re-typed in detail here — a loose index signature keeps such fields
+ * flowing through the tool layer unchanged, which is what "PPTD is an
+ * agent-friendly, human reviewable DSL" requires. The types below cover
+ * every decision point that the tool layer reads, writes or validates.
  *
  * The two dialects (profiles) are the core idea:
  *  - `generate`: design-system slots (`$key`) + generation semantics, what an
@@ -407,6 +405,14 @@ export interface DeckSource {
   slideCount: number
   size: [number, number]
   app?: string
+  /**
+   * 源文件在工程内的存档位置（source/original.pptx）与其内容指纹。
+   * 导出管线据此做「未改页整页恢复」：页内容与导入时一致（按 originalSha1
+   * 与 sourceRef 完整性判定）时从存档原样并入，chart / custGeom / connector
+   * 等 PPTD 模型承载不了的部件因此不丢。见 docs/pptd-spec.md §10。
+   */
+  archive?: string
+  originalSha1?: string
 }
 
 export interface Theme {
@@ -425,6 +431,8 @@ export interface CustomFont {
 /** Spec §3.1 — deck.pptd. */
 export interface Presentation {
   profile?: Profile
+  /** Spec §2.0 — protocol version; the tool layer refuses decks without `schema: 2`. */
+  schema?: number
   title?: string
   size: [number, number]
   customFonts?: CustomFont[]
@@ -432,15 +440,42 @@ export interface Presentation {
   export?: ExportConfig
   pages: string[]
   source?: DeckSource
+  /** Spec §3.5 — generate-dialect masters/layouts; absent = engine default blank master. */
+  masters?: MasterSpec[]
   [key: string]: unknown
 }
 
 export interface LayoutRef {
-  partName: string
+  /** Generate dialect: layout name resolved against deck.masters[*].layouts[*].name (§3.5). */
+  partName?: string
   name?: string
   type?: string | null
   masterPartName?: string
   [key: string]: unknown
+}
+
+/* ------------------------------------------------------------------ *
+ * Masters & layouts (spec §3.5, generate dialect only)
+ * ------------------------------------------------------------------ */
+
+export type MasterPlaceholderKind = 'title' | 'body' | 'content' | 'picture' | 'chart' | 'table'
+
+export interface LayoutPlaceholderSpec {
+  kind: MasterPlaceholderKind
+  bounds: [number, number, number, number]
+}
+
+export interface LayoutSpec {
+  name: string
+  shapes?: ElementBase[]
+  placeholders?: LayoutPlaceholderSpec[]
+}
+
+export interface MasterSpec {
+  name: string
+  background?: unknown
+  shapes?: ElementBase[]
+  layouts: LayoutSpec[]
 }
 
 export interface SourceRef {
@@ -518,10 +553,13 @@ export interface ElementBase {
 
 /** Spec §4.1 — one `.page` file. */
 export interface Page {
+  /** `svg` = design source is an SVG under media/svg/ (spec §4.2); absent = native element page. */
   pageType?: string
   background?: unknown
   notes?: string
   elements: ElementBase[]
+  /** Spec §4.2 — svg pages only: `{ref, viewBox?}` pointing at media/svg/<file>.svg. */
+  svgSource?: { ref: string; viewBox?: [number, number] }
   animations?: Animation[]
   // reverse dialect only
   transition?: PageTransition
@@ -580,7 +618,11 @@ export const ERROR_CODES = {
   TransitionOptionNotApplicableError: 'TransitionOptionNotApplicableError',
   UnmodeledTransitionWarning: 'UnmodeledTransitionWarning',
   PlaceholderFieldError: 'PlaceholderFieldError',
-  PlaceholderContrastWarning: 'PlaceholderContrastWarning'
+  PlaceholderContrastWarning: 'PlaceholderContrastWarning',
+  /** Spec §2.0 — deck without `schema: 2` is refused by the tool layer. */
+  UnsupportedSchemaError: 'UnsupportedSchemaError',
+  /** Spec §3.5 — Page.layoutRef.name has no match in deck.masters[*].layouts. */
+  UnknownLayoutError: 'UnknownLayoutError'
 } as const
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
@@ -589,7 +631,6 @@ export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
 export const REVERSE_ONLY_PAGE_FIELDS = [
   'transition',
   'hidden',
-  'layoutRef',
   'sectionName'
 ] as const
 

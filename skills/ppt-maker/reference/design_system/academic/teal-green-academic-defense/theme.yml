@@ -1,0 +1,49 @@
+# 由 design.md（PART B）手工提炼。字号为 design.md 声明的 960×540 等效值（17/27/47/11pt）。
+name: Teal-Green Academic Defense · Academic STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 页面底色
+  panel: '#F7F7F4'        # 近白：仅章节标题框内部
+  ink: '#000000'          # 正文与标题
+  primary: '#009682'      # 青绿结构色：方形项目符、关键连接符、对勾、小标签（≤10% 面积）；兼任 positive
+  sky: '#68BCE0'          # 天蓝框架色：仅目标横幅/列头
+  slate: '#939FB5'        # 蓝灰：侧栏/非激活态
+  muted: '#868686'        # 中性灰：中性线条、导航非当前项
+  mint: '#70D6A6'         # 证据标签
+  ice: '#F4FAFD'          # 目标单元格背景
+  accent: '#F0A81D'       # 黄橙焦点标记：每页只圈一个维度/参数
+  negative: '#B51E00'     # 错误/风险（approx.）
+  series1: '#1F77B4'      # 图表系列色（文档固定五色系）
+  series2: '#FF7F0E'
+  series3: '#2CA02C'
+  series4: '#D62728'
+  series5: '#9467BD'
+textStyles:
+  title:
+    fontSize: 27
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+    bold: true            # 页标题为粗黑体（“Primary Class - Subclass”式）
+  display:
+    fontSize: 47          # 章节标题
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+    bold: true
+  body:
+    fontSize: 17
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontSize: 11
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted         # 脚注/页脚
+tableStyles:
+  default:
+    # design.md 明确给的表格处理：顶/底横线（三线表语义），最优值加粗由内容侧决定
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+    firstRowStyle:
+      bold: true
+      border: [ { style: solid, width: 1, color: $ink }, null, { style: solid, width: 1, color: $ink }, null ]
+    lastRowStyle:
+      border: [ null, null, { style: solid, width: 1, color: $ink }, null ]

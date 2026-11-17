@@ -454,6 +454,47 @@ export const CSS = `
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .ppt-history-time{font-size:10px;color:var(--dsw-alias-label-secondary)}
+/* ── 规划契约抽屉（与历史抽屉同位，左对齐宽面板） ── */
+.ppt-plan-drawer{
+  position:absolute;top:0;left:0;bottom:0;width:340px;z-index:20;
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--dsw-alias-bg-base);
+  border-right:1px solid var(--dsw-alias-border-l2);
+  box-shadow:6px 0 16px rgba(0,0,0,0.12);
+}
+.ppt-plan-head{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;flex:none;
+  border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;
+}
+.ppt-plan-head .ppt-spacer{flex:1 1 auto}
+.ppt-plan-status{
+  font-size:10px;padding:1px 8px;border-radius:999px;
+  border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);
+}
+.ppt-plan-status[data-status="confirmed"]{color:var(--dsw-alias-label-status-success,#15803d);border-color:currentColor}
+.ppt-plan-body{flex:1 1 auto;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:12px}
+.ppt-plan-body h4{margin:0 0 6px;font-size:11.5px;color:var(--dsw-alias-label-primary)}
+.ppt-plan-brief{
+  margin:0;padding:8px;font-size:11px;line-height:1.55;white-space:pre-wrap;word-break:break-word;
+  background:var(--dsw-alias-bg-sunken,rgba(0,0,0,0.03));border-radius:6px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.ppt-plan-empty{margin:0;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.ppt-plan-table{width:100%;border-collapse:collapse;font-size:10.5px}
+.ppt-plan-table th,.ppt-plan-table td{
+  text-align:left;padding:4px 6px;border-bottom:1px solid var(--dsw-alias-border-l2);
+  vertical-align:top;word-break:break-word;
+}
+.ppt-plan-table th{color:var(--dsw-alias-label-secondary);font-weight:500}
+.ppt-plan-table code{font-size:10px}
+/* ── QA 状态徽标（StatusBar 右侧） ── */
+.ppt-qa-badge{
+  flex:none;font-size:10px;padding:1px 8px;border-radius:999px;margin-right:6px;
+  border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);
+}
+.ppt-qa-badge[data-state="pass"]{color:var(--dsw-alias-label-status-success,#15803d);border-color:currentColor}
+.ppt-qa-badge[data-state="fail"]{color:var(--dsw-alias-label-status-error,#b91c1c);border-color:currentColor}
+.ppt-qa-badge[data-state="stale"]{color:var(--dsw-alias-label-status-warning,#b45309);border-color:currentColor}
 `
 
 /** 幂等注入样式表（重复挂载只插一次；HMR 卸载由调用方决定是否移除）。 */

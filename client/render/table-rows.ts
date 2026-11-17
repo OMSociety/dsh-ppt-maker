@@ -2,7 +2,7 @@
  * 表格视图的结构助手（Inspector 的 TableGrid 用；纯函数，可单测）。
  *
  * PPTD 的 table.rows 是稀疏二维数组：合并区域按「被占位的单元格直接省略」存放
- * （reference/pptd.md Merged-cell rules），单元格可以是 {text, ...} 对象或简写标量。
+ * （docs/pptd-spec.md §6.6 合并单元格规则），单元格可以是 {text, ...} 对象或简写标量。
  */
 
 export type TableCell = Record<string, unknown>

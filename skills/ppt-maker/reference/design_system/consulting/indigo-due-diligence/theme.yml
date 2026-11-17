@@ -1,0 +1,37 @@
+# 由 design.md（PART B）手工提炼。design.md 只给相对倍率（body=1x、title 1.8–2.2x 等），
+# 未给绝对 pt，故 textStyles 不写 fontSize。标题与正文使用两套字体对（衬线标题 + 无衬线正文）。
+name: Indigo Due Diligence · Consulting STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 内容页底色
+  panel: '#E5E6E5'        # 冷灰：目录页右半 / 右侧判断面板
+  ink: '#000000'          # 正文与标题
+  primary: '#2151FF'      # 品蓝：选中列、关键数字、目标框；兼任 positive
+  accent: '#00A9F4'       # 亮青蓝：激活导航、次要系列
+  navy: '#041C2C'         # 结构深色：章节带、侧栏、编号圆、表头
+  series1: '#282C70'      # 补充系列色
+  series2: '#99C4FF'      # 补充系列色；目标行淡蓝填充也用它
+  series3: '#B2B3B2'      # 补充系列灰
+  rise: '#92D050'         # 向上图标偶用
+  negative: '#E4536C'     # 负向；热力表目标行/列的粉色描边也用此色系
+  warning: '#FF0000'      # 仅警告
+textStyles:
+  title:
+    fontFamily: { latin: Oranienbaum, ea: 思源宋体 }   # 衬线断言式标题
+    color: $ink
+    bold: true            # 高对比粗衬线标题
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }           # 无衬线正文/数据
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 脚注（0.55–0.65x，调色板未设脚注灰）
+tableStyles:
+  default:
+    # 细边框表格；表头用结构深 navy 底 + 白字（#041C2C 明确用于 table headers）
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+    firstRowStyle:
+      bold: true
+      color: $background
+      fill: { type: solid, color: $navy }

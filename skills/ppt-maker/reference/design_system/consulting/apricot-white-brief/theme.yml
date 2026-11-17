@@ -1,0 +1,31 @@
+# 由 design.md（PART B）手工提炼。16:9 迁移时 design.md 明确「不沿用源稿绝对字号与倍率」，
+# 故 textStyles 不写 fontSize；正/负态文档未设专色（沿用 secondary 表示正负号与零线）。
+name: Apricot White Brief · Consulting STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 纯白满铺，图表与正文下不另垫色
+  ink: '#000000'          # 正文、主标题、轴文字
+  secondary: '#231F20'    # 副标题、图表注释、次级标签；正负号与零线也用它
+  primary: '#CC0000'      # 生动红：图号、章节提示、引文金句、细规则线（仅小面积文字与线）
+  series1: '#CC2027'      # 图表焦点系列
+  series2: '#F16667'      # 图表浅红层级；引文上下细线也用它
+  series3: '#991B1E'      # 图表深红层级
+  gray1: '#D1D3D4'        # 灰阶：背景/历史/次要系列（由浅到深四档）
+  gray2: '#99999A'
+  muted: '#808285'        # 低强调灰
+  gray4: '#58595B'
+  bluegray1: '#506E86'    # 第三系列备选（蓝灰组，与品红组二选一，数据真有第三维才启用）
+  bluegray2: '#748B9E'
+  bluegray3: '#95A6B5'
+  magenta1: '#B86E9B'     # 第三系列备选（品红组）
+  magenta2: '#A33D7A'
+  magenta3: '#891D5A'
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # Graphik Medium 层级，粗于正文但非 Bold
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $secondary     # 脚注/来源/次级注释依次后退

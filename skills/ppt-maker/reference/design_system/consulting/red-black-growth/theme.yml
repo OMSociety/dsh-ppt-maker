@@ -1,0 +1,49 @@
+# 由 design.md（PART B）手工提炼。源画布 13.333×7.5in = 960×540pt，与 PPTD 画布一致，
+# 字号直接采用声明 pt：body 8.5、title 24、大数字 20–30→25、footnote 7.5。
+# 单一珊瑚红焦点：red 仅表强调，不设独立 positive/negative（负向用 ink/gray + 箭头 + 文字）。
+name: Red-Black Growth · Consulting STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 白底满铺
+  ink: '#454545'          # 正文、轴标签、连接线；负向值也用它
+  heading: '#0F0605'      # 近黑：标题、断言、大数字
+  primary: '#FF4D4D'      # 珊瑚红单一焦点：关键转折/领先项/中心节点（每页至多 1 个大色块 ≤20%）
+  panel: '#F6F6F6'        # 浅灰证据背景（≤30%）、KPI 砖底
+  muted: '#909090'        # 副标题、注释、页脚小字
+  line: '#DDDBDB'         # 细边框
+  palered: '#FFF1F1'      # 淡红模块背景（≤15%）
+  paleredline: '#FED8D8'  # 淡红描边
+  dark: '#1C0B0B'         # 近黑：窄结论条/单一结果节点（≤8%）
+  gray: '#BDBDBD'         # 对照系列灰（图表系列：$primary / $ink / $gray）
+  grid: '#E0E6F1'         # 图表网格线
+textStyles:
+  title:
+    fontSize: 24
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $heading
+    bold: true            # 标题与数字用 extra-bold
+  display:
+    fontSize: 25          # 重大断言/大数字
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $heading
+    bold: true
+  body:
+    fontSize: 8.5
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontSize: 7.5
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted
+tableStyles:
+  default:
+    # 细线数据表：$line 细边框；KPI 砖为浅灰底+细边框（卡片侧模式）
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+      border:
+        - { style: solid, width: 0.75, color: $line }
+        - { style: solid, width: 0.75, color: $line }
+        - { style: solid, width: 0.75, color: $line }
+        - { style: solid, width: 0.75, color: $line }
+    firstRowStyle:
+      bold: true

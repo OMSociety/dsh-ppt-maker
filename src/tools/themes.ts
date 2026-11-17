@@ -29,7 +29,8 @@ export function registerThemesTool(ctx: PluginToolCtx): (() => void) | undefined
               designSystem: { type: 'string' },
               theme: { type: 'string' },
               name: { type: 'string' },
-              path: { type: 'string' }
+              path: { type: 'string' },
+              executable: { type: 'boolean', description: 'theme.yml（机器可读调色板/字体表）可用时，ppt_create 会把它写进 deck.theme' }
             }
           }
         }

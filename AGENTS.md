@@ -1,12 +1,12 @@
 # AGENTS.md — dsh-ppt-maker Agent 宪法
 
 适用范围：本仓库全部目录。这是接手开发的第一入口；对外说明见 [README.md](README.md)。
-最后更新：2026-11-01
+最后更新：2026-11-18
 
 ## 项目概览
 
 DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、逆向与本地导出。
-宿主半侧注册 11 个 `ppt_*` 工具与 webServer 路由；浏览器半侧是右侧栏「PPT 创客」工作台；`skills/ppt-maker/` 是技能本体。
+宿主半侧注册 13 个 `ppt_*` 工具与 webServer 路由；浏览器半侧是右侧栏「PPT 创客」工作台；`skills/ppt-maker/` 是技能本体。
 
 | 项 | 事实 |
 |---|---|
@@ -58,7 +58,7 @@ Windows PowerShell 里先设环境变量，再跑第二句：`$env:NODE_OPTIONS=
 宿主路由    plugin/host/*.mjs （纯 JS，被 src/index.ts 动态 import；不 import lib/）
 ```
 
-- `src/index.ts` 的 `apply()` 做三件事：注册技能、懒展开注册 11 个工具、起 webServer 前缀路由。
+- `src/index.ts` 的 `apply()` 做三件事：注册技能、懒展开注册 13 个工具、起 webServer 前缀路由。
 - 工具链：`src/tools/*.ts`（raw JSON-Schema 注册）→ `src/core/project/store.ts`（PPTD 工程读写）→ `src/core/engine/officekit.ts`（引擎实现）→ 产物。
 - 工作台链：浏览器每 3s 轮询 `/ppt-maker/api/*` → `plugin/host/routes.mjs` → 经 `deps.core` 注入的同一批 `src/core` 函数（路由侧不 import `lib/`）。
 - 引擎隔离：`src/core/engine/types.ts` 是接口层，换引擎只动 `officekit.ts`。新增引擎能力先扩接口，再在 `officekit.ts` 实现，其它模块只依赖 `types.ts`。
@@ -91,7 +91,7 @@ Windows PowerShell 里先设环境变量，再跑第二句：`$env:NODE_OPTIONS=
 
 ## 禁止操作
 
-- 禁止把 `llm` / `attachments` 加进 `src/index.ts` 的 `inject`。原因：Cordis 对「声明注入但服务缺席」会让 `apply()` 无限期挂起且全程静默，实测症状是技能在目录里看得见、11 个工具与 webServer 路由全部消失。二者只能经 `ctx.get()` 调用时懒取，缺席时由 `src/core/review/ai.ts` 自行降级。
+- 禁止把 `llm` / `attachments` 加进 `src/index.ts` 的 `inject`。原因：Cordis 对「声明注入但服务缺席」会让 `apply()` 无限期挂起且全程静默，实测症状是技能在目录里看得见、13 个工具与 webServer 路由全部消失。二者只能经 `ctx.get()` 调用时懒取，缺席时由 `src/core/review/ai.ts` 自行降级。
 - 禁止在 `src/` 里回落 `process.cwd()`。原因：会话 cwd 只能取 `exec.agent.session.id` → `ctx.sessions.get(id).header.cwd`，回落会把工程写进宿主进程目录；取不到就报错。
 - 禁止手改 `lib/index.js`、`lib/client.js`。原因：二者是 tsup / esbuild 产物，且 EOL 由 `.gitattributes` 钉死为 `lf`，重新落盘别转成 CRLF；要改先改 `src/` 或 `client/` 再 `npm run build`。
 - 禁止在 `client/` 里 import `@deepseek-ai/*` 宿主包。原因：浏览器模块表只有 9 项平台种子，多一个依赖整块面板不加载（守卫测试会红）。
@@ -110,9 +110,9 @@ npm run check:build
 NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ```
 
-全量 24 个测试文件 / 245 个用例，约 40s（高负载下 fonts-embed 单文件可到 85s）。CI 跳过 `tests/fonts-embed.test.ts`（断言子集字体体积，依赖本机中文字体，云端 runner 上没有这些字体），其余 23 文件 / 229 用例在云端跑。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
+全量 30 个测试文件 / 274 个用例，约 40s（高负载下 fonts-embed 单文件可到 85s）。CI 跳过 `tests/fonts-embed.test.ts`（断言子集字体体积，依赖本机中文字体，云端 runner 上没有这些字体），其余 29 文件 / 259 用例在云端跑。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
 
-面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 11 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
+面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 13 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
 ## 提交与协作
 
@@ -150,5 +150,5 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 
 ## 维护
 
-本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与依赖版本、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。[skills/ppt-maker/reference/pptd.md](skills/ppt-maker/reference/pptd.md) 是上游快照，`docs/pptd-spec.md` 的承继条款按行号点名它：改它的行数就必须同步改规格里的 `reference/pptd.md:<起>-<止>`（本仓已删掉它的 `version` 字段声明，快照现为 2027 行）；本仓格式以 `docs/pptd-spec.md` 为准。
+本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与依赖版本、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。PPTD 格式契约全量自包含于 [docs/pptd-spec.md](docs/pptd-spec.md)，本仓格式以它为准。
 本文件写的是约定与边界，发现与代码不符时先判断哪边过时：约定过时改本文件，代码违规改代码。`docs/DECISIONS.md` 记的是决策依据，与现状冲突时以代码和测试为准。

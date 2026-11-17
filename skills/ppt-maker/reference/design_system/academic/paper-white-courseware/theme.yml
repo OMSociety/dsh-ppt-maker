@@ -1,0 +1,40 @@
+# 由 design.md（PART B）手工提炼。字号为 design.md「16:9 adaptation」声明值（区间取中值）：
+# body 16–18→17、titles 34–40→37、large figures 56–72→64；脚注 8pt 为 Letter 竖版源稿实测，960×540 未声明，caption 不写字号。
+name: Paper White Courseware · Academic STYLE DESIGN SYSTEM
+colors:
+  background: '#FDFAF5'   # 纸白底色（满铺，保留纸感暖度）
+  ink: '#56687A'          # 正文主色（全部长文不用纯黑）
+  primary: '#44712E'      # 森林绿：页标题、节标签、加粗强调、深色结果条
+  accent: '#F5987E'       # 珊瑚橙：短分隔线、章节号、步骤号、关键数字（正向/负向同用此色，方向靠 ↑/↓）
+  palegreen: '#D7EBCE'    # 辅助绿：列表项、表格行、标题面板的填充
+  palepink: '#F9DED8'     # 辅助粉：章节圆、案例顶部色带、表格交替行
+textStyles:
+  title:
+    fontSize: 37
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary
+    bold: true            # 参考稿为特粗黑标题（reference image wins）
+  display:
+    fontSize: 64          # 大数字/图示大号字
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary
+    bold: true
+  body:
+    fontSize: 17
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 页脚/脚注（调色板无灰色，沿用 ink）
+tableStyles:
+  default:
+    # design.md 明确给的表格处理：绿色行填充 + 粉色交替行
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+    firstRowStyle:
+      bold: true
+      fill: { type: solid, color: $palegreen }
+    bodyStyles:
+      - { fill: { type: solid, color: $background } }
+      - { fill: { type: solid, color: $palepink } }

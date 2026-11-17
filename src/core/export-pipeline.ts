@@ -8,10 +8,11 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createConverter, type Converter, type RenderImagesResult } from '@deepseek-ai/libreoffice-kit'
-import { loadProject, ProjectError } from './project/store.js'
+import { loadProject, ProjectError, type Manifest } from './project/store.js'
 import { createOfficeKitEngine } from './engine/officekit.js'
 import type { BuildContext, DeckBuildResult } from './engine/types.js'
 import { reviewDeck, type ReviewIssue } from './review/index.js'
+import { buildDeckMeasurer } from './review/measure.js'
 import { aiIssuesAsReviewIssues, runAiReview, type AiReviewDeps, type AiReviewResult } from './review/ai.js'
 import { getSlides, type PresentationData } from '@office-kit/pptx'
 import { embedFontsForPptx, modeOfExportConfig, type FontEmbedSummary } from './fonts/embed-pipeline.js'
@@ -27,6 +28,8 @@ export interface PipelineResult {
   /** 供 saveProjectPptx 嵌字体用：deck + pages 再次递进来 */
   deck: Presentation
   pages: Page[]
+  /** 加载时的 manifest（含 qaReport / exportReport 落账），QA 门禁用。 */
+  manifest: Manifest
 }
 
 /** Build the native deck for a project. Shared by all three tools. */
@@ -62,7 +65,8 @@ export async function buildProjectDeck(cwd: string, dir: string): Promise<Pipeli
     buildWarnings: warnings,
     fontsUsed: built.fontsUsed,
     deck: loaded.deck,
-    pages
+    pages,
+    manifest: loaded.manifest
   }
 }
 
@@ -213,7 +217,13 @@ export interface CheckOptions {
 export async function checkProject(cwd: string, dir: string, options: CheckOptions = {}): Promise<CheckResult> {
   const pipeline = await buildProjectDeck(cwd, dir)
   const pres = pipeline.built.native as PresentationData
-  const review = reviewDeck(pres, { pages: options.pages })
+  // 真实字形量测：工程用到的字体注册进 fontkit 量测器，溢出判定按真实
+  // 字形宽度；建不起来（无字体可解析等）回退启发式量测，质检不因此失败。
+  const measurer = await buildDeckMeasurer(pipeline.deck, pipeline.pages, { projectDir: pipeline.dir })
+  const review = reviewDeck(pres, {
+    pages: options.pages,
+    ...(measurer ? { measureText: measurer.measureText } : {})
+  })
 
  // 字体许可预检（不动导出也可见）——收集 fsType 位与缺字体清单
   const fontLicenseIssues = await reviewFontLicenses(pipeline.deck, pipeline.pages, { projectDir: pipeline.dir })

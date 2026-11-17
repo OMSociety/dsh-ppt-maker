@@ -10,6 +10,7 @@
  * advisory only — they never block; rule-layer blockers do.
  */
 import { checkProject } from '../core/export-pipeline.js'
+import { computeProjectFingerprint } from '../core/release/fingerprint.js'
 import { writeQaReport } from '../core/project/store.js'
 import { sessionIdOf, renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
@@ -59,7 +60,9 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
         const blockers = issues.filter((i) => i.severity === 'blocker').length
         const ai = r.ai as { performed?: boolean } | undefined
         const aiNote = ai === undefined ? '' : ai.performed === true ? '，AI 已审' : '，AI 降级'
-        return `质检：${r.pass === true ? '通过' : `${blockers} 个阻断`}（共 ${issues.length} 条${aiNote}）`
+        const pages = (r as { pages?: number[] | null }).pages
+        const coverage = Array.isArray(pages) ? `，仅检 ${pages.length} 页` : '，全页覆盖'
+        return `质检：${r.pass === true ? '通过' : `${blockers} 个阻断`}（共 ${issues.length} 条${aiNote}${coverage}）`
       })
     },
     execute: async (args, exec) => {
@@ -87,8 +90,11 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
         })
 
         // 质检落账（best-effort）：报告随 revision 可追溯，落账失败不反噬质检结论。
+        // fingerprint 绑定「质检那一刻的工程内容」——ppt_export 重新计算并比对，
+        // 质检后又有改动即 stale，拒导出（见 core/release/fingerprint.ts）。
         try {
           const blockers = result.issues.filter((i) => i.severity === 'blocker').length
+          const fingerprint = await computeProjectFingerprint(cwd, dir)
           await writeQaReport(cwd, dir, {
             tool: 'ppt_check',
             pass: result.pass,
@@ -96,7 +102,8 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
             blockerCount: blockers,
             issues: result.issues,
             pages: (args.pages as number[] | undefined) ?? null,
-            ai: ai ? (result.ai ?? null) : null
+            ai: ai ? (result.ai ?? null) : null,
+            fingerprint
           })
         } catch {
           /* 落账是副产物：manifest 写不动时质检结果仍然有效 */

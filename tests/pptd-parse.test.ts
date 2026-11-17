@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { parseProject, type Issue } from '../src/core/pptd/parse.js'
 
-const DECK_BASIC = `size: [960, 540]
+const DECK_BASIC = `schema: 2
+size: [960, 540]
 pages:
   - pages/01.page
 `
@@ -29,12 +30,12 @@ describe('parseProject（PPTD）', () => {
   })
 
   it('未知 profile → UnknownProfileError', () => {
-    const r = parseProject('profile: sideways\npages: []\n', [])
+    const r = parseProject('schema: 2\nprofile: sideways\npages: []\n', [])
     expect(codes(r.issues)).toContain('UnknownProfileError')
   })
 
   it('export.fontEmbed 越值 → ExportFieldValueError', () => {
-    const r = parseProject('export: { fontEmbed: bogus }\npages: []\n', [])
+    const r = parseProject('schema: 2\nexport: { fontEmbed: bogus }\npages: []\n', [])
     expect(codes(r.issues)).toContain('ExportFieldValueError')
   })
 
@@ -87,7 +88,8 @@ elements: []
   })
 
   it('引用未定义 theme key → UnknownThemeKeyError', () => {
-    const deck = `size: [960, 540]
+    const deck = `schema: 2
+size: [960, 540]
 theme:
   colors:
     brand: '#112233'
@@ -107,5 +109,39 @@ pages:
   it('缺失的页文件 → SchemaError（pages 列表声明但读不到）', () => {
     const r = parseProject(DECK_BASIC, [])
     expect(codes(r.issues).length).toBeGreaterThan(0)
+  })
+
+  it('缺少 schema 字段 → UnsupportedSchemaError（v1 工程被拒）', () => {
+    const r = parseProject('size: [960, 540]\npages: []\n', [])
+    expect(codes(r.issues)).toContain('UnsupportedSchemaError')
+    expect(r.issues.find((i) => i.code === 'UnsupportedSchemaError')?.level).toBe('blocker')
+  })
+
+  it('schema: 1 → UnsupportedSchemaError', () => {
+    const r = parseProject('schema: 1\nsize: [960, 540]\npages: []\n', [])
+    expect(codes(r.issues)).toContain('UnsupportedSchemaError')
+  })
+
+  it('pageType: svg 合法形态通过；缺 svgSource 或混入 elements 被拦', () => {
+    const ok = parseProject(DECK_BASIC, [
+      { path: 'pages/01.page', text: 'pageType: svg\nsvgSource: { ref: media/svg/cover.svg }\nelements: []\n' }
+    ])
+    expect(ok.issues.filter((i) => i.level === 'blocker')).toEqual([])
+
+    const noRef = parseProject(DECK_BASIC, [{ path: 'pages/01.page', text: 'pageType: svg\nelements: []\n' }])
+    expect(codes(noRef.issues)).toContain('SchemaError')
+
+    const mixed = parseProject(DECK_BASIC, [
+      {
+        path: 'pages/01.page',
+        text: 'pageType: svg\nsvgSource: { ref: media/svg/cover.svg }\nelements:\n  - elementType: text\n    elementId: t1\n    bounds: [0, 0, 10, 10]\n'
+      }
+    ])
+    expect(codes(mixed.issues)).toContain('SchemaError')
+
+    const badRef = parseProject(DECK_BASIC, [
+      { path: 'pages/01.page', text: 'pageType: svg\nsvgSource: { ref: ../escape.svg }\nelements: []\n' }
+    ])
+    expect(codes(badRef.issues)).toContain('SchemaError')
   })
 })

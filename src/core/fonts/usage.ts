@@ -58,7 +58,7 @@ function addFont(fonts: Map<string, Set<FontSlot>>, name: string, slot: FontSlot
  * 富文本内联字体
  * ------------------------------------------------------------------ */
 
-/** 起始 <span> 标签（PPTD 的内联样式只允许写在 span 上，见 reference/pptd.md「Inline styles」） */
+/** 起始 <span> 标签（PPTD 的内联样式只允许写在 span 上，见 docs/pptd-spec.md §6.1.1 内联样式） */
 const SPAN_TAG_RE = /<span\b[^>]*>/gi
 /** 标签内的 style 属性（双引号或单引号） */
 const STYLE_ATTR_RE = /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i
@@ -144,7 +144,7 @@ function scanTable(rows: unknown[][], fonts: Map<string, Set<FontSlot>>, chars: 
 }
 
 function scanChart(el: Record<string, unknown>, fonts: Map<string, Set<FontSlot>>, chars: Set<string>): void {
-  // 常见 chart 字体槽位：title / legend / dataLabel / axis.label / tooltip（对齐 reference/pptd.md 优先级链）
+  // 常见 chart 字体槽位：title / legend / dataLabel / axis.label / tooltip（对齐 docs/pptd-spec.md §1.3.3 图表样式链）
   const scanConfig = (cfg: unknown): void => {
     if (!cfg || typeof cfg !== 'object') return
     const rec = cfg as Record<string, unknown>

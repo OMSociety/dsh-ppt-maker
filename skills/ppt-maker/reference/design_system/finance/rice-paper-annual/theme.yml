@@ -1,0 +1,41 @@
+# 由 design.md（PART B）手工提炼。源画布 960×540 但 design.md 只给相对倍率（body=1x、assertions 2.2–2.8x 等），
+# 未给绝对 pt，故 textStyles 不写 fontSize。正/负色继承 PART A 通用约定，design.md 未给专色，不列入。
+# 章节强调色按 orange→pink→green→purple→indigo 轮换；#A4C9FF 与 #08BC51 同时是系列色（角色兼任）。
+name: Rice Paper Annual · Finance STYLE DESIGN SYSTEM
+colors:
+  background: '#F2EFE6'   # 暖纸白底
+  ink: '#000000'          # 正文/标题（超粗黑字）
+  primary: '#F9961F'      # 轮换强调首色橙：高亮块、关键数字、图题箭头胶囊
+  pink: '#FFC1A8'         # 轮换强调：粉桃
+  green: '#08BC51'        # 轮换强调：亮绿（兼系列色）
+  purple: '#D772FF'       # 轮换强调：紫
+  indigo: '#4C36FD'       # 轮换强调：靛蓝
+  sectionbg1: '#05225A'   # 章节页底色（仅特殊页）
+  sectionbg2: '#4C1431'
+  sectionbg3: '#05201B'
+  lightblue: '#A4C9FF'    # 浅蓝（兼章节页底与系列色）
+  series1: '#0B1636'      # 固定实填系列色（深海军蓝，表格深色表头也用它）
+  series2: '#1058E2'
+  series4: '#F6A031'
+  series6: '#7421F7'
+textStyles:
+  title:
+    fontFamily: { latin: Archivo Black, ea: MiSans }   # 超粗标题/巨大数字（Archivo Black 经 customFonts；中文 MiSans Bold）
+    color: $ink
+    bold: true
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 脚注 0.6–0.7x（调色板无灰，沿用 ink）
+tableStyles:
+  default:
+    # 表格为深色整行表头 + 反白字；关键行可整行饱和填充（内容侧决定）
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+    firstRowStyle:
+      bold: true
+      color: $background
+      fill: { type: solid, color: $series1 }

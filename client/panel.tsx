@@ -27,6 +27,7 @@ import { ThumbStrip } from './components/ThumbStrip'
 import { Stage } from './components/Stage'
 import { Inspector } from './components/Inspector'
 import { HistoryDrawer } from './components/HistoryDrawer'
+import { PlanDrawer } from './components/PlanDrawer'
 import { Toolbar } from './components/Toolbar'
 
 /** 右侧栏标签页（tab chip）里那个小标题：品牌图 + 「PPT 工作台」。 */
@@ -108,10 +109,41 @@ function StatusBar({ store }: { store: PptStore }) {
   return (
     <div className="ppt-statusbar" data-kind={kind} role="status" aria-live="polite">
       <span className="ppt-statusbar-text">{text}</span>
+      <QaBadge manifest={state.manifest} currentRevision={state.lastSeenRevision} />
       {file && state.activeKey ? (
         <ExportOpenMenu file={file} sessionId={state.sessionId} sessionKey={state.activeKey} />
       ) : null}
     </div>
+  )
+}
+
+/**
+ * QA 状态徽标：manifest.qaReport 的最近一次落账（ppt_check / ppt_export 刷新）。
+ * revision ≠ 当前游标时标「已过期」——内容在质检后又改过，结论不再作数。
+ */
+function QaBadge({ manifest, currentRevision }: { manifest: unknown; currentRevision: number }) {
+  const qa = (manifest as { qaReport?: Record<string, unknown> | null } | null)?.qaReport
+  if (!qa || typeof qa !== 'object') return null
+  const pass = qa.pass === true
+  const rev = typeof qa.revision === 'number' ? qa.revision : null
+  const stale = rev !== null && rev !== currentRevision
+  const issues = Array.isArray(qa.issues) ? qa.issues : []
+  const blockers = issues.filter(
+    (i) => i && typeof i === 'object' && (i as { severity?: string }).severity === 'blocker',
+  ).length
+  const label = stale
+    ? '质检已过期'
+    : pass
+      ? '质检通过'
+      : `质检未过${blockers ? `（${blockers} 阻断）` : ''}`
+  return (
+    <span
+      className="ppt-qa-badge"
+      data-state={stale ? 'stale' : pass ? 'pass' : 'fail'}
+      title={typeof qa.checkedAt === 'string' ? `质检时间 ${qa.checkedAt}` : undefined}
+    >
+      {label}
+    </span>
   )
 }
 
@@ -258,6 +290,8 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
   const [rightOpen, setRightOpen] = React.useState(false)
   // 版本历史抽屉：顶栏「历史」按钮开合；恢复成功后抽屉自己关。
   const [historyOpen, setHistoryOpen] = React.useState(false)
+  // 规划契约抽屉：顶栏「规划」按钮开合（只读视图，写入口在 ppt_plan 工具）。
+  const [planOpen, setPlanOpen] = React.useState(false)
   // 右栏「手动收起」的标记：记下被收起时的元素 id——只有改选**别的**元素才重置，
   // 同元素重选不弹开。取消选择（点空白）时清空。
   const rightDismissedFor = React.useRef<string | null>(null)
@@ -284,7 +318,13 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
 
   return (
     <div className="ppt-root">
-      <Toolbar store={store} historyOpen={historyOpen} onShowHistory={() => setHistoryOpen((v) => !v)} />
+      <Toolbar
+        store={store}
+        historyOpen={historyOpen}
+        onShowHistory={() => setHistoryOpen((v) => !v)}
+        planOpen={planOpen}
+        onShowPlan={() => setPlanOpen((v) => !v)}
+      />
       {state.status === 'loading' && <BlankLoading hint={state.loadingHint} />}
       {state.status === 'error' && <BlankError error={state.error || '面板载入失败'} onRetry={() => void store.actions.init()} />}
       {state.status === 'empty' && <BlankEmpty />}
@@ -332,6 +372,7 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
 
           {/* 版本历史抽屉（覆盖在画布之上；预览只读，恢复走游标移动） */}
           {historyOpen ? <HistoryDrawer store={store} onClose={() => setHistoryOpen(false)} /> : null}
+          {planOpen ? <PlanDrawer store={store} onClose={() => setPlanOpen(false)} /> : null}
         </div>
       )}
       {state.status === 'ready' ? <StatusBar store={store} /> : null}

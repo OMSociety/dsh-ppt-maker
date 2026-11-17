@@ -1,0 +1,47 @@
+# 由 design.md（PART B）手工提炼，全部色值为文档 approx. 采样值（细笔触抗锯齿，采样偏差 ±8）。
+# 源画布 960×540pt（与 PPTD 一致），字号直接采用声明 pt：title 26（+3 字距）、cover 30、body 10.5–12→11、
+# labels 12（+3–4 字距）、大数字 28–34→31（旁置 13–14pt 小单位同基线）、页码 10.5。
+# 三字体分工（禁第四款）：楷意衬线 LXGW Bright=页题/封面引文/中文大数字与单位；MiSans=标签/副题/正文/表格/注；
+# Oranienbaum=大数字与页码。正负语义：负=陶橙加粗、正=墨棕常规，不借红绿。
+name: Warm Clay Works · Work STYLE DESIGN SYSTEM
+colors:
+  background: '#F9F4E9'   # 暖米白全幅底；图表区无独立填充
+  ink: '#7A6A56'          # 灰棕：正文、副题、解释段落
+  heading: '#5C4630'      # 墨棕：标题、大数字、表内强调、步骤题；正向=此色常规字重
+  primary: '#C0651F'      # 陶橙唯一点亮（每页一处）：关键数字、负向状态词加粗、短粗线、引文条、柱图
+  kicker: '#C0762F'       # 标签橙棕：仅 kicker 章节标签（「NN | 节名」）
+  blush: '#F2DCD4'        # 腮红粉软装饰：角饰圆、照片背衬、编号筹码（不承载信息层级）
+  chipdeep: '#F5D9CE'     # 编号筹码可加深半档
+  muted: '#A08F78'        # 浅注灰褐：来源行、依据脚注、页码
+  camel: '#A37850'        # 驼棕：表头行、列标签
+  vline: '#DCD2BE'        # 竖分隔细线
+  hline: '#CBBFA9'        # 底线/行分隔细线
+  coil: '#7A5732'         # 角饰线圈描边
+  ornament: '#DEC7B5'     # 角饰偶用陶驼
+textStyles:
+  title:
+    fontSize: 26
+    fontFamily: LXGW Bright   # 楷意衬线页题/封面引文（+3 字距；无装饰字、无斜体题）
+    color: $heading
+  display:
+    fontSize: 31              # 大数字（Oranienbaum 数字 + LXGW Bright 中文单位同基线）
+    fontFamily: { latin: Oranienbaum, ea: LXGW Bright }
+    color: $heading
+  body:
+    fontSize: 11
+    fontFamily: MiSans        # 无衬线正文/表格/注（行高 1.5–1.65）
+    color: $ink
+  caption:
+    fontSize: 10.5
+    fontFamily: MiSans
+    color: $muted             # 来源/依据/页码
+tableStyles:
+  default:
+    # 无边框比较表：仅细横线、宽松行高；表头/列标签驼棕；最新/关键列陶橙点亮（列选择属内容侧）；空格用 em dash
+    cellStyle:
+      fontFamily: MiSans
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $hline }, null ]
+    firstRowStyle:
+      bold: true
+      color: $camel

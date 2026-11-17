@@ -70,6 +70,8 @@ export async function reverseImport(options: ImportOptions): Promise<ReverseWrit
   }
 
   const mapped = mapReverseModel(read, { sourcePath: sourceAbs, sourceSha1: sha1 })
+  // 原始字节随映射结果一起走：writeProject 原样落 source/original.pptx（spec §10 源存档）。
+  mapped.sourceBytes = bytes
 
   return writeReverseProject(mapped, {
     cwd: options.cwd,

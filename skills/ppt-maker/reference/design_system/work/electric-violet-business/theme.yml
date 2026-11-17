@@ -1,0 +1,27 @@
+# 由 design.md（PART B）手工提炼。字号：源画布 10×5.625in=720×405pt（body 7/标准题 22/章节题 26/封面 36/
+# 大数字 17–26/脚注 6–6.5），design.md 未给 960×540 等效值 → 不写 fontSize。
+# 单焦点紫：除中性色外每页只许一个色相；满铺紫仅章节页（正文页须有二元结构才可占 44%–56%）。
+# 正/负色继承 PART A（源无稳定 hex），不列入。
+name: Electric Violet Business · Work STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 正文页白底；兼暗底页反白标题字
+  ink: '#121212'          # 白底正文与标题；兼封面/图主导页近黑底
+  black: '#000000'        # 收尾页底；图表偶发优先星标
+  primary: '#5114F6'      # 电紫唯一焦点：章节底、关键数字、条/泡/细描边、图表主系列（正文区禁装饰性色块）
+  muted: '#9E9E9E'        # 次级注；图表基线系列
+  grid: '#CCCCCC'         # 网格线
+textStyles:
+  title:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }   # Tahoma 层级中性无衬线
+    color: $ink
+    bold: true            # 标题/KPI 数字/章节带用粗；正文保持常规
+  display:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $primary       # 大数字/关键数字紫
+    bold: true
+  body:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }
+    color: $muted         # 脚注/次级注

@@ -1,0 +1,48 @@
+# 由 design.md（PART B）手工提炼。字号取 design.md「16:9 migration」在 960×540 的声明值（px≈pt，区间取中值）：
+# body 16–18→17、captions 13–15→14、sources 11–13→12、pull quotes 28–34→31、content titles 56–64→60、section titles 84–96→90。
+name: Lake Blue Memo · Finance STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 内容页底（绝大部分）
+  panel: '#EEF3F9'        # 近白蓝：仅开篇声明页整页铺
+  ink: '#072535'          # 深湖蓝近黑：正文、页眉、主轴标签（细湖蓝表格线也用它）
+  primary: '#490E5A'      # 葡萄紫：节名、引文金句、证据结论与编号（判断轴，绝不做正文背景）
+  deepurple: '#49004B'    # 深紫：仅小图标题
+  teal: '#0C989A'         # 大节编号青
+  orange: '#FFA500'       # 问答序列起点橙点
+  lavender: '#DFE3F6'     # 浅薰衣草：分组表头轻填充
+  series1: '#0229B1'      # 图表主系列亮蓝
+  series2: '#00A1C7'      # 多系列/阶段编码加入色
+  muted: '#869198'        # 对比系列灰（图表对照、低强调）
+  positive: '#5CA712'     # 方向性正向（兼多系列色）
+  negative: '#ED1C24'     # 方向性负向；拐点红圈/细箭头也用红色系
+textStyles:
+  title:
+    fontSize: 60
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary       # 巨大轻字重紫标题（Light，不加粗）
+  display:
+    fontSize: 90          # 节标题/大数字
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary
+  quote:
+    fontSize: 31          # 无边框紫色引文金句（每页 ≤1）
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary
+  body:
+    fontSize: 17
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontSize: 12
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 来源行；captions 档（13–15）介于 body 与 sources 之间，取 sources 档
+tableStyles:
+  default:
+    # 预测/情景表：浅薰衣草分组表头、白表体、细湖蓝线；仅对比单元格用淡青/淡暖红（无 hex，未列入）
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $ink }, null ]
+    firstRowStyle:
+      bold: true
+      fill: { type: solid, color: $lavender }

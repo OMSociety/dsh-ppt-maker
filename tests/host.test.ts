@@ -31,12 +31,11 @@ import {
   redoProject,
   restoreProject,
   undoProject,
-  writeExportReport,
+  writeQaReport,
 } from '../src/core/project/store.js'
-import {
-  buildProjectDeck,
-  saveProjectPptx,
-} from '../src/core/export-pipeline.js'
+import { checkProject } from '../src/core/export-pipeline.js'
+import { computeProjectFingerprint } from '../src/core/release/fingerprint.js'
+import { releaseProject } from '../src/core/release/release.js'
 import { setHistoryPolicy, DEFAULT_HISTORY_LIMIT, DEFAULT_MERGE_WINDOW_MS } from '../src/core/project/history.js'
 
 const core = {
@@ -48,9 +47,10 @@ const core = {
   listProjectHistory,
   readHistorySnapshot,
   restoreProject,
-  buildProjectDeck,
-  saveProjectPptx,
-  writeExportReport,
+  releaseProject,
+  checkProject,
+  writeQaReport,
+  computeProjectFingerprint,
   ProjectError,
 }
 
@@ -361,6 +361,16 @@ describe('host 路由', () => {
       body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] },
     })
 
+    // v2 门禁：未质检直接导出 → 409（QaReportMissing）
+    const early = await apiJson(`${API_PREFIX}/export`, { method: 'POST', body: { sessionId: SESSION, key } })
+    expect(early.status).toBe(409)
+
+    // 面板质检（与 ppt_check 同规则链，落账 qaReport + 指纹绑定）
+    const check = await apiJson(`${API_PREFIX}/check`, { method: 'POST', body: { sessionId: SESSION, key } })
+    expect(check.status).toBe(200)
+    expect(check.json!.pass).toBe(true)
+    expect(typeof check.json!.fingerprint).toBe('string')
+
     // 默认口径：二进制流 + attachment（工作台导出后由 /export/open-menu 打开成品）
     const bin = await api(`${API_PREFIX}/export`, {
       method: 'POST',
@@ -370,8 +380,7 @@ describe('host 路由', () => {
     expect(bin.status).toBe(200)
     expect(bin.contentType).toContain('presentationml.presentation')
     expect(String(bin.headers['content-disposition'] || '')).toContain('attachment')
-    // pptx 是 zip：PK 魔数。顺带锁住「core.saveProjectPptx 返回 { bytes, fontEmbed }、
-    // 路由必须取 .bytes」——写成 Buffer.from({bytes,...}) 这里就红。
+    // pptx 是 zip：PK 魔数。
     expect(bin.body.subarray(0, 2).toString('latin1')).toBe('PK')
     expect(bin.body.length).toBeGreaterThan(1000)
 
@@ -421,6 +430,9 @@ describe('host 路由', () => {
         method: 'POST',
         body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] },
       })
+      // v2 门禁：面板导出前先过 /check（qaReport + 指纹落账）
+      const check = await apiJson(`${API_PREFIX}/check`, { method: 'POST', body: { sessionId: SESSION, key } })
+      expect(check.status).toBe(200)
       const saved = await apiJson(`${API_PREFIX}/export`, { method: 'POST', body: { sessionId: SESSION, key, save: true } })
       expect(saved.status).toBe(200)
       const abs = String(saved.json!.absolutePath || '')

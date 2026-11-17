@@ -1,0 +1,54 @@
+# 由 design.md（PART B）手工提炼。源画布 12192000×6858000 EMU = 960×540pt，与 PPTD 画布一致，
+# 故字号直接采用声明 pt（区间取中值）：body 12–16→14、title 24、大数字 32–40→36、章节码 18–27→22、脚注 7–9→8。
+name: Pine Green Strategy · Consulting STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 主底色（正文大区）
+  panel: '#F1F1F1'        # 浅灰：解释列、底部 so-what 条（仅分区间，不做正文主背景）
+  ink: '#565656'          # 正文主色（中灰）
+  muted: '#7E7E7E'        # 脚注/页码
+  primary: '#03522C'      # 深森林绿：标题、骨架线、章节码（近似值 #04512C 视同）
+  accent: '#29B974'       # 亮绿：关键数字、图标、行动线（不铺面）
+  mint: '#D1F5E2'         # 薄荷底：半屏过渡/引文/大解释区；首列薄荷侧栏导航
+  lightgreen: '#B8EDBC'   # 浅绿：指标卡/摘要面板
+  covermint: '#A8EFB8'    # 封面叠层附加色
+  olive: '#D3DF33'        # 图表同色系第三档（深绿→亮绿→橄榄黄）
+  cyan: '#2FC1D6'         # 图表需要时追加的青色
+  negative: '#E71C56'     # 品红：负向/风险
+  burgundy: '#670E30'     # 深酒红：负向边界
+textStyles:
+  title:
+    fontSize: 24
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary       # 调色板明确深绿掌标题（深色照片带上的白标题为版式特例）
+    bold: true
+  chaptercode:
+    fontSize: 22
+    fontFamily: { latin: QuattrocentoSans, ea: MiSans }   # 章节码 Trebuchet MS → 可接受替代
+    color: $primary
+  display:
+    fontSize: 36          # 大数字
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $accent        # 关键数字用亮绿
+    bold: true
+  body:
+    fontSize: 14
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontSize: 8
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted
+tableStyles:
+  default:
+    # design.md 明确：深绿表头、白表体、细绿网格线、少量浅灰行填充；关键行用粗体而非重填充
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+      border: [ { style: solid, width: 0.75, color: $accent }, null, { style: solid, width: 0.75, color: $accent }, null ]
+    firstRowStyle:
+      bold: true
+      color: $background
+      fill: { type: solid, color: $primary }
+    bodyStyles:
+      - { fill: { type: solid, color: $background } }
+      - { fill: { type: solid, color: $panel } }

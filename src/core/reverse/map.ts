@@ -1133,6 +1133,10 @@ export function mapReverseModel(
       sha1: options.sourceSha1,
       slideCount,
       size: sizePx,
+      // 源存档契约（spec §10）：writeProject 把原始字节落到 source/original.pptx；
+      // originalSha1 是「整轮导入的原子单位」——导出侧据此判定未改页可否整页恢复。
+      archive: 'source/original.pptx',
+      originalSha1: options.sourceSha1,
       ...(read.sourceApp !== null ? { app: read.sourceApp } : {})
     }
   }

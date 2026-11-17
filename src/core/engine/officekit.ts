@@ -19,14 +19,21 @@ import {
   addBlankSlide,
   addSlideChart,
   addSlideImage,
+  addSlideLayout,
+  addSlideLayoutPlaceholder,
   addSlideLine,
+  addSlideMaster,
   addSlideShape,
   addSlideTable,
   addSlideTextBox,
   clearSlideShapes,
   createPresentation,
   emu,
+  getPresentationFonts,
+  getSlides,
   getTableCell,
+  importSlide,
+  loadPresentation,
   mergeTableCells,
   renameShape,
   savePresentation,
@@ -58,6 +65,9 @@ import {
   setSlideBackgroundGradientFill,
   setSlideBackgroundImage,
   setSlideHidden,
+  setSlideLayout,
+  setSlideLayoutName,
+  setSlideMasterName,
   setSlideNotes,
   setSlideSize,
   setSlideTransition,
@@ -77,13 +87,17 @@ import {
   type PresentationData,
   type PresentationFontsInput,
   type SlideData,
+  type SlideLayoutData,
   type SlideShapeData,
   type TableCellData,
   type TextFormat,
   type TransitionOptions
 } from '@office-kit/pptx'
-import type { Animation, ElementBase, Page, PageTransition, Presentation, Theme } from '../pptd/schema.js'
+import type { Animation, ElementBase, MasterSpec, Page, PageTransition, Presentation, Theme } from '../pptd/schema.js'
 import { PLACEHOLDER_DEFAULT_LABELS } from '../pptd/schema.js'
+import { SVG_PAGE_TYPE } from '../pptd/schema-v2.js'
+import { compileSvgPage, themeHashOf } from '../svg/compiler.js'
+import { planSourceRestore } from '../reverse/restore.js'
 import { parseRichText, type RichParagraph, type RichRun } from './richtext.js'
 import type { BuildContext, DeckBuildResult, DeckEngine } from './types.js'
 
@@ -1329,6 +1343,76 @@ function applyDeckTheme(pres: PresentationData, theme: Theme | undefined, warnin
 }
 
 /* ------------------------------------------------------------------ *
+ * Masters & layouts (spec §3.5, generate dialect)
+ * ------------------------------------------------------------------ */
+
+/**
+ * 从 deck.masters 建真实 OOXML 母版/版式。
+ *
+ * 装饰图形直接画在母版/版式上（addSlideShape 等接受 SlideData；SlideLayoutData
+ * 与 SlideData 在库里同构——都是包内一张 slide-like 部件，占位框单独走
+ * addSlideLayoutPlaceholder）。页侧按 layoutRef.name 挂版式（setSlideLayout），
+ * 之后 clearSlideShapes 只清页自身的形状，不动版式继承来的装饰。
+ *
+ * 失败口径：母版/版式是显式声明的结构，建不出来要让人知道——单个装饰元素
+ * 失败降级为 warning（与页内元素同口径），版式本身建不出来抛错（fail-closed）。
+ */
+function buildMasters(
+  pres: PresentationData,
+  masters: MasterSpec[],
+  resolver: ThemeResolver,
+  ctx: BuildContext
+): Map<string, SlideLayoutData> {
+  const byName = new Map<string, SlideLayoutData>()
+  for (const master of masters) {
+    const partName = addSlideMaster(pres)
+    setSlideMasterName(pres, partName, master.name)
+    for (const spec of master.layouts) {
+      const layout = addSlideLayout(pres, partName)
+      setSlideLayoutName(layout, spec.name)
+      if (byName.has(spec.name)) {
+        throw new Error(`版式名重复：${spec.name}（deck.masters[*].layouts[*].name 必须唯一）`)
+      }
+      byName.set(spec.name, layout)
+      // 装饰图形：母版级 + 版式级共用同一个绘制通道（slide-like 部件）。
+      const draw = (elements: ElementBase[] | undefined, owner: string): void => {
+        for (const el of elements ?? []) {
+          const record = el as Record<string, unknown>
+          const where = `${owner} 装饰 ${String(record.elementId)}`
+          try {
+            switch (record.elementType) {
+              case 'shape':
+                buildShape(layout as unknown as SlideData, record, resolver, ctx)
+                break
+              case 'text':
+                buildText(layout as unknown as SlideData, record, resolver, undefined, ctx, new Set())
+                break
+              case 'line':
+                buildLine(layout as unknown as SlideData, record, resolver, ctx)
+                break
+              default:
+                ctx.warnings.push(`${where}：母版/版式装饰只支持 shape/text/line，${String(record.elementType)} 已跳过`)
+            }
+          } catch (err) {
+            ctx.warnings.push(`${where}：装饰绘制失败：${(err as Error).message}`)
+          }
+        }
+      }
+      if (spec === master.layouts[0]) draw(master.shapes, `母版 ${master.name}`)
+      draw(spec.shapes, `版式 ${spec.name}`)
+      for (const ph of spec.placeholders ?? []) {
+        const [x, y, w, h] = ph.bounds
+        const kind = ph.kind === 'title' ? 'content' : ph.kind === 'body' ? 'text' : ph.kind
+        addSlideLayoutPlaceholder(layout, kind as never, {
+          x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h)
+        })
+      }
+    }
+  }
+  return byName
+}
+
+/* ------------------------------------------------------------------ *
  * The engine
  * ------------------------------------------------------------------ */
 
@@ -1355,16 +1439,119 @@ export function createOfficeKitEngine(): DeckEngine {
 
       const slides: SlideData[] = []
       const shapesPerPage = new Map<number, Map<string, unknown>>()
+
+      // 逆向保真（spec §10.4）：逆向工程自导入后零编辑时，整份 deck 从
+      // source/original.pptx 逐页 importSlide 恢复——chart / custGeom /
+      // connector / SmartArt 等 PPTD 承载不了的部件原样回来。
+      // 任何一页有编辑痕迹（sourceRef 被 invalidatePageProvenance 清掉）或
+      // 存档校验不过，整份回退逐页重建，永不部分恢复（避免页序/依赖错位）。
+      const restore = await planSourceRestore(deck, pages, ctx.projectDir)
+      for (const note of restore.notes) warnings.push(note)
+      const restoreAll = restore.archiveReady && restore.restorePage.every(Boolean)
+      if (restoreAll && restore.bytes) {
+        const srcPres = await loadPresentation(restore.bytes)
+        const srcSlides = getSlides(srcPres)
+        if (srcSlides.length !== pages.length) {
+          warnings.push(`源存档页数异常（${srcSlides.length}），回退逐页重建`)
+        } else {
+          for (let i = 0; i < srcSlides.length; i++) {
+            const slide = importSlide(pres, srcSlides[i])
+            slides.push(slide)
+            shapesPerPage.set(i, new Map())
+          }
+          // 页序与导入时一致（planSourceRestore 已校验页数），直接收尾返回。
+          // 主题/字体：恢复页自带原始部件，不重设；字体用字表从存档读。
+          try {
+            const srcFonts = getPresentationFonts(srcPres)
+            if (srcFonts) {
+              for (const f of [srcFonts.majorLatin, srcFonts.majorEastAsian, srcFonts.majorComplexScript,
+                srcFonts.minorLatin, srcFonts.minorEastAsian, srcFonts.minorComplexScript]) {
+                if (f) fonts.add(f)
+              }
+            }
+          } catch {
+            // 字体清单缺失不阻断恢复。
+          }
+          warnings.push(`整份 deck 自导入后零编辑：${srcSlides.length} 页全部从源存档恢复（chart/custGeom/connector 等部件原样保留）`)
+          return {
+            native: pres,
+            slides,
+            shapes: shapesPerPage,
+            warnings,
+            fontsUsed: [...fonts].filter((f) => f !== 'default')
+          }
+        }
+      }
+
       const stats = {
         transitionPages: 0,
         animationsWritten: 0,
         animationsSkipped: 0
       }
 
+      // 母版/版式轨（§3.5）：页循环之前建好，页侧按 layoutRef.name 挂接。
+      // 仅生成方言；逆向工程走源存档整页恢复（§10.4），不重建母版。
+      const layoutByName =
+        profile === 'generate' && Array.isArray(deck.masters) && deck.masters.length > 0
+          ? buildMasters(pres, deck.masters, resolver, ctx)
+          : new Map<string, SlideLayoutData>()
+
       for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
         const page = pages[pageIndex]
         const pageLabel = `第 ${pageIndex + 1} 页`
+
+        // svg 页：整页经 vendored 编译器编成单页 pptx，再 importSlide 并入主 deck。
+        // 按页序处理时 importSlide 的尾部追加天然落在正确位置，无需 moveSlide。
+        // fail-closed：编译失败/产物异常直接抛错，不产空白占位页。
+        if (page.pageType === SVG_PAGE_TYPE) {
+          const svgRef = page.svgSource?.ref
+          if (!svgRef) {
+            throw new Error(`${pageLabel}：svg 页缺少 svgSource.ref`)
+          }
+          const compiled = await compileSvgPage({
+            projectDir: ctx.projectDir,
+            svgRef,
+            themeHash: themeHashOf(deck.theme)
+          })
+          const srcPres = await loadPresentation(compiled.bytes)
+          const srcSlides = getSlides(srcPres)
+          if (srcSlides.length !== 1) {
+            throw new Error(`${pageLabel}：svg 编译产物页数异常（${srcSlides.length}）`)
+          }
+          const slide = importSlide(pres, srcSlides[0])
+          slides.push(slide)
+          shapesPerPage.set(pageIndex, new Map())
+          for (const family of compiled.fonts) fonts.add(family)
+          if (typeof page.notes === 'string' && page.notes !== '') setSlideNotes(slide, page.notes)
+          // deck 级转场对 svg 页同样生效（页内动画 svg 页不支持，见规格 §4）。
+          if (transitionMode !== 'none') {
+            const curated =
+              transitionMode === 'auto'
+                ? AUTO_TRANSITION_CURATED[pageIndex % AUTO_TRANSITION_CURATED.length]
+                : { effect: 'fade' }
+            try {
+              setSlideTransition(slide, {
+                effect: curated.effect as never,
+                ...(curated.direction !== undefined ? { direction: curated.direction } : {}),
+                speed: 'fast',
+                advanceOnClick: true
+              })
+              stats.transitionPages++
+            } catch (err) {
+              warnings.push(`${pageLabel}：deck 级转场 ${curated.effect} 写入失败：${(err as Error).message}`)
+            }
+          }
+          continue
+        }
+
         const slide = addBlankSlide(pres)
+        // 挂版式（§3.5）：版式带来装饰图形与占位框；clearSlideShapes 只清
+        // 页自身的形状，不动版式继承。未知版式名 fail-closed（与校验层一致）。
+        if (profile === 'generate' && page.layoutRef?.name) {
+          const layout = layoutByName.get(page.layoutRef.name)
+          if (!layout) throw new Error(`${pageLabel}：未知版式 ${page.layoutRef.name}（deck.masters 里没有）`)
+          setSlideLayout(slide, layout)
+        }
         clearSlideShapes(slide)
         slides.push(slide)
         const shapeMap = new Map<string, SlideShapeData>()

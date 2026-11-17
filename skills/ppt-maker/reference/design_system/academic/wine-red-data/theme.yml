@@ -1,0 +1,40 @@
+# 由 design.md（PART B）手工提炼。design.md 只给相对倍率（body=1x、titles 1.6–2x 等），
+# 未给 960×540 绝对 pt，故 textStyles 不写 fontSize。
+name: Wine Red Data · Academic STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 内容页底色（约 108/150 页）
+  panel: '#F3F3F3'        # 浅灰：封面/目录页底、定义/引文框
+  ink: '#000000'          # 正文主色
+  primary: '#820000'      # 酒红：章节整页换肤（约 7 页）、大字宣言页
+  purple: '#4F0E86'       # 标题紫：仅开场/导航
+  accent: '#E69138'       # 主强调橙：关键词、数字、箭头（≤10–15%）
+  highlight: '#F7D05B'    # 荧光黄：短平刷痕，仅标记当前目录项/关键短语（approx.）
+  cream: '#FFEFD9'        # 独立小节奶油底（与 forest 配套，绝不与酒红同页混用）
+  forest: '#004032'       # 奶油小节深绿文字
+  muted: '#A9AAAC'        # 灰基线：图表基准系列、次要信息
+  positive: '#00B050'     # 仅状态语义
+  negative: '#FF0000'     # 仅状态语义
+  series1: '#0076BA'      # 常用图表系列色（灰为基线，见 muted）
+  series2: '#00A2FF'
+  series3: '#56C1FF'
+  series4: '#D2C7EB'
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+    bold: true            # 文档明确 titles 用 bold
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $muted         # 页底来源行
+tableStyles:
+  default:
+    # 高密度表：仅细横线、白或浅灰底，不发明额外彩色填充
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $muted }, null ]
+    firstRowStyle:
+      bold: true

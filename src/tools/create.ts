@@ -1,10 +1,13 @@
 /**
- * ppt_create — create an empty PPTD project under the session cwd.
+ * ppt_create — create an empty PPTD v2 project under the session cwd.
  *
- * Frozen result shape (plan §2): `{ ok, manifest }` with
- * `manifest.revision === 0`.
+ * When `designSystem` + `theme` name a bundled theme with a theme.yml, the
+ * palette/font tables are written into `deck.theme` up front, so `$key`
+ * references resolve from the first page.
  */
 import { createProject, DEFAULT_SIZE } from '../core/project/store.js'
+import { loadThemeYaml } from '../core/theme.js'
+import { PACKAGE_ROOT } from '../root.js'
 import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerCreateTool(ctx: PluginToolCtx): (() => void) | undefined {
@@ -41,12 +44,19 @@ export function registerCreateTool(ctx: PluginToolCtx): (() => void) | undefined
       try {
         const cwd = resolveSessionCwd(exec, ctx.sessions)
         const size = args.size as [number, number] | undefined
+        const designSystem = (args.designSystem as string | undefined) ?? null
+        const theme = (args.theme as string | undefined) ?? null
+        // A theme without a usable theme.yml leaves deck.theme absent rather
+        // than half-populated (spec §3: $key refs must resolve or not exist).
+        const deckTheme =
+          designSystem && theme ? ((await loadThemeYaml(PACKAGE_ROOT, designSystem, theme)) as Record<string, unknown> | null) : null
         const { manifest } = await createProject(cwd, {
           dir: args.dir as string,
           title: args.title as string | undefined,
           size,
-          designSystem: (args.designSystem as string | undefined) ?? null,
-          theme: (args.theme as string | undefined) ?? null,
+          designSystem,
+          theme,
+          ...(deckTheme ? { deckTheme } : {}),
           sessionId: sessionIdOf(exec)
         })
         return { ok: true, manifest }

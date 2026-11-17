@@ -1,0 +1,36 @@
+# 由 design.md（PART B）手工提炼。源画布 720×405pt 的绝对 pt（body 9–10、title 16 等）
+# 非 960×540 口径且文档未给等效换算，故 textStyles 不写 fontSize。
+name: Marine Blue Research · Consulting STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 内容页底色（图片页文字区也留白）
+  ink: '#000000'          # 正文/轴
+  primary: '#00295F'      # 藏青：眉题/断言式标题
+  accent: '#00ACEE'       # 主青色：细线、第一系列、当前章节（≤1/4 面积）
+  deepblue: '#0064BC'     # 深蓝：第二系列/终值/深单元格
+  lightblue: '#BEE0FF'    # 浅蓝：低强调单元格
+  muted: '#D5D6D9'        # 灰：基线/其他系列
+  panel: '#F1F2F1'        # 面板灰：so-what 综合条
+  orange: '#F17E00'       # 橙：第三系列/编号圆点（不承载正负语义，禁止做背景填充）
+  highlight: '#F2E292'    # 行内高亮（approx.）
+  map: '#C3CFE0'          # 地图底色（approx.，仅地图）
+textStyles:
+  title:
+    fontFamily: { latin: QuattrocentoSans, ea: LXGW Bright }
+    color: $primary       # 藏青断言标题（楷体感）
+  body:
+    fontFamily: { latin: QuattrocentoSans, ea: LXGW Bright }
+    color: $ink
+  caption:
+    fontFamily: { latin: QuattrocentoSans, ea: LXGW Bright }
+    color: $ink           # 脚注 8pt（源稿口径），未设专色
+tableStyles:
+  default:
+    # 蓝阶矩阵：深蓝表头白字，行分隔用虚线（design.md 明确的三档：deep blue/light blue/gray 按单元格语义着色）
+    cellStyle:
+      fontFamily: { latin: QuattrocentoSans, ea: LXGW Bright }
+      color: $ink
+      border: [ null, null, { style: dash, width: 0.75, color: $muted }, null ]
+    firstRowStyle:
+      bold: true
+      color: $background
+      fill: { type: solid, color: $deepblue }

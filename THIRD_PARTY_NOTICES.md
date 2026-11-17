@@ -59,6 +59,24 @@ SOFTWARE.
 `@office-kit/pptx`（MIT）、`@office-kit/pptx-preview`、`@deepseek-ai/libreoffice-kit`（MPL-2.0）、
 `@deepseek-ai/dsh-native-command`、`fontkit`（MIT）、`subset-font`（BSD-3-Clause）。
 
+## Vendored：ppt-master SVG → DrawingML 转换器
+
+`skills/ppt-maker/vendor/ppt-master/` 收录自 [ppt-master](https://github.com/hugohe3/ppt-master)
+（commit `7e0df6705de0cd24345210d31f07fcb5a32b6900`）的 SVG → 原生 DrawingML PPTX 转换器，
+MIT 许可，**Copyright (c) 2025-2026 Hugo He**。许可全文见该目录下的 `LICENSE`；
+版权头在各源文件中原样保留。
+
+收录范围为 `svg_to_pptx.pptx_package.builder` 的 import 闭包；上游的署名完整性校验
+（`attribution_guard.py`、`console_encoding.py` 中的分发身份校验）不在本副本内。
+MIT 许可条款（含 `LICENSE` 中的版权声明）按要求完整保留。
+
+该目录 `pptx_shapes/data/` 下的数据文件带各自许可：Apache-2.0 与 MIT
+（见同目录 `LICENSE-APACHE-2.0.txt`、`LICENSE-OPEN-XML-SDK-MIT.txt`、`NOTICE.md`）。
+
+Python 侧依赖（`python-pptx`、`XlsxWriter`、`skia-pathops`、`uharfbuzz`、`lxml`、`Pillow`）
+由 `scripts/prepare-vendor-env.mjs` 按 `skills/ppt-maker/vendor/requirements.txt` 的 pin 版本
+安装到本地虚拟环境，作为普通依赖各自带许可文件，不随本包分发。
+
 ## 技能与语料
 
 `skills/ppt-maker/` 与 `tests/corpus/` 是本项目的自有内容；语料已脱敏，不含来源机构的专名与真实人名，

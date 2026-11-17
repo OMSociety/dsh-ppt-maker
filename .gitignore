@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.cache/
+skills/ppt-maker/vendor/.venv/
+skills/ppt-maker/vendor/.venv-ready.json
 node_modules/
 .preview/
 *.pptx

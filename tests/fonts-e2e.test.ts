@@ -66,6 +66,7 @@ describe('字体嵌入 e2e：导出管线完整跑通', () => {
 
         // 塞一页内容 + theme 引用测试字体
         const deckText = [
+          'schema: 2',
           'profile: generate',
  'title: 端到端字体嵌入',
           'size: [960, 540]',

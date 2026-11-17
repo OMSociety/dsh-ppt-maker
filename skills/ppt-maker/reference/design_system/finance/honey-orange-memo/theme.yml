@@ -1,0 +1,52 @@
+# 由 design.md（PART B）手工提炼。源画布即 960×540pt（与 PPTD 一致），字号直接采用声明 pt：
+# body 10.6–11→10.8、subtitle 16、title 28、section 44、footnote 7–8→7.5。
+# design.md 声明 Arial 字族但未给中文配套渲染对，fontFamily 用字符串形态 'Arial'（不编造 ea）。
+name: Honey Orange Memo · Finance STYLE DESIGN SYSTEM
+colors:
+  background: '#FAF8F6'   # 暖白底（approx.）
+  panel: '#FFFFFF'        # 纯白：仅表格/注释区
+  ink: '#4D4D55'          # 正文主色
+  primary: '#FF6600'      # 亮橙：标题与主强调、图表第一系列、桥图终值高柱
+  rail: '#FF5703'         # 左侧通高结构轨（approx.）
+  navy: '#172856'         # 深结构藏蓝：激活导航段、表头、侧标签、论证带
+  series2: '#25408B'      # 系列/对比（橙→深蓝→青蓝序列第二档）
+  series3: '#579DB7'      # 系列/对比第三档（青蓝）
+  peach: '#FFE0CC'        # 浅橙：注释块/行组填充、合计行
+  lightblue: '#96C2D2'    # 浅蓝：注释块/行组填充
+  muted: '#A6A6A6'        # 分隔灰（仅分隔用途）
+  line: '#D9D9D9'         # 分隔细灰
+  positive: '#008000'     # 财务方向正向（固定）
+  negative: '#C00000'     # 财务方向负向（固定）
+textStyles:
+  title:
+    fontSize: 28
+    fontFamily: Arial
+    color: $primary
+    bold: true            # Arial-BoldMT 标题/强调
+  display:
+    fontSize: 44          # 章节大数字/大标题
+    fontFamily: Arial
+    color: $navy          # 章节页为深绿蓝大标题
+    bold: true
+  body:
+    fontSize: 10.8
+    fontFamily: Arial
+    color: $ink
+  caption:
+    fontSize: 7.5
+    fontFamily: Arial
+    color: $muted
+tableStyles:
+  default:
+    # 财务模型表：藏蓝表头白字、细分隔线；合计/分组行用浅橙填充（light-yellow 文档未给 hex，未列入）
+    cellStyle:
+      fontFamily: Arial
+      color: $ink
+      border: [ null, null, { style: solid, width: 0.75, color: $line }, null ]
+    firstRowStyle:
+      bold: true
+      color: $panel
+      fill: { type: solid, color: $navy }
+    lastRowStyle:
+      bold: true
+      fill: { type: solid, color: $peach }

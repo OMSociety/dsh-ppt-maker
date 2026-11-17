@@ -1,0 +1,38 @@
+# 由 design.md（PART B）手工提炼。字号：源画布 720×405pt（body 8–9/密，sparse 11–12；标准题 ~18；关键数 12–14；
+# 脚注 ~6；章节卡 ~28），design.md 未给 960×540 等效值 → 不写 fontSize。
+# 正/负色继承 PART A（源无稳定红绿）：负值用 $navy/括号/下降条表达。featuregreen/featurepurple 仅专题页局部。
+name: Sky Blue Wayfinding · Work STYLE DESIGN SYSTEM
+colors:
+  background: '#FFFFFF'   # 正文与表格主底
+  panel: '#C2E6FF'        # 淡天蓝区块底：右侧解释面板/整片数据区/章节过渡（非全篇底）；图表对比系列
+  highlight: '#D6F1FF'    # 行/列高亮：仅当期列、优先行、小标签带
+  ink: '#000000'          # 正文/表格/脚注（长文不用蓝）
+  primary: '#007ACC'      # 电蓝唯一强强调：标题、规则线、主柱系列、关键数字（禁整页铺底）
+  navy: '#001142'         # 深藏蓝：对比柱/基线/深堆叠段/少量强调文字；负值表达
+  line: '#F2F2F2'         # 细规则线
+  altfill: '#F5F6F7'      # 交替填充
+  featuregreen: '#00948A' # 专题页主题系列/色块分区（不进标准指标页）
+  featurepurple: '#7E59BD'
+textStyles:
+  title:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $primary       # 标题统一电蓝
+    bold: true
+  body:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink
+  caption:
+    fontFamily: { latin: Liter, ea: MiSans }
+    color: $ink           # 脚注 ~0.7x
+tableStyles:
+  default:
+    # 多期表：细蓝顶/底规则线、合计行加粗；当期列整列 $highlight 填充（列选择属内容侧）
+    cellStyle:
+      fontFamily: { latin: Liter, ea: MiSans }
+      color: $ink
+    firstRowStyle:
+      bold: true
+      border: [ { style: solid, width: 1, color: $primary }, null, null, null ]
+    lastRowStyle:
+      bold: true
+      border: [ null, null, { style: solid, width: 1, color: $primary }, null ]
