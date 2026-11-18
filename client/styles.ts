@@ -22,7 +22,7 @@ export const CSS = `
 }
 .ppt-root *{box-sizing:border-box}
 
-/* ── 顶栏（S6 骨架只放品牌行，工具按钮 S9 再加）────────────── */
+/* ── 顶栏：品牌行与工具按钮 ── */
 .ppt-toolbar{
   display:flex;align-items:center;gap:6px;
   padding:6px 8px;flex:none;border-bottom:1px solid var(--dsw-alias-border-l2);
@@ -69,7 +69,7 @@ export const CSS = `
   background-image:linear-gradient(var(--dsw-alias-interactive-bg-hover),var(--dsw-alias-interactive-bg-hover));
   border-color:var(--dsw-alias-border-l1);
 }
-/* 缩略图条头部行：新页按钮 + 收起按钮；按钮让出右侧固定 16px，不再互相叠压 */
+/* 缩略图条头部行：新页按钮占据弹性宽度，收起按钮固定 16px，保持几何分离 */
 .ppt-thumbs-head{display:flex;align-items:center;gap:4px}
 .ppt-thumbs-head>.ppt-btn{flex:1;min-width:0}
 .ppt-rail-right .ppt-inspector{position:relative}
@@ -128,7 +128,7 @@ export const CSS = `
 }
 .ppt-btn-primary:hover{color:var(--dsw-alias-label-primary-foreground);filter:brightness(1.06)}
 
-/* ── 工程卡片列表（S6 占位：ProjectList 真组件在 S7，这里先把壳它穿）── */
+/* ── 工程卡片列表（ProjectList）── */
 .ppt-projlist{display:flex;flex-direction:column;width:100%;gap:8px;margin-top:10px}
 .ppt-projrow{
   display:flex;flex-direction:column;gap:2px;align-items:stretch;
@@ -166,7 +166,7 @@ export const CSS = `
 
 /* ── 页脚状态条（保存态 / toast 文本）──────────────────────── */
 /* 常驻固定高度：只换文字，不参与「有则出现」的高度变化——
-   保存横幅从顶栏挪到这里，画布才不再每编辑一次就被顶一下。 */
+   保存状态位于页脚，编辑时顶栏与画布保持几何稳定。 */
 .ppt-statusbar{
   position:relative;
   display:flex;align-items:center;gap:6px;flex:none;
@@ -257,8 +257,7 @@ export const CSS = `
   border-radius:3px;color:var(--dsw-alias-label-secondary);
   box-shadow:var(--dsw-shadow-lv1);
 }
-/* hover：底色必须保持不透明——直接换成 interactive-bg-hover（带 alpha）会让缩略图透上来，
-   视觉上像按钮被抠空。改用叠加层：不透明底 + 半透明高亮叠在一起。 */
+/* hover：不透明底色叠加半透明 interactive-bg-hover，保持按钮底不透明并遮住缩略图。 */
 .ppt-thumb-action:hover{
   color:var(--dsw-alias-label-primary);
   background-image:linear-gradient(var(--dsw-alias-interactive-bg-hover),var(--dsw-alias-interactive-bg-hover));
@@ -267,7 +266,7 @@ export const CSS = `
 .ppt-thumb-gap{height:3px;margin:0 -2px;border-radius:1px;transition:background-color .1s ease}
 .ppt-thumb-gap-over{background:var(--dsw-alias-interactive-bg-hover)}
 
-/* ── PptdView（DOM 直渲画布，取代光栅化 PNG）────────────────── */
+/* ── PptdView（DOM 直渲画布）────────────────── */
 /* 外层容器：决定可用空间，内部 flex 居中 */
 .pptd-viewport{position:relative;width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
 /* 逻辑画布：固定 pt 尺寸，transform scale 缩放；transform 不改变布局占位，配合 flex 居中 */
@@ -487,14 +486,6 @@ export const CSS = `
 }
 .ppt-plan-table th{color:var(--dsw-alias-label-secondary);font-weight:500}
 .ppt-plan-table code{font-size:10px}
-/* ── QA 状态徽标（StatusBar 右侧） ── */
-.ppt-qa-badge{
-  flex:none;font-size:10px;padding:1px 8px;border-radius:999px;margin-right:6px;
-  border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);
-}
-.ppt-qa-badge[data-state="pass"]{color:var(--dsw-alias-label-status-success,#15803d);border-color:currentColor}
-.ppt-qa-badge[data-state="fail"]{color:var(--dsw-alias-label-status-error,#b91c1c);border-color:currentColor}
-.ppt-qa-badge[data-state="stale"]{color:var(--dsw-alias-label-status-warning,#b45309);border-color:currentColor}
 `
 
 /** 幂等注入样式表（重复挂载只插一次；HMR 卸载由调用方决定是否移除）。 */

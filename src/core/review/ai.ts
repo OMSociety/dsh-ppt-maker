@@ -1,7 +1,7 @@
 /**
  * AI 视觉质检层（按需深检，`ai: true` 才跑）。
  *
- * 通路（全部按宿主已发布源码实测落地，无臆造 API）：
+ * 通路：
  *  - 路由：`ctx.sessions.get(sessionId).requestHeader()?.config` 取
  *    provider/model（dsh-agent-loop prepareRequest / dsh-experimental-auto-review
  *    同款取法）；无会话外路由，也没有按工具单独选模型的设置面。

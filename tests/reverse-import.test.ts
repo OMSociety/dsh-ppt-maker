@@ -21,7 +21,10 @@ import {
   addSlideTextBox,
   createPresentation,
   emu,
+  getShapeId,
+  groupShapes,
   savePresentation,
+  setShapeAnimation,
   setParagraphAlignment,
   setParagraphLineSpacing,
   setShapeParagraphs,
@@ -248,6 +251,83 @@ describe('reverse engine（PPTX → PPTD 逆向）', () => {
     const styles = (loaded.deck.theme?.textStyles ?? {}) as Record<string, { fontFamily?: { latin?: string } }>
     expect(styles.title?.fontFamily?.latin).toBeTruthy()
     expect(styles.body?.fontFamily?.latin).toBeTruthy()
+  })
+
+  it('同页重复 shapeId：元素 ID 页内唯一，动画指向已映射元素', async () => {
+    const pres = createPresentation({ size: '16:9' })
+    const slide = (await import('@office-kit/pptx')).addBlankSlide(pres)
+    const first = addSlideTextBox(slide, {
+      x: emu(0),
+      y: emu(0),
+      w: emu(200 * 12700),
+      h: emu(60 * 12700),
+      text: '第一个组合子形状'
+    })
+    const second = addSlideTextBox(slide, {
+      x: emu(0),
+      y: emu(80 * 12700),
+      w: emu(200 * 12700),
+      h: emu(60 * 12700),
+      text: '第二个组合子形状'
+    })
+    groupShapes([first, second])
+    setShapeAnimation(first, { effect: 'fadeIn', start: 'click' })
+    const animatedShapeId = getShapeId(first)
+    const bytes = await savePresentation(pres)
+
+    await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
+    const loaded = await loadProject(cwd, 'proj')
+    const page = loaded.pages.get('pages/01.page') as Page
+    const sourceShapeIds = page.elements.map((element) => element.sourceRef?.shapeId)
+    expect(new Set(sourceShapeIds).size).toBeLessThan(sourceShapeIds.length)
+
+    const elementIds = page.elements.map((element) => element.elementId)
+    expect(new Set(elementIds).size).toBe(elementIds.length)
+    expect(page.animations).toHaveLength(1)
+    expect(page.animations?.[0]?.trigger).toBe('onClick')
+    const animationTarget = page.elements.find((element) => element.elementId === page.animations?.[0]?.elementId)
+    expect(animationTarget).toBeDefined()
+    expect(animationTarget?.elementType).not.toBe('placeholder')
+    expect(animationTarget?.sourceRef?.shapeId).toBe(animatedShapeId)
+  })
+
+  it('同页重复占位 shapeId：占位与报告使用同一组唯一 ID', async () => {
+    const { unzipSync, zipSync } = await import('fflate')
+    const pres = createPresentation({ size: '16:9' })
+    ;(await import('@office-kit/pptx')).addBlankSlide(pres)
+    const bytes = await savePresentation(pres)
+    const entries = unzipSync(bytes)
+    const slidePath = 'ppt/slides/slide1.xml'
+    const xml = new TextDecoder().decode(entries[slidePath])
+    const frames = [1, 2].map((n) =>
+      `<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:nvGraphicFramePr><p:cNvPr id="900" name="Diagram ${n}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${n * 914400}" y="914400"/><a:ext cx="4572000" cy="2743200"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:dm="rId10${n}" r:lo="rId11${n}" r:qs="rId12${n}" r:cs="rId13${n}"/></a:graphicData></a:graphic></p:graphicFrame>`
+    ).join('')
+    entries[slidePath] = new TextEncoder().encode(xml.replace('</p:spTree>', `${frames}</p:spTree>`))
+
+    const result = await reverseImport({ cwd, source: zipSync(entries), targetDir: 'proj', sessionId: 's1' })
+    expect(result.dropped).toHaveLength(2)
+    const loaded = await loadProject(cwd, 'proj')
+    const page = loaded.pages.get('pages/01.page') as Page
+    const placeholders = page.elements.filter((element) => element.elementType === 'placeholder')
+    const placeholderIds = placeholders.map((element) => element.elementId)
+    expect(new Set(placeholderIds).size).toBe(2)
+    expect(result.dropped.map((entry) => entry.placeholder?.elementId)).toEqual(placeholderIds)
+  })
+
+  it("transition.effect 为 none 时省略页面转场", async () => {
+    const { unzipSync, zipSync } = await import('fflate')
+    const pres = createPresentation({ size: '16:9' })
+    ;(await import('@office-kit/pptx')).addBlankSlide(pres)
+    const bytes = await savePresentation(pres)
+    const entries = unzipSync(bytes)
+    const slidePath = 'ppt/slides/slide1.xml'
+    const xml = new TextDecoder().decode(entries[slidePath])
+    entries[slidePath] = new TextEncoder().encode(xml.replace('</p:sld>', '<p:transition/></p:sld>'))
+
+    await reverseImport({ cwd, source: zipSync(entries), targetDir: 'proj', sessionId: 's1' })
+    const loaded = await loadProject(cwd, 'proj')
+    const page = loaded.pages.get('pages/01.page') as Page
+    expect(page.transition).toBeUndefined()
   })
 
   it('sha1 去重：两张同字节图片只在 media 写一次', async () => {

@@ -7,7 +7,7 @@
  */
 import * as React from 'react'
 import type { PptStore } from '../store'
-import { ExportGlyph, HistoryGlyph, RedoGlyph, UndoGlyph } from '../icons'
+import { ExportGlyph, HistoryGlyph, PlanGlyph, RedoGlyph, UndoGlyph } from '../icons'
 
 export function Toolbar({
   store,
@@ -49,7 +49,7 @@ export function Toolbar({
           onClick={() => onShowPlan?.()}
           title="规划契约：查看 brief 与页面计划（再点一次收起）"
         >
-          规划
+          <PlanGlyph size={13} /> 规划
         </button>
         <button
           type="button"

@@ -1514,6 +1514,9 @@ export function createOfficeKitEngine(): DeckEngine {
             themeHash: themeHashOf(deck.theme)
           })
           const srcPres = await loadPresentation(compiled.bytes)
+          // 编译器按 CSS px（9525 EMU）产出页面；主 deck 按 pt（12700 EMU）。
+          // importSlide 保留源坐标，因此先在源文档内等比缩放到主画布。
+          setSlideSize(srcPres, { width: toEmu(size[0]), height: toEmu(size[1]) }, { content: 'fit' })
           const srcSlides = getSlides(srcPres)
           if (srcSlides.length !== 1) {
             throw new Error(`${pageLabel}：svg 编译产物页数异常（${srcSlides.length}）`)

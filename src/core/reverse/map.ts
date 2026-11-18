@@ -140,9 +140,23 @@ function ensurePlaceholder(
   })
 }
 
-/** elementId generator inside map: stable per source shape so animations can target them. */
+/** Base elementId; page assembly appends a suffix when source shape ids repeat. */
 function elementIdOf(rec: ReverseShapeRecord): string {
   return `el-${rec.slideIndex}-${rec.shapeId}`
+}
+
+function uniquePageElementId(baseId: string, used: Set<string>): string {
+  if (!used.has(baseId)) {
+    used.add(baseId)
+    return baseId
+  }
+  for (let suffix = 2; ; suffix += 1) {
+    const candidate = `${baseId}-${suffix}`
+    if (!used.has(candidate)) {
+      used.add(candidate)
+      return candidate
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -162,7 +176,7 @@ function baseElement(rec: ReverseShapeRecord): Record<string, unknown> {
 }
 
 /* ------------------------------------------------------------------ *
- * R1 — run-level rich text mapping (保真度修复计划 R1)
+ * Run-level rich text mapping
  * ------------------------------------------------------------------ */
 
 const H_ALIGN_MAP: Record<string, string> = {
@@ -662,7 +676,7 @@ function mapLine(rec: ReverseShapeRecord): Record<string, unknown> {
 }
 
 /* ------------------------------------------------------------------ *
- * R3 — 背景继承链（slide → layout → master）
+ * 背景继承链（slide → layout → master）
  * ------------------------------------------------------------------ */
 
 interface BackgroundSource {
@@ -821,7 +835,7 @@ function applyBackgroundChain(
 }
 
 /* ------------------------------------------------------------------ *
- * R2 — graphicFrame 细分识别（SmartArt / OLE / 3D / 未知）
+ * graphicFrame 细分识别（SmartArt / OLE / 3D / 未知）
  * ------------------------------------------------------------------ */
 
 /** ECMA-376 a:graphicData URI → dropped 通道的 originalType。 */
@@ -883,6 +897,12 @@ function classifyUnhandledShape(shape: SlideShapeData, kind: ReverseShapeRecord[
  * Page-level assembly
  * ------------------------------------------------------------------ */
 
+function animationTriggerOf(value: unknown): Animation['trigger'] | undefined {
+  if (value === 'click' || value === 'onClick') return 'onClick'
+  if (value === 'withPrevious' || value === 'afterPrevious') return value
+  return undefined
+}
+
 function mapPage(
   slide: ReverseSlideRecord,
   pres: PresentationData,
@@ -904,14 +924,14 @@ function mapPage(
   if (slide.notes !== null && slide.notes !== '') page.notes = slide.notes
   if (slide.title !== null && slide.title !== '') page.title = slide.title
 
-  // background — R3：slide → layout → master 链，取最终生效的背景
+  // background — slide → layout → master 链，取最终生效的背景
   const rawSlide = slide.raw as SlideData
   applyBackgroundChain(rawSlide, pres, slide.slideIndex, page, media, report)
 
   // transition
   try {
     const transition = getSlideTransition(rawSlide)
-    if (transition) {
+    if (transition && transition.effect !== 'none') {
       page.transition = {
         effect: transition.effect,
         ...(transition.preset !== undefined ? { preset: transition.preset } : {})
@@ -922,12 +942,17 @@ function mapPage(
   }
 
   // elements
+  const usedElementIds = new Set<string>()
+  const animationTargets = new Map<number, string>()
   for (const rec of slide.shapes) {
-    if (rec.bounds === null) {
-      ensurePlaceholder(page, rec, 'unknown', report, '形状无可用几何（own / layout / master 三链都缺 <a:xfrm>）')
-      continue
-    }
+    const elementStart = page.elements.length
+    const droppedStart = report.dropped.length
+    const degradedStart = report.degraded.length
     try {
+      if (rec.bounds === null) {
+        ensurePlaceholder(page, rec, 'unknown', report, '形状无可用几何（own / layout / master 三链都缺 <a:xfrm>）')
+        continue
+      }
       const rawShape = rec.raw as SlideShapeData
       if (isTableShape(rawShape)) {
         page.elements.push(mapTable(rec, pres, report) as Page['elements'][number])
@@ -968,7 +993,7 @@ function mapPage(
           page.elements.push(mapLine(rec) as Page['elements'][number])
           break
         case 'graphicFrame': {
-          // R2：表/图已在上面分流；其余 graphicFrame（SmartArt/ole/未知）走 dropped + 占位
+          // 表/图已在上面分流；其余 graphicFrame（SmartArt/ole/未知）走 dropped + 占位
           const cls = classifyUnhandledShape(rawShape, rec.kind)
           ensurePlaceholder(
             page,
@@ -980,7 +1005,7 @@ function mapPage(
           break
         }
         case 'picture': {
-          // R2：带媒体剪辑的 picture 不进 image 通道，走 dropped + 占位
+          // 带媒体剪辑的 picture 不进 image 通道，走 dropped + 占位
           const cls = classifyUnhandledShape(rawShape, rec.kind)
           if (cls && cls.originalType === 'media') {
             ensurePlaceholder(page, rec, 'media', report, cls.reason)
@@ -1000,6 +1025,24 @@ function mapPage(
       }
     } catch (err) {
       ensurePlaceholder(page, rec, 'unknown', report, `形状映射抛错：${(err as Error).message}`)
+    } finally {
+      for (let index = elementStart; index < page.elements.length; index += 1) {
+        const element = page.elements[index]
+        const baseId = element.elementId
+        const elementId = uniquePageElementId(baseId, usedElementIds)
+        element.elementId = elementId
+        for (let reportIndex = droppedStart; reportIndex < report.dropped.length; reportIndex += 1) {
+          const dropped = report.dropped[reportIndex]
+          if (dropped.placeholder?.elementId === baseId) dropped.placeholder.elementId = elementId
+        }
+        for (let reportIndex = degradedStart; reportIndex < report.degraded.length; reportIndex += 1) {
+          const degraded = report.degraded[reportIndex]
+          if (degraded.elementId === baseId) degraded.elementId = elementId
+        }
+        if (element.elementType !== 'placeholder' && !animationTargets.has(rec.shapeId)) {
+          animationTargets.set(rec.shapeId, elementId)
+        }
+      }
     }
   }
 
@@ -1013,13 +1056,14 @@ function mapPage(
         const shapeId = target?.shapeId
         const effect = (step as { effect?: string | null }).effect ?? null
         const originalEffect = (step as { originalEffect?: string }).originalEffect
-        const elementId =
-          shapeId !== undefined && shapeId !== null ? `el-${slide.slideIndex}-${shapeId}` : `el-${slide.slideIndex}-0`
+        const elementId = shapeId !== undefined && shapeId !== null ? animationTargets.get(shapeId) : undefined
+        const trigger = animationTriggerOf(step.start)
+        if (!elementId) continue
         mapped.push({
           elementId,
           effect: effect as Animation['effect'],
           ...(originalEffect !== undefined ? { originalEffect } : {}),
-          ...(step.start !== undefined ? { trigger: step.start as Animation['trigger'] } : {}),
+          ...(trigger !== undefined ? { trigger } : {}),
           ...(step.durationMs !== undefined && step.durationMs !== null ? { durationMs: step.durationMs } : {}),
           ...(step.delayMs !== undefined && step.delayMs !== null ? { delayMs: step.delayMs } : {})
         })
@@ -1080,7 +1124,7 @@ export function mapReverseModel(
   const deck: Presentation = {
     profile: 'reverse',
     size: sizePx,
-    // R3：母版 txStyles 不可完整还原；主题字体落到 title/body 两个
+    // 母版 txStyles 不可完整还原；主题字体落到 title/body 两个
     // textStyles 槽位，作为占位符未显式设字体时的默认（render 端 run 级
     // 富文本已逐字携带字体，textStyles 只兜底空文本与新建文本框）。
     // 导出端同时用它们回写 major/minor 字体方案（setPresentationFonts）。

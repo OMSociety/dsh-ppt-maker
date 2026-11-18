@@ -49,8 +49,8 @@ function readUint32BE(dv: DataView, off: number): number {
  * @param bytes 全字体字节
  * @param faceOffset 该 face 在容器内的偏移（TTC 用；TTF/OTF 为 0）。
  * 注意（OTSpec 实证，fontkit 交叉验证）：表目录里的 offset 一律是相对文件起点
- * 的绝对偏移——TTF 时 face 起点即文件起点二者重合；TTC 时**不是**相对 face 起点。
- * 此前实现加成 faceOffset 导致 TTC 读串（雅黑 face0 误读 0x0204 拒嵌，实为 0x0000 可嵌）。 */
+ * 的绝对偏移——TTF 时 face 起点即文件起点二者重合；TTC 时**不是**相对 face 起点，
+ * 因此表偏移不得再叠加 faceOffset。 */
 function fsTypeOfFace(bytes: Uint8Array, faceOffset: number): number | null {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   if (faceOffset + 12 > dv.byteLength) return null

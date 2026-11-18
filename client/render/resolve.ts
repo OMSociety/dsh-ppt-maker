@@ -23,6 +23,7 @@ import { escapeAttr } from './sanitize'
 export interface ThemeLike {
   colors?: Record<string, string>
   textStyles?: Record<string, Record<string, unknown>>
+  tableStyles?: Record<string, Record<string, unknown>>
 }
 
 /** 解析一个可能是 $引用 的颜色：$paper → theme.colors.paper；已是字面量则原样返回。 */

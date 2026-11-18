@@ -33,7 +33,7 @@
 | **母版与版式** | `deck.masters` 声明真实 OOXML 母版/版式（共享装饰 + 占位框），页用 `layoutRef` 挂接，多页 deck 共享装饰不必逐页重复 |
 | **双向性** | `ppt_import` 把既有 .pptx 全量逆向进 PPTD 工程并原样存档源文件；自导入后零编辑的 deck 导出时整份从源存档恢复（chart/SmartArt/连接器不丢），任何内容编辑即整份回退重建；`ppt_patch` 对 .pptx 外科手术（改字 / 换图 / 调页序），不走 PPTD 往返 |
 | **PPTD 契约** | YAML DSL（`deck.pptd` + `pages/*.page`），单页自包含、可视即所得；generate / reverse 双方言，可手改也可机改 |
-| **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板）：双击文字就地改、拖拽调页序、图片一键替换、table/chart 直渲、SVG 页整页预览、规划抽屉、QA 状态徽标、撤销 / 重做、版本历史直渲快照并一键恢复、409 冲突保护与「外部已修改」提示 |
+| **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板）：双击文字就地改、拖拽调页序、图片一键替换、table/chart 直渲、SVG 页整页预览、规划抽屉、撤销 / 重做、版本历史直渲快照并一键恢复、409 冲突保护与「外部已修改」提示 |
 | **质检分层** | 规则层（文字溢出按真实字形宽度量测 / 出界 / 重叠 / 逐 run 对比度 / 结构 / 缺字体）阻断导出；AI 层按需（`ppt_check ai:true`）把成品页 PNG 送多模态模型审配色与版式，只出建议不阻断；结果落账 `manifest.qaReport`，指纹绑定 deck+pages+plan+media+检查器与转换器版本，过期或未覆盖全页即拒导出 |
 | **统一发布管线** | 模型导出与面板导出同一条 release 管线：QA 门禁 → 构建 + 字体嵌入 → postflight 回读（ZIP 重解析 + 库级校验）→ SHA-256 落账 |
 | **字体嵌入** | 导出自动嵌入实际用到的字体（EOT 封装 `fntdata` + `embeddedFontLst`），未装字体的机器渲染不回落；子集 / 整字体 / 关闭三档（`export.fontEmbed`），逐字体 fsType 许可闸 |
@@ -44,9 +44,19 @@
 
 ## 效果
 
-![PPT 创客工作台：左侧缩略图条、中间 SVG 页画布、右侧属性面板与规划契约；底部状态条显示质检通过与导出落账](docs/workbench.png)
+### 浅色工作台 · 封面页
 
-工作台三栏：缩略图 + 画布 + 属性面板。图中第 3 页为 SVG 轨道页（整页编译为原生 DrawingML），工具栏「规划」打开规划抽屉，状态栏 QA 徽标显示「质检通过 · 8/8 页覆盖」。预览图源文件为 [`docs/preview/workbench.html`](docs/preview/workbench.html)（HTML 仿真，可复用改字重新出图）。
+![DSH 浅色主题中的 PPT 创客工作台：顶部为 PPT 工作台标签页，左侧为三页缩略图，中间为原生封面页](docs/workbench-light.png)
+
+### 深色工作台 · 原生图表与表格
+
+![DSH 深色主题中的 PPT 创客工作台：顶部为 PPT 工作台标签页，中间画布直渲原生柱状图与表格](docs/workbench-dark.png)
+
+### 实际导出 · SVG 页面轨
+
+![同一工程第三页的实际导出渲染：SVG 流程页经 DrawingML 编译后保留可编辑文本与形状](docs/export-svg.png)
+
+两张工作台图直接渲染正式 client 组件、样式与真实三页 PPTD 数据，只把网络传输换成本地 fixture；[`docs/preview/workbench.html`](docs/preview/workbench.html) 是可离线打开的自包含产物，通过 `#theme=light&page=0` 与 `#theme=dark&page=1` 切换主题和页码。第三张图来自同一工程第三页最终 PPTX 的实际渲染。
 
 ## 安装方式
 
@@ -59,9 +69,9 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 > **提示**：装好后**刷新一下浏览器页面**，从右侧栏打开「PPT 工作台」——只重启宿主不够，客户端产物是页面加载时取的。
 
-> **依赖：**主链全 TS、无 Python；`ppt_render` 与质检用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。仅当用到 SVG 页面轨（`ppt_svg`）时需要 Python 3.10+：跑一次 `node scripts/prepare-vendor-env.mjs` 自动建虚拟环境并装好 pin 依赖（pip 走默认源，可按需加镜像）。`skills/ppt-maker/scripts/` 下的 Python 脚本仅作逃生舱，见 SKILL.md「Python 逃生舱」。
+> **依赖**：主链全 TS、无 Python；`ppt_render` 与质检用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。仅当用到 SVG 页面轨（`ppt_svg`）时需要 Python 3.10+：跑一次 `node scripts/prepare-vendor-env.mjs` 自动建虚拟环境并装好 pin 依赖（pip 走默认源，可按需加镜像）。`skills/ppt-maker/scripts/` 下的 Python 脚本仅作逃生舱，见 SKILL.md「Python 逃生舱」。
 
-> **平台：**引擎按平台分发——Windows（x64/arm64）与 macOS（x64/arm64）用原生包，Linux 没有原生包（npm 上不存在 `libreoffice-kit-linux-*`），渲染与质检改走 WASM。CI 在 `windows-latest` 与 `ubuntu-latest` 上跑同一套用例（字体嵌入断言除外），两个平台都通过；导出产物同源，未做跨平台逐字节对比。macOS 目前没有 CI 覆盖。
+> **平台**：引擎按平台分发——Windows（x64/arm64）与 macOS（x64/arm64）用原生包，Linux 没有原生包（npm 上不存在 `libreoffice-kit-linux-*`），渲染与质检改走 WASM。CI 在 `windows-latest` 与 `ubuntu-latest` 上跑同一套用例（字体嵌入断言除外），两个平台都通过；导出产物同源，未做跨平台逐字节对比。macOS 目前没有 CI 覆盖。
 
 **装完怎么用**
 
@@ -90,7 +100,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 模型的标准动作顺序是 **`ppt_plan`（写 brief/plan）→ `ppt_create`（或 `ppt_import`）→ `ppt_edit` 迭代（复杂视觉页走 `ppt_svg`）→ `ppt_check` → `ppt_export`**；技能 `ppt-maker`（随插件注册）写明了设计系统选型与编辑纪律，模型需要时会自己读。轻改既有 .pptx（改字 / 换图 / 调页序）走 `ppt_patch`，不经 PPTD 往返。
 
-> **提示：**导出被规则 blocker 拦住时，按 `ppt_check` 返回的 `issues` 逐条修，或 `skipCheck:true` 强导（不推荐）。`ppt_check ai:true` 返回 `ai.performed:false` 加 PNG 路径清单时，说明当前路由模型不支持图像输入，主模型自行 `read_image` 复核即可。
+> **提示**：导出被规则 blocker 拦住时，按 `ppt_check` 返回的 `issues` 逐条修，或 `skipCheck:true` 强导（不推荐）。`ppt_check ai:true` 返回 `ai.performed:false` 加 PNG 路径清单时，说明当前路由模型不支持图像输入，主模型自行 `read_image` 复核即可。
 
 ## 工作台
 
@@ -98,7 +108,6 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 - **底图即 DOM**：画布与缩略图把 PPTD 页 AST 直接渲染成 DOM（`client/components/PptdView.tsx`），打开即出、无需等 libreoffice 冷启动；元素、选择框、就地编辑器同一坐标系，恒对齐。table / chart 直渲为真实 DOM/SVG；SVG 页整页铺底预览；icon / SmartArt 等暂不支持渲染的元素显示灰底占位。
 - **规划抽屉**：工具栏「规划」打开只读抽屉，看 brief.md 与 plan.yml（页文件/标题/轨道/意图）。
-- **QA 徽标**：状态栏显示质检落账状态——通过 / 未过（阻断数）/ 已过期（revision 对不上）。
 - **左右栏可收缩**：左栏页列表默认展开、可收起；右栏属性面板选中元素才展开。收起态只留边缘把手。
 - **就地编辑**：双击文字就地改 / 拖拽调页序 / 复制删除新增页 / 替换图片 / 「导出 .pptx」落到工程目录 `export/` 下（文件名带版本号）。
 - **版本历史**：「历史」抽屉直渲任意快照的画布预览并一键恢复。
@@ -113,11 +122,12 @@ npm install          # 安装依赖
 npm test             # 全量回归（先设 12GB 堆并串行跑，见下）
 npm run typecheck    # src/ 与 client/ 两份 tsconfig
 npm run build        # 重出 lib/index.js 与 lib/client.js（改完 src/ 或 client/ 必跑，并提交产物）
+npm run build:preview # 用正式工作台组件与 docs/preview/fixture.json 重建自包含预览 HTML
 npm run check:build  # 确认 lib/ 与 git 一致
 npm run check:mounts # 挂载声明核对
 ```
 
-> **提示：**全量测试需大堆串行跑（默认堆会 OOM）：先 `$env:NODE_OPTIONS='--max-old-space-size=12288'`，再 `npm test -- --no-file-parallelism`。完整验收口径与禁止事项见 [`AGENTS.md`](AGENTS.md)。
+> **提示**：全量测试需大堆串行跑（默认堆会 OOM）：先 `$env:NODE_OPTIONS='--max-old-space-size=12288'`，再 `npx vitest run --no-file-parallelism`。完整验收口径与禁止事项见 [`AGENTS.md`](AGENTS.md)。
 
 目录与「改东西去哪」：
 

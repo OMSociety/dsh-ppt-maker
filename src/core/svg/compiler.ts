@@ -20,8 +20,8 @@ import { ProjectError } from '../project/store.js'
 
 const execFileAsync = promisify(execFile)
 
-/** vendored 转换器身份：上游 ppt-master 的固定 commit，升级时同步改。 */
-export const SVG_COMPILER_VERSION = 'ppt-master@7e0df670'
+/** SVG 转换器契约版本；转换行为变化时递增，使编译缓存与既有 QA 指纹失效。 */
+export const SVG_COMPILER_VERSION = 'dsh-svg-compiler@1'
 
 const VENDOR_DIR = path.join(PACKAGE_ROOT, 'skills', 'ppt-maker', 'vendor')
 const DRIVER = path.join(VENDOR_DIR, 'compile_svg_page.py')
@@ -79,7 +79,7 @@ export async function compileSvgPage(opts: CompileSvgPageOptions): Promise<Compi
     const sidecar = JSON.parse(await readFile(sidecarAbs, 'utf8')) as { fonts?: string[] }
     return { bytes: new Uint8Array(await readFile(outAbs)), cached: true, fonts: sidecar.fonts ?? [] }
   }
-  // 旧版缓存只有 pptx 没有 sidecar：视为未命中重编译，避免丢字体清单。
+  // 缓存必须同时包含 pptx 与 sidecar；缺任一件即重编译，保证字体清单完整。
 
   const python = venvPython()
   if (!existsSync(python)) {

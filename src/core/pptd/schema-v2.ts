@@ -1,5 +1,5 @@
 /**
- * src/core/pptd/schema-v2.ts — schema extensions introduced with `schema: 2`.
+ * src/core/pptd/schema-v2.ts — schema 2 vocabulary.
  *
  * Vocabulary: `pageType: 'svg'` marks a page whose design source is an SVG
  * file under `media/svg/`; the compiled DrawingML page lives in the build

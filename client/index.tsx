@@ -5,11 +5,11 @@
  *   - `openRequest` 出现 → 自动打开/展开面板（模型调 ppt_import / ppt_open 后用户立刻看到）
  *   - `active.revision` 变了 → 通知面板（干净就静默重载，有草稿只亮「外部已修改」）
  *
- * 读完 DSH 宿主源码后的正确姿势照抄自 `dsh-fishpai/client/index.tsx`（同为右侧栏面板）。
+ * 右侧栏挂载方式与 `dsh-fishpai/client/index.tsx` 一致（同为右侧栏面板）。
  * 两个关键事实：
  *   1. `ctx.inject(deps, cb)` 回调**不是同步执行**的（cordis 在 Fiber._reload 里先
  *      `await Promise.resolve()` 再跑 apply），「注册完同步回头检查」这类判断必然落空；
- *   2. 「界面上当前的会话」在 0.1.7 多会话形态里由**右侧栏座位的挂载态**公开
+ *   2. 「界面上当前的会话」在多会话形态里由**右侧栏座位的挂载态**公开
  *      （`ISidebarRight.mounted`），读不到就不能猜（猜错会把别的会话的 openRequest 算到当前头上）。
  */
 import * as React from 'react'
@@ -54,10 +54,10 @@ function service(ctx: any, key: string): any {
 }
 
 /**
- * 「界面上当前选中的会话」，两代宿主各有一条读法，全都拿不到时退到「只有一个会话」：
- *   - 旧线：选中态挂在会话列表快照上（`list.getSnapshot().current`）；
- *   - 0.1.7 起：列表快照不再携带选中态，屏幕上那个会话由右侧栏座位的挂载态公开
- *     （`ISidebarRight.mounted`），所以走注入回调捕获的读取函数。
+ * 「界面上当前选中的会话」按宿主公开能力依次读取：
+ *   - 会话列表快照的选中态（`list.getSnapshot().current`）；
+ *   - 右侧栏座位的挂载态（`ISidebarRight.mounted`），由注入回调捕获读取函数；
+ *   - 列表只有一个会话时，该会话就是当前会话。
  * 返回 null 就让轮询这一轮空转，下一轮再试——**绝不瞎猜会话**。
  */
 function currentSessionId(ctx: any, readMounted?: () => string | null): string | null {
@@ -79,7 +79,7 @@ export function apply(ctx: any): void {
   const disposeStyles = ensureStyles()
   ctx.effect(() => () => disposeStyles(), 'ppt-maker: 面板样式')
 
-  // 右侧栏座位的挂载会话读取函数，由通道一的注入回调捕获（0.1.7 线读当前会话就靠它）。
+  // 右侧栏座位的挂载会话读取函数，由通道一的注入回调捕获。
   let getMountedSession: (() => string | null) | null = null
   const readMounted = (): string | null => {
     try {
@@ -149,8 +149,7 @@ export function apply(ctx: any): void {
       const tabs = pick(injected, 'sidebarRightTabs')
       const sidebarRight = pick(injected, 'sidebarRight')
 
-      // 0.1.7 线读「当前会话」：右侧栏座位挂载的会话就是屏幕上那个。
-      // 旧版没有这个公开字段，读不到就返回 null、走别的读法。
+      // 右侧栏座位挂载的会话就是屏幕上那个；mounted 是可选能力，读不到时返回 null。
       // 装在 tab 注册守卫之前：挂载读法与注册无关，裁剪构建（有 mounted、没有席位注册）也要能读。
       getMountedSession = () => {
         try {
@@ -170,8 +169,7 @@ export function apply(ctx: any): void {
           title: () => 'PPT 工作台',
           guide: [
             {
-              // 0.1.7 起 guide 条目契约要求稳定 id（注册时的唯一性检查与渲染 key 都按它走）；
-              // 旧版注册处不读这个字段，多了无害。
+              // guide 条目契约要求稳定 id：注册时的唯一性检查与渲染 key 都按它走。
               id: 'workbench',
               order: 40,
               title: () => 'PPT 工作台',

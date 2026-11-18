@@ -12,14 +12,14 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 |---|---|
 | 语言 / 运行时 | TypeScript 5.9、ESM、Node >= 22.19（引擎 @office-kit/pptx 0.24.0 要 22.18、libreoffice-kit 0.1.2 要 22.19） |
 | 构建 | 宿主半侧 tsup：`src/` → `lib/index.js`；客户端半侧 esbuild：`client/` → `lib/client.js` |
-| 测试 | vitest 3.2，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
+| 测试 | vitest 5.0，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
 | 包管理 | npm，锁文件 `package-lock.json`；根目录的 `pnpm-lock.yaml` / `pnpm-workspace.yaml` 未入库，勿提交 |
 | 引擎（pin 死） | `@office-kit/pptx@0.24.0`、`@deepseek-ai/libreoffice-kit@0.1.2`（约 183MB，随包安装） |
 | 宿主契约 | 面板与工具依赖的宿主包由 DSH 运行时提供：`package.json` 不写 `engines.dsh`，peer 只列运行期 import 的宿主包名（`@deepseek-ai/dsh-native-command`，区间 `*`，标 `optional`） |
 
 文档索引（按读序）：
 
-- [docs/DECISIONS.md](docs/DECISIONS.md) — 设计决策与风险登记：14 条决策、风险对策、D0 spike 结论（「为什么这么选」的出处）
+- [docs/DECISIONS.md](docs/DECISIONS.md) — 设计决策与风险登记：14 条决策、风险对策与验证结论（「为什么这么选」的出处）
 - [docs/pptd-spec.md](docs/pptd-spec.md) — PPTD 格式契约（改格式前必读）
 - [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) — 技能正文，模型侧用法
 
@@ -29,6 +29,7 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 |---|---|
 | 安装依赖 | `npm install` |
 | 构建两类产物 | `npm run build` |
+| 生成 README 工作台预览 | `npm run build:preview`（正式 client 组件 + `docs/preview/fixture.json`；改 client 后需同步重出预览图） |
 | 全部测试 | `npx vitest run`（先设 12GB 堆并串行跑，见下） |
 | 单文件测试 | `npx vitest run tests/host.test.ts` |
 | 类型检查（两个 tsconfig） | `npm run typecheck` |
@@ -110,7 +111,7 @@ npm run check:build
 NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ```
 
-全量 30 个测试文件 / 274 个用例，约 40s（高负载下 fonts-embed 单文件可到 85s）。CI 跳过 `tests/fonts-embed.test.ts`（断言子集字体体积，依赖本机中文字体，云端 runner 上没有这些字体），其余 29 文件 / 259 用例在云端跑。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
+全量 31 个测试文件 / 284 个用例，约 40s（高负载下 fonts-embed 单文件可到 85s）。CI 跳过 `tests/fonts-embed.test.ts`（断言子集字体体积，依赖本机中文字体，云端 runner 上没有这些字体），其余 30 文件 / 269 用例在云端跑。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
 
 面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 13 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
@@ -124,14 +125,14 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 
 | 路径 | 风险 | 改动前后置动作 |
 |---|---|---|
-| `tests/corpus/*.pptx` | 20 份语料随仓库分发，文件名与用例名一律中性；能倒推到具体会议的字面量（地点、日期、届次）已换成占位 | 新增或替换语料：先补 `scripts/desensitize-corpus.mjs` 的 `RULES` 再跑，跑完用 `--check` 复查为 0 命中，最后跑 `npx vitest run tests/corpus-roundtrip.test.ts` |
+| `tests/corpus/*.pptx` | 20 份语料随仓库分发，文件名与用例名一律中性；能倒推到具体会议的字面量（地点、日期、届次）均使用占位 | 新增或替换语料：先补 `scripts/desensitize-corpus.mjs` 的 `RULES` 再跑，跑完用 `--check` 复查为 0 命中，最后跑 `npx vitest run tests/corpus-roundtrip.test.ts` |
 | `tests/host-contract.test.ts` | 硬断言工具名集合、注册数与 `output.schema` 的关键词子集 | 加删工具或改 schema 后必跑 |
 | `src/index.ts` | `core: {...}` 接线漏传函数 → 运行时 `is not a function` | 改后 `npm run build`；`tests/host-bundle.test.ts` 是哨兵 |
 | `src/tools/*.ts` | 缺 `output` schema → 宿主拒收、被吞成 warn，工具静默全灭 | 每个工具都要 output schema；跑 `tests/tools-e2e.test.ts` |
 | `src/lazy-tools.ts` | 工具懒展开只在技能被成功 invoke 后发生，改触发条件会让工具静默不出场 | 跑 `tests/lazy-tools.test.ts`，并在新会话里验证「invoke 技能后工具进场」 |
 | `src/core/fonts/` | TTC 表目录 offset 是文件绝对偏移（勿加 faceOffset）；fontkit 的 fsType 是位域对象（勿 `Number()` 直接比） | 跑 `tests/fonts-embed.test.ts` 与 `tests/fonts-e2e.test.ts` |
-| `src/core/reverse/map.ts` | 逆向保真度是产品护城河（R1 富文本、R2 graphicFrame 分类、R3 背景继承已修），但自动化只有合成 fixture | 跑 `tests/reverse-import.test.ts`；真实语料没有逆向回归落点，改动后人工 `ppt_import` 一份 `tests/corpus/` 文件复核 |
-| `tests/fonts-embed.test.ts` | 幂等用例并行下会抖动（单跑不现），已加 `{timeout:90000, retry:2}`，根因未除 | 它红了先单跑一次再判断 |
+| `src/core/reverse/map.ts` | 逆向保真覆盖富文本、graphicFrame 分类与背景继承，自动化只有合成 fixture | 跑 `tests/reverse-import.test.ts`；真实语料没有逆向回归落点，改动后人工 `ppt_import` 一份 `tests/corpus/` 文件复核 |
+| `tests/fonts-embed.test.ts` | 幂等用例并行下会抖动（单跑不现），当前配置 `{timeout:90000, retry:2}`，根因未除 | 它红了先单跑一次再判断 |
 | `src/core/export-pipeline.ts` | 预览/质检必须渲染**未嵌字体**的裸字节：LibreOffice 会误用嵌入的子集 EOT，出现字形张冠李戴（「0」渲染成「A」） | 别把渲染源换成嵌字体后的字节；字体嵌入的真实效果只能靠 PowerPoint/WPS 人工核对 |
 
 ## 出错怎么办

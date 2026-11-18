@@ -103,6 +103,16 @@ export function ImportGlyph(props: GlyphProps) {
   )
 }
 
+/** 「规划契约」：文档外框与三条任务清单。 */
+export function PlanGlyph(props: GlyphProps) {
+  return (
+    <GlyphSvg {...props}>
+      <path d="M3.5 1A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 12.5 1h-9ZM3 2.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-11Z" />
+      <path d="M5 4h1v1H5zm2 0h4v1H7zM5 7h1v1H5zm2 0h4v1H7zm-2 3h1v1H5zm2 0h4v1H7z" />
+    </GlyphSvg>
+  )
+}
+
 /** 「版本历史」：两片叠放的版本卡片（后片虚一档，前片实）。 */
 export function HistoryGlyph(props: GlyphProps) {
   return (

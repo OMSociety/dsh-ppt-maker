@@ -66,9 +66,11 @@ SOFTWARE.
 MIT 许可，**Copyright (c) 2025-2026 Hugo He**。许可全文见该目录下的 `LICENSE`；
 版权头在各源文件中原样保留。
 
-收录范围为 `svg_to_pptx.pptx_package.builder` 的 import 闭包；上游的署名完整性校验
-（`attribution_guard.py`、`console_encoding.py` 中的分发身份校验）不在本副本内。
-MIT 许可条款（含 `LICENSE` 中的版权声明）按要求完整保留。
+本副本在 `svg_to_pptx/drawingml/elements.py` 对 SVG 无换行文本使用固定 DrawingML
+文本框。转换器行为与缓存版本由本仓库独立维护。
+
+收录范围为 `svg_to_pptx.pptx_package.builder` 的 import 闭包。
+MIT 许可条款及 `LICENSE` 中的版权声明随本副本完整分发。
 
 该目录 `pptx_shapes/data/` 下的数据文件带各自许可：Apache-2.0 与 MIT
 （见同目录 `LICENSE-APACHE-2.0.txt`、`LICENSE-OPEN-XML-SDK-MIT.txt`、`NOTICE.md`）。
@@ -76,6 +78,14 @@ MIT 许可条款（含 `LICENSE` 中的版权声明）按要求完整保留。
 Python 侧依赖（`python-pptx`、`XlsxWriter`、`skia-pathops`、`uharfbuzz`、`lxml`、`Pillow`）
 由 `scripts/prepare-vendor-env.mjs` 按 `skills/ppt-maker/vendor/requirements.txt` 的 pin 版本
 安装到本地虚拟环境，作为普通依赖各自带许可文件，不随本包分发。
+
+## README 预览的 DSH 宿主外观
+
+`scripts/preview/main.tsx` 的标签页结构、尺寸与主题变量取自
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的
+`packages/client/ui-dockkit` 与 `packages/client/ui-theme`，MIT 许可，
+**Copyright (c) 2026 DeepSeek**。MIT 许可正文见本文「MIT 许可正文」。
+工作台本体仍渲染本项目的正式 client 组件。
 
 ## 技能与语料
 

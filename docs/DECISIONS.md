@@ -1,55 +1,72 @@
-# dsh-ppt-maker 设计决策与风险登记
+# 设计决策登记（DECISIONS）
 
-> 这里是「为什么这么选」的依据：重写时定下的 14 条决策、风险登记与 D0 spike 结论。施工细节看代码，格式契约看 [pptd-spec.md](pptd-spec.md)。
-> 项目从 dsh-kimi-ppt 改头换脸重写为 dsh-ppt-maker，版本重启 1.0.0，**不考虑旧兼容、不考虑旧用户迁移**。
+> 本文件记录架构选择的依据与风险对策；具体行为以代码、测试与 [PPTD 格式规格](pptd-spec.md) 为准。
 
-## 产品定位
+## A. 架构决策
 
-护城河是**双向性**：读、改、修任何一份已存在的 pptx（竞品 dsh-ppt 实测只有生成能力，不能读改既有文件）。
-辅以 PPTD 格式（Agent 友好、单页自包含、用户可肉眼审查）、本地优先导出、设计系统厚度。
-不退守学术小场景；学术是组合拳落点（与 paper-writer/sciverse/mineru 联动的「论文→答辩」流水线），不是产品边界。
+### 1. `store.ts` 是工程的单一写者
+所有页面、deck、plan、brief 与 manifest 变更都经过 store；`deck.pptd` 保存于工程根目录，页面路径按序号对齐。乐观锁 `baseRevision` 防止并发写入互相覆盖，合并窗口内的连续保存合并为一个历史版本。
 
-## 总决策清单（盘问确认，逐条有主）
+### 2. 服务器持有权威状态
+轮询、长任务与外部事件都汇入同一状态源；界面不维护平行的权威副本。轮询失败时保留最后一次有效画面并明确提示，避免用空响应覆盖可用工程。
 
-| # | 决策 | 结论 |
-|---|---|---|
-| 1 | 包名 | dsh-ppt-maker（npm 已确认可用）；PR 1 开工即改名，避免客户端产物返工 |
-| 2 | 技能 key | 随包名统一换新（不再叫 kimi-ppt）；cordis.patch.yml、plugin 硬编码、README、locale 同步改；提醒用户改 ~/.dsh/AGENTS.md 路由表 |
-| 3 | 版本号 | 新包生命周期统一从 1.0.0 起 |
-| 4 | peerDeps | 不声明宿主版本要求：不写 `engines.dsh`，peer 只列运行期 import 的宿主包名（`@deepseek-ai/dsh-native-command`，区间 `*`） |
-| 5 | 语言栈 | **主线全 TS**。SVG 页面轨的转换器（vendored 自 ppt-master，Python）是唯一例外，作为编译桥经子进程调用；python-pptx/Pillow 同时保留为「逃生舱」（处理库拒收的破损文件） |
-| 6 | 引擎 | @office-kit/pptx **pin 0.24.0**（动画 95 preset、转场含 morph；0.x 单维护者，引擎接口化 + PPTD 不暴露库 API + 20 份语料双向对拍，三件套进 PR1 验收） |
-| 7 | 格式 | PPTD 自主化：不再跟踪 Moonshot 上游，pptd.md 成为自家契约，显式定义逆向方言（绝对几何超集） |
-| 8 | 质检 | **规则引擎为主**（pptx-preview 的 auditTextLayout/findShapesOutsideCanvas/findOverlappingShapePairs + 对比度 + missingFonts）阻断式；AI 多模态降级为按需深检（截图对象是 libreoffice-kit 渲染的成品页） |
-| 9 | 工作台 | **先 spike @office-kit/pptx-editor**（1 天验证能否挂进 sidebar.right.pane.tab）；不行则回退**完整可视化编辑器**（缩略图条+画布 overlay+Inspector+拖拽页序） |
-| 10 | 逆向 | 轻改走**外科手术模式**（loadPresentation 直接 patch 文本/图片/页序，L1 passthrough 契约保未建模部件）；全量逆向 PPTD 是 opt-in 高阶动作；不支持元素**插占位提示** |
-| 11 | 字体嵌入 | fflate 后处理注入 fntdata（库无 API，已实测）；字体解析用宿主已有 **fontkit**（不手写 TTC 重建）；子集化默认 subset；fsType=Preview&Print 嵌入+警告；预览加载嵌入字体 |
-| 12 | CJK 兜底字体 | **砍**。预子集化撞上未覆盖字即哑弹，且与字体嵌入功能重复；改为嵌入实际用到的字体 + missingFonts 警告。西文/等宽小子集（Inter/JetBrains Mono）可打包 |
-| 13 | 桌面轨道 | **已执行**：export_pptx.py / export_images.py / export_host.html 及对应 pytest（test_export_pptx.py / test_export_images.py）已删除；逃生舱三件套（pptd_to_pptx / pptd_to_png / check_fonts）按决策 #5 保留 |
-| 14 | LibreOffice 精确预览 | 进 PR（用宿主已有 libreoffice-kit，渲染成品 pptx 页面 PNG） |
+### 3. YAML 是页面内容的唯一真源
+model（JS 对象）与 AST（YAML 解析树）成对使用：model 负责引擎映射与预览，AST 负责注释、格式与局部更新的往返保真。
 
-## 风险登记
+### 4. 模型、规格与实现三方一致
+PPTD 的方言、profile 与错误码在生成、逆向和编辑路径中使用同一套定义；解析失败定位到具体字段，不静默降级为另一种方言。
 
-| 风险 | 状态 | 对策 |
-|---|---|---|
-| @office-kit/pptx 0.x 破坏性变更 | 已防 | pin 0.24.0 + 引擎接口化 + 语料对拍 |
-| 字体嵌入 EOT | **已攻克** | 六轮实测：fntdata=EOT 封装（非裸字节）、EOT Version 必须 0x00020001（真件 0x00020002 是 MicroType 压缩通道版本号，配未压缩数据必死）、flags=0 未压缩即被 t2embed 加载、fsType 不设卡（0x0004→privStatus=P&P 只读提示）、MTX 压缩非硬要求（仅影响体积）。纯 TS 自研成立：spike 期用纯 JS 原型（19/19 断言）加本机 headless 裁决器背书，原型与裁决器都是暂存区产物，已随清理删除 |
-| 宿主 Node 版本 | 已排除 | 宿主 Node v24.16.0 ≥ 库要求 22.18 |
-| LLM 视觉通路 | 已确认可行 | llm + attachments 服务源码实证；resolveModelInfo 模态门控；read_image 兜底 |
-| typeface 名不匹配静默失效 | 已防 | 同源取值 + 实测兜底 |
-| libreoffice-kit 体积 | 已接受 | 硬依赖 ~183MB/平台（用户拍板），锁 0.1.2 与宿主同轨 |
-| LibreOffice 不用嵌入字体渲染 | 已知 | 预览/质检所见 ≠ 嵌入字体效果；嵌入字体验证只能靠 PowerPoint/WPS 实测清单 |
+### 5. 主线保持全 TypeScript
+引擎、工程、质检、导出与工作台共用 TypeScript 领域模型。SVG 页面轨使用 vendored 自 ppt-master 的 Python 转换器作为编译桥，经受圈子进程调用；其产物仍进入统一的 PPTX 工程与发布管线。
 
-## D0 Spike 结论存档（已全部完成）
+### 6. 撤销 / 重做采用游标模型
+`history/` 采用 append-only 快照，manifest 保存当前游标。撤销与重做只移动游标，新编辑会截断被放弃的分支；`r0000` 是永久锚点。
 
-| Spike | 结论 | 报告 |
-|---|---|---|
-| L1 passthrough | **0 丢件**：5 份样本（含 chart/SmartArt/嵌入字体/批注/母版，最大 21.4MB）round-trip 逐部件 sha1 全同；load 30ms/save 99ms | spike 期暂存区产物，已清理 |
-| libreoffice-kit | **可用**：公开 npm 包，硬依赖定案；missingFonts 诊断现成；锁 0.1.2（0.1.5 起 koffi FFI 架构分叉） | 同上 |
-| pptx-editor | 可嵌入、中文可构建期劫持，但**用户拍板自研编辑器**；报告留档后备 | spike 期暂存区产物，已清理 |
-| 字体嵌入 | **已攻克** | fntdata=EOT 封装（Version 0x00020001 + flags=0），t2embed headless 裁决通过——裁决器是 spike 期自编的 Windows 小工具，不属本仓资产（本仓无 CI，回归只守结构面），纯 TS 自研成立 |
+### 7. 质检分为规则层与 AI 视觉层
+规则层检查溢出、出界、重叠、对比度、结构与字体；AI 视觉层按需提供建议。预览使用真实字形量测，逐 run 计算对比度，不能把启发式估算包装成实测结论。
 
-## 相关文档
+### 8. 设计系统直接产出 PPTD theme
+`design_system/*/theme.yml` 映射为 deck 的颜色、字体、段落样式、组件样式与表格样式，模型与工作台解析同一份主题，不依赖另一套中间引用格式。
 
-- [pptd-spec.md](pptd-spec.md) — PPTD 格式契约（双方言、95 动画词表、export 契约）
-- [fallback-fonts.md](fallback-fonts.md) — 字体选型与嵌入许可名单（按决策 12 定稿）
+### 9. 字体嵌入作为 OOXML 后处理
+嵌入阶段处理 fsType 许可、子集化、EOT 封装、presentation 关系与 content type；预览和质检使用未嵌字体的构建字节，避免 LibreOffice 误用子集字体。
+
+### 10. 真实语料验证工程契约
+`tests/corpus/` 保存脱敏后的真实 PPTX，覆盖构建、逆向、导出与回读。语料与测试名称保持中性，隐私红线由脚本与测试共同检查。
+
+### 11. 文件引用保持显式
+模型、技能与工具使用明确的工程目录、页面路径和媒体引用，不依赖当前对话中的隐式文件位置；工作区外的路径由 store 拒绝。
+
+### 12. 逆向结果进入统一 PPTD 工程
+导入、编辑、预览、质检和导出共享同一工程模型。库无法表达的 chart、SmartArt、OLE 等部件进入 `dropped` 并回插占位；轻量文本、图片和页序修改可使用 `ppt_patch` 的 passthrough 路径。
+
+### 13. 导出统一经过发布管线
+构建、QA 指纹、覆盖范围、媒体清单、字体与 postflight 回读由同一发布管线协调。`ppt_export` 先通过质检门禁，工作台面板与工具使用同一套导出约束。
+
+### 14. README 预览复用正式工作台
+预览 HTML 直接打包正式 client 组件与 CSS，只将网络传输替换为真实 PPTD 工程的本地 fixture；浅色与深色由 hash 选择，导出效果图来自同一工程的发布渲染。
+
+## B. 风险登记
+
+| 风险 | 对策 |
+|---|---|
+| 工程变化后继续使用旧 QA 结果 | QA 指纹绑定源码树与 SVG 编译器版本；指纹不一致返回 409，并要求重新 `ppt_check` |
+| 只检查部分页面却导出完整工程 | 覆盖不完整返回 `QaCoverageIncomplete`，列出未覆盖页码 |
+| 重复导出同一批产物 | exportRef 作为幂等键；同一引用必须对应同一产物指纹 |
+| 媒体被替换或丢失 | 二进制按 SHA-256 记录；发布前重新读取并核对内容哈希 |
+| 媒体路径穿越工作区 | 所有媒体、SVG 与输出路径经 store 的工作区边界校验 |
+| 字体许可不允许嵌入 | fsType 为 0x0002 时 blocker；缺失族名进入 `missingFonts`；其他限制位进入许可提醒 |
+| 字体子集影响预览 | 预览与规则质检使用裸 PPTX；嵌入后的最终效果在 PowerPoint / WPS 中人工核对 |
+| Windows 125% 缩放导致 Office 直接光栅化放大 | 预览与质检统一走 PPTX → PDF → PDFium PNG |
+| SVG 与原生页面坐标单位不同 | SVG 编译产物先按主 deck 画布等比适配，再导入页面 |
+| SVG 文本被 LibreOffice 自动换行 | 简单 SVG 文本使用固定框与 `noAutofit`，保留 SVG 的不换行语义 |
+| 转换器升级后缓存仍被采用 | `SVG_COMPILER_VERSION` 参与编译缓存键与 QA 指纹 |
+| 表格、图表与 SVG 在工作台失真 | 工作台直接解析 PPTD 元素；SVG 以 `image/svg+xml` Blob 显示；传输 MIME 由真实 `mimeFor` 测试覆盖 |
+| 预览图与正式界面漂移 | 预览与正式面板共享组件、样式、主题 token 和真实工程 fixture；client 改动后重新生成预览 |
+
+## C. 验证结论
+
+- EOT 的 `Version` 使用 `0x00020001`，`flags=0`；fntdata 必须是 EOT 封装，裸 TTF/CFF 不能作为 PowerPoint 嵌入字体数据。
+- TTC 表目录中的 offset 是相对文件起点的绝对偏移，不能叠加 faceOffset；fontkit 的 fsType 是位域对象，需要按位解析。
+- 预览与导出需要分别验收 DOM 显示和 PPTX → LibreOffice → PDF 渲染，两者通过才构成完整的视觉回归。
+- 16:9 与 4:3 共用同一坐标模型；测试分别验证 960×540 与 800×600 的原生页、SVG 页和导出几何。

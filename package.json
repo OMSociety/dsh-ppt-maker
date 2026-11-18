@@ -67,6 +67,8 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/react": "^18.3.31",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tsup": "^9.0.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.4"
@@ -85,6 +87,7 @@
   },
   "scripts": {
     "build": "tsup && node scripts/build-client.mjs",
+    "build:preview": "node scripts/build-preview.mjs",
     "check:build": "node scripts/check-build.mjs",
     "check:mounts": "node scripts/check-mounts.mjs",
     "test": "vitest run",

@@ -1,11 +1,9 @@
 /**
  * Python escape hatch — interface only.
  *
- * Broken third-party `.pptd` files that the strict YAML parser rejects can be
- * handed to a small Python script (lenient YAML cleanup, encoding fixes) as a
- * last resort. The harness lives in `py/` and is wired up in a later PR; the
- * tool layer must already code against this seam so the integration is a
- * drop-in.
+ * This seam describes best-effort repair of third-party `.pptd` files that the
+ * strict YAML parser rejects. The current factory reports the unavailable
+ * escape hatch through EscapeHatchUnavailableError.
  */
 import type { Issue } from '../core/pptd/parse.js'
 
@@ -34,12 +32,12 @@ export class EscapeHatchUnavailableError extends Error {
   readonly code = 'EscapeHatchUnavailable'
 
   constructor() {
-    super('Python 逃生舱尚未接线（接口预留，后续 PR 实现）')
+    super('Python 逃生舱不可用')
     this.name = 'EscapeHatchUnavailableError'
   }
 }
 
-/** Factory seam: later PRs return a real implementation here. */
+/** Report the unavailable Python escape hatch. */
 export function createEscapeHatch(): EscapeHatch {
   throw new EscapeHatchUnavailableError()
 }

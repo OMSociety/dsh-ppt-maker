@@ -1,6 +1,6 @@
 ---
 name: ppt-maker
-description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：用插件注册的十一个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出，以及把既有 .pptx 逆向成 PPTD 工程或外科手术式轻改（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx）；Python 脚本（pptd_to_pptx.py 等）是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作等设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
+description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：用插件注册的十三个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出，以及把既有 .pptx 逆向成 PPTD 工程或外科手术式轻改（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx）；Python 脚本（pptd_to_pptx.py 等）是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作等设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
 ---
 
 # ppt-maker：PPT 生成与本地导出

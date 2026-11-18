@@ -13,6 +13,8 @@ import { describe, expect, it } from 'vitest'
 // 无类型声明的 .mjs 宿主路由（与 src/index.ts 同一入口）；无声明时按 any 处理。
 // @ts-ignore
 import { createApiHandler } from '../plugin/host/routes.mjs'
+// @ts-ignore
+import { mimeFor } from '../plugin/host/store.mjs'
 import { createProject, loadProject } from '../src/core/project/store.js'
 import { ProjectError } from '../src/core/project/store.js'
 
@@ -99,7 +101,7 @@ function makeHandler(cwd: string, abs: string) {
     pendingOpenRequests: () => [],
     resolveProject: (_s: string, _c: string, key: string) =>
       key === KEY ? { dir: 'deck', abs } : null,
-    mimeFor: (p: string) => (p.endsWith('.svg') ? 'image/svg+xml' : 'application/octet-stream'),
+    mimeFor,
   }
   // core 只给本测试触达的成员；REQUIRED_CORE 装配期校验要求全部函数，未用到的给 noop。
   const noop = async () => ({})
@@ -141,6 +143,7 @@ describe('宿主路由：规划透传与 svg 媒体白名单', () => {
     const res3 = mockRes()
     await handle(mockReq('GET', '/media', { key: KEY, src: 'media/svg/cover.svg' }), res3)
     expect(res3.out.status).toBe(200)
+    expect(mimeFor('cover.svg')).toBe('image/svg+xml')
     expect(String(res3.out.raw)).toContain('<svg')
 
     // 路径逃逸仍然 400

@@ -42,7 +42,7 @@ describe('源存档与整页恢复', () => {
     expect(loaded.deck.source?.archive).toBe('source/original.pptx')
     expect(loaded.deck.source?.originalSha1).toBe(sha1)
 
-    // 零编辑 → 整份恢复：chart 部件回来，dropped 的占位不再是唯一出口。
+    // 零编辑 → 整份恢复：chart 等原始部件随存档保留。
     const pipeline = await buildProjectDeck(cwd, 'proj')
     expect(pipeline.buildWarnings.some((w) => w.includes('零编辑') && w.includes('源存档恢复'))).toBe(true)
   })

@@ -1,0 +1,1026 @@
+{
+  "key": "preview",
+  "state": {
+    "cwd": "demo-deck",
+    "projects": [
+      {
+        "key": "preview",
+        "dir": "demo-deck"
+      }
+    ],
+    "activeKey": "preview",
+    "openRequests": [],
+    "manifest": {
+      "revision": 6,
+      "title": "构成主义 · 功能演示",
+      "designSystem": "work",
+      "theme": "blue-flame-brand",
+      "pageCount": 3,
+      "checksumMismatch": false,
+      "canUndo": true,
+      "canRedo": false
+    },
+    "canUndo": true,
+    "canRedo": false
+  },
+  "project": {
+    "key": "preview",
+    "dir": "demo-deck",
+    "revision": 6,
+    "manifest": {
+      "revision": 6,
+      "createdAt": "2026-11-17T21:10:27.804Z",
+      "updatedAt": "2026-11-17T22:26:39.094Z",
+      "designSystem": "work",
+      "theme": "blue-flame-brand",
+      "checksum": "2daa1b044d9d3dd00fad79b8fbf50edb909f7467",
+      "qaReport": {
+        "revision": 4,
+        "checkedAt": "2026-11-17T21:21:03.864Z",
+        "tool": "ppt_check",
+        "pass": true,
+        "issueCount": 15,
+        "blockerCount": 0,
+        "issues": [
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / sq",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / title",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / sub",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / circle",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / yellow",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / bar",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / header",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / title",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / accent",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / chart",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / table",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / caption",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "TextBox 3 / TextBox 4",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Ellipse 5 / Line 6",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Freeform 7 / Rectangle 8",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          }
+        ],
+        "pages": null,
+        "ai": null,
+        "fingerprint": "b78c76d95691547086fc422dec203c31602cadcbb7d8d9cfe1292b221743dc61"
+      },
+      "exportReport": {
+        "revision": 5,
+        "exportedAt": "2026-11-17T21:53:42.506Z",
+        "out": "demo-deck.pptx",
+        "bytes": 251858,
+        "sha256": "ec7ecc12b808ef36acd84edfbac13dadf16e3ce846edbba2685ca6f2576e6051",
+        "postflight": {
+          "ok": true,
+          "slides": 3,
+          "errors": []
+        },
+        "fontsUsed": [
+          "Noto Sans SC",
+          "Microsoft YaHei"
+        ],
+        "transition": "fade",
+        "animations": "auto",
+        "fontEmbed": {
+          "mode": "subset",
+          "facesEmbedded": 2,
+          "skipped": 1,
+          "rawBytes": 24624,
+          "finalBytes": 251858,
+          "warnings": [
+            "Noto Sans SC(bold)：实际解析到 regular 槽位，与请求的 bold 不符",
+            "Noto Sans SC(regular) → rId10 @ fonts/font1.fntdata",
+            "Microsoft YaHei(regular) → rId11 @ fonts/font2.fntdata",
+            "presentation.xml 新建 p:embeddedFontLst",
+            "embeddedFontLst 新增 typeface=\"Noto Sans SC\"",
+            "embeddedFontLst 新增 typeface=\"Microsoft YaHei\""
+          ],
+          "subset": [
+            {
+              "typeface": "Noto Sans SC",
+              "slot": "regular",
+              "beforeBytes": 17773244,
+              "afterBytes": 150964
+            },
+            {
+              "typeface": "Microsoft YaHei",
+              "slot": "regular",
+              "beforeBytes": 19583608,
+              "afterBytes": 90860
+            }
+          ],
+          "skippedDetail": [
+            {
+              "typeface": "Noto Sans SC",
+              "slot": "bold",
+              "reason": "实际解析到 regular 槽位，与请求的 bold 不符"
+            }
+          ]
+        },
+        "buildWarnings": [],
+        "check": {
+          "skipped": true
+        }
+      }
+    },
+    "deck": {
+      "profile": "generate",
+      "schema": 2,
+      "title": "构成主义 · 功能演示",
+      "size": [
+        960,
+        540
+      ],
+      "export": {
+        "fontEmbed": "subset",
+        "transition": "fade",
+        "animations": "auto"
+      },
+      "pages": [
+        "pages/01.page",
+        "pages/02.page",
+        "pages/03.page"
+      ]
+    },
+    "pages": [
+      {
+        "path": "pages/01.page"
+      },
+      {
+        "path": "pages/02.page"
+      },
+      {
+        "path": "pages/03.page"
+      }
+    ],
+    "issues": [],
+    "checksumMismatch": false,
+    "plan": {
+      "pages": [
+        {
+          "intent": "品牌展示",
+          "page": "pages/01.page",
+          "title": "封面",
+          "type": "native"
+        },
+        {
+          "intent": "原生图表与表格",
+          "page": "pages/02.page",
+          "title": "原生数据",
+          "type": "native"
+        },
+        {
+          "intent": "SVG 编译为 DrawingML",
+          "page": "pages/03.page",
+          "svgRef": "media/svg/03-visual.svg",
+          "title": "SVG 页面轨",
+          "type": "svg"
+        }
+      ],
+      "status": "confirmed",
+      "version": 1
+    },
+    "brief": "- **purpose**：功能演示\n- **audience**：开发者\n- **coreMessage**：原生页面、数据视图与 SVG 导出\n- **mode**：deck\n"
+  },
+  "pages": {
+    "pages/01.page": {
+      "path": "pages/01.page",
+      "page": {
+        "pageType": "title",
+        "elements": [
+          {
+            "elementId": "bg",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              0,
+              0,
+              960,
+              540
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#f5f2ea"
+            }
+          },
+          {
+            "elementId": "rail",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              0,
+              0,
+              18,
+              540
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "mark",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              64,
+              48,
+              22,
+              22
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "brand",
+            "elementType": "text",
+            "bounds": [
+              100,
+              43,
+              330,
+              32
+            ],
+            "content": {
+              "text": "DSH / PPT MAKER",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "bold": true,
+              "letterSpacing": 2,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "folio",
+            "elementType": "text",
+            "bounds": [
+              800,
+              43,
+              96,
+              32
+            ],
+            "content": {
+              "text": "01 — 03",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "align": [
+                "right",
+                "top"
+              ],
+              "color": "#6b665c"
+            }
+          },
+          {
+            "elementId": "title",
+            "elementType": "text",
+            "bounds": [
+              64,
+              132,
+              590,
+              150
+            ],
+            "content": {
+              "text": "把演示文稿，\n做成可编辑的原生作品",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 45,
+              "bold": true,
+              "lineHeight": 1.22,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "subtitle",
+            "elementType": "text",
+            "bounds": [
+              68,
+              310,
+              520,
+              66
+            ],
+            "content": {
+              "text": "从规划、生成到质检与导出，\n一条管线完成。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 20,
+              "lineHeight": 1.45,
+              "color": "#575249"
+            }
+          },
+          {
+            "elementId": "red-rule",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              68,
+              405,
+              112,
+              6
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#c8102e"
+            }
+          },
+          {
+            "elementId": "yellow-rule",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              68,
+              432,
+              180,
+              16
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#f2b705"
+            }
+          },
+          {
+            "elementId": "hero-circle",
+            "elementType": "shape",
+            "shapeName": "ellipse",
+            "bounds": [
+              710,
+              112,
+              152,
+              152
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#d42b1e"
+            }
+          },
+          {
+            "elementId": "hero-line",
+            "elementType": "line",
+            "bounds": [
+              662,
+              90,
+              224,
+              224
+            ],
+            "viewBox": [
+              224,
+              224
+            ],
+            "points": "0,224 224,0",
+            "curve": "sharp",
+            "border": {
+              "style": "solid",
+              "width": 10,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "hero-square",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              808,
+              286,
+              58,
+              58
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#2456c4"
+            }
+          },
+          {
+            "elementId": "hero-caption",
+            "elementType": "text",
+            "bounds": [
+              664,
+              374,
+              230,
+              58
+            ],
+            "content": {
+              "text": "PLAN  /  BUILD\nREVIEW  /  EXPORT",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "bold": true,
+              "lineHeight": 1.5,
+              "letterSpacing": 1,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "footer",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              0,
+              516,
+              960,
+              24
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "footer-text",
+            "elementType": "text",
+            "bounds": [
+              64,
+              518,
+              620,
+              18
+            ],
+            "content": {
+              "text": "十三个工具 · 原生 PPTX · 本地构建",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "color": "#f5f2ea"
+            }
+          },
+          {
+            "elementId": "footer-link",
+            "elementType": "text",
+            "bounds": [
+              610,
+              518,
+              286,
+              18
+            ],
+            "content": {
+              "text": "github.com/OMSociety/dsh-ppt-maker",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "align": [
+                "right",
+                "top"
+              ],
+              "color": "#f5f2ea"
+            }
+          }
+        ]
+      },
+      "revision": 6
+    },
+    "pages/02.page": {
+      "path": "pages/02.page",
+      "page": {
+        "pageType": "content",
+        "elements": [
+          {
+            "elementId": "bg",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              0,
+              0,
+              960,
+              540
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#f5f2ea"
+            }
+          },
+          {
+            "elementId": "rail",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              0,
+              0,
+              18,
+              540
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "mark",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              64,
+              42,
+              22,
+              22
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "brand",
+            "elementType": "text",
+            "bounds": [
+              100,
+              37,
+              330,
+              32
+            ],
+            "content": {
+              "text": "02 / NATIVE DATA",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "bold": true,
+              "letterSpacing": 2,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "folio",
+            "elementType": "text",
+            "bounds": [
+              800,
+              37,
+              96,
+              32
+            ],
+            "content": {
+              "text": "02 — 03",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "align": [
+                "right",
+                "top"
+              ],
+              "color": "#6b665c"
+            }
+          },
+          {
+            "elementId": "title",
+            "elementType": "text",
+            "bounds": [
+              64,
+              88,
+              720,
+              58
+            ],
+            "content": {
+              "text": "数据与结构，保持原生",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 38,
+              "bold": true,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "subtitle",
+            "elementType": "text",
+            "bounds": [
+              66,
+              151,
+              650,
+              32
+            ],
+            "content": {
+              "text": "十三个工具各司其职；图表和表格仍可继续编辑。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "color": "#6b665c"
+            }
+          },
+          {
+            "elementId": "accent",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              64,
+              198,
+              92,
+              5
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#c8102e"
+            }
+          },
+          {
+            "elementId": "chart-card",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              54,
+              230,
+              410,
+              242
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#fffdf7"
+            },
+            "border": {
+              "style": "solid",
+              "width": 1,
+              "color": "#d8d2c4"
+            }
+          },
+          {
+            "elementId": "table-card",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              510,
+              230,
+              386,
+              242
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#fffdf7"
+            },
+            "border": {
+              "style": "solid",
+              "width": 1,
+              "color": "#d8d2c4"
+            }
+          },
+          {
+            "elementId": "chart-label",
+            "elementType": "text",
+            "bounds": [
+              70,
+              240,
+              300,
+              24
+            ],
+            "content": {
+              "text": "01 / 工具覆盖",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "bold": true,
+              "letterSpacing": 1,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "table-label",
+            "elementType": "text",
+            "bounds": [
+              526,
+              240,
+              300,
+              24
+            ],
+            "content": {
+              "text": "02 / 统一管线",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "bold": true,
+              "letterSpacing": 1,
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "chart",
+            "elementType": "chart",
+            "bounds": [
+              70,
+              272,
+              378,
+              184
+            ],
+            "data": {
+              "cols": [
+                "环节",
+                "工具数"
+              ],
+              "rows": [
+                [
+                  "创作",
+                  8
+                ],
+                [
+                  "质量",
+                  3
+                ],
+                [
+                  "交付",
+                  2
+                ]
+              ]
+            },
+            "series": [
+              {
+                "name": "工具数",
+                "type": "bar",
+                "encode": {
+                  "x": "环节",
+                  "y": "工具数"
+                },
+                "fill": "#2456c4"
+              }
+            ],
+            "barWidth": 0.48
+          },
+          {
+            "elementId": "table",
+            "elementType": "table",
+            "bounds": [
+              526,
+              272,
+              354,
+              184
+            ],
+            "columnWidths": [
+              0.43,
+              0.57
+            ],
+            "rowHeights": [
+              0.2,
+              0.2,
+              0.2,
+              0.2,
+              0.2
+            ],
+            "rows": [
+              [
+                {
+                  "text": "工具",
+                  "color": "#ffffff",
+                  "bold": true,
+                  "fill": {
+                    "type": "solid",
+                    "color": "#1a1a1a"
+                  },
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 13
+                },
+                {
+                  "text": "职责",
+                  "color": "#ffffff",
+                  "bold": true,
+                  "fill": {
+                    "type": "solid",
+                    "color": "#1a1a1a"
+                  },
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 13
+                }
+              ],
+              [
+                {
+                  "text": "ppt_plan",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                },
+                {
+                  "text": "规划契约",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                }
+              ],
+              [
+                {
+                  "text": "ppt_svg",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                },
+                {
+                  "text": "复杂视觉",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                }
+              ],
+              [
+                {
+                  "text": "ppt_check",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                },
+                {
+                  "text": "统一质检",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                }
+              ],
+              [
+                {
+                  "text": "ppt_export",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                },
+                {
+                  "text": "发布交付",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 12
+                }
+              ]
+            ],
+            "style": {
+              "cellStyle": {
+                "border": {
+                  "color": "#d8d2c4",
+                  "style": "solid",
+                  "width": 1
+                }
+              },
+              "bodyStyles": [
+                {
+                  "fill": {
+                    "type": "solid",
+                    "color": "#fffdf7"
+                  }
+                },
+                {
+                  "fill": {
+                    "type": "solid",
+                    "color": "#ece8dd"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "elementId": "caption",
+            "elementType": "text",
+            "bounds": [
+              64,
+              480,
+              680,
+              24
+            ],
+            "content": {
+              "text": "同一份 PPTD 数据，同时驱动画布预览与最终 PPTX。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "color": "#6b665c"
+            }
+          },
+          {
+            "elementId": "footer",
+            "elementType": "shape",
+            "shapeName": "rect",
+            "bounds": [
+              0,
+              516,
+              960,
+              24
+            ],
+            "fill": {
+              "type": "solid",
+              "color": "#1a1a1a"
+            }
+          },
+          {
+            "elementId": "footer-text",
+            "elementType": "text",
+            "bounds": [
+              64,
+              518,
+              620,
+              18
+            ],
+            "content": {
+              "text": "PPTD → OFFICEKIT → PPTX",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "letterSpacing": 1,
+              "color": "#f5f2ea"
+            }
+          },
+          {
+            "elementId": "footer-link",
+            "elementType": "text",
+            "bounds": [
+              610,
+              518,
+              286,
+              18
+            ],
+            "content": {
+              "text": "github.com/OMSociety/dsh-ppt-maker",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "align": [
+                "right",
+                "top"
+              ],
+              "color": "#f5f2ea"
+            }
+          }
+        ]
+      },
+      "revision": 6
+    },
+    "pages/03.page": {
+      "path": "pages/03.page",
+      "page": {
+        "pageType": "svg",
+        "svgSource": {
+          "ref": "media/svg/03-visual.svg"
+        },
+        "elements": []
+      },
+      "revision": 6
+    }
+  },
+  "media": {
+    "media/svg/03-visual.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 540\" width=\"960\" height=\"540\">\n  <rect width=\"960\" height=\"540\" fill=\"#f5f2ea\"/>\n  <rect width=\"18\" height=\"540\" fill=\"#1a1a1a\"/>\n  <rect x=\"64\" y=\"42\" width=\"22\" height=\"22\" fill=\"#1a1a1a\"/>\n  <text x=\"100\" y=\"57\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"13\" font-weight=\"700\" letter-spacing=\"2\" fill=\"#1a1a1a\">03 / SVG TRACK</text>\n  <text x=\"896\" y=\"57\" text-anchor=\"end\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"13\" fill=\"#6b665c\">03 — 03</text>\n  <text x=\"64\" y=\"132\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"38\" font-weight=\"700\" fill=\"#1a1a1a\">复杂视觉，也可回到原生</text>\n  <text x=\"66\" y=\"174\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"16\" fill=\"#6b665c\">整页 SVG 编译为 DrawingML，文本与形状继续可编辑。</text>\n  <rect x=\"64\" y=\"202\" width=\"92\" height=\"5\" fill=\"#c8102e\"/>\n  <circle cx=\"792\" cy=\"132\" r=\"72\" fill=\"#d42b1e\"/>\n  <line x1=\"694\" y1=\"218\" x2=\"850\" y2=\"88\" stroke=\"#1a1a1a\" stroke-width=\"10\"/>\n  <rect x=\"820\" y=\"222\" width=\"48\" height=\"48\" fill=\"#2456c4\"/>\n  <text x=\"64\" y=\"282\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"12\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#1a1a1a\">从源文件到可交付作品</text>\n  <rect x=\"64\" y=\"306\" width=\"250\" height=\"116\" fill=\"#1a1a1a\"/>\n  <text x=\"88\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#f5f2ea\">01 / SOURCE</text>\n  <text x=\"88\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"30\" font-weight=\"700\" fill=\"#f5f2ea\">SVG</text>\n  <line x1=\"322\" y1=\"364\" x2=\"344\" y2=\"364\" stroke=\"#1a1a1a\" stroke-width=\"3\"/>\n  <path d=\"M344 364 L334 358 L334 370 Z\" fill=\"#1a1a1a\"/>\n  <rect x=\"355\" y=\"306\" width=\"250\" height=\"116\" fill=\"#2456c4\"/>\n  <text x=\"379\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#ffffff\">02 / COMPILE</text>\n  <text x=\"379\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"27\" font-weight=\"700\" fill=\"#ffffff\">DrawingML</text>\n  <line x1=\"613\" y1=\"364\" x2=\"635\" y2=\"364\" stroke=\"#1a1a1a\" stroke-width=\"3\"/>\n  <path d=\"M635 364 L625 358 L625 370 Z\" fill=\"#1a1a1a\"/>\n  <rect x=\"646\" y=\"306\" width=\"250\" height=\"116\" fill=\"#fffdf7\" stroke=\"#1a1a1a\" stroke-width=\"2\"/>\n  <text x=\"670\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#6b665c\">03 / NATIVE</text>\n  <text x=\"670\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"27\" font-weight=\"700\" fill=\"#1a1a1a\">可编辑 PPT</text>\n  <rect x=\"64\" y=\"450\" width=\"144\" height=\"12\" fill=\"#f2b705\"/>\n  <text x=\"230\" y=\"462\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"12\" fill=\"#6b665c\">ppt_svg · 编译缓存 · 统一质量门</text>\n  <rect x=\"0\" y=\"516\" width=\"960\" height=\"24\" fill=\"#1a1a1a\"/>\n  <text x=\"64\" y=\"533\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"10\" letter-spacing=\"1\" fill=\"#f5f2ea\">SVG / DRAWINGML</text>\n  <text x=\"896\" y=\"533\" text-anchor=\"end\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"10\" fill=\"#f5f2ea\">github.com/OMSociety/dsh-ppt-maker</text>\n</svg>"
+  }
+}

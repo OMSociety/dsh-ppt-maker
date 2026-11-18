@@ -15,8 +15,8 @@
  * 的 `resolveProjectDir` 复检（必须落在会话 cwd 内）。跨会话读要先知道对方的
  * sessionId **与** key；本机单用户场景下这条不是授权边界，同源校验才是（见 routes.mjs）。
  *
- * openRequests 的 shape 由整合任务的消费方（/state、/tab-opened）决定，这里照抄
- * fishpai 的三件套：request 写时间戳、consume 读了就删、pending 只认 60s 内未过期的。
+ * openRequests 由 /state 与 /tab-opened 消费：request 写时间戳，consume 读取后删除，
+ * pending 只接受 60s 内未过期的请求。
  */
 import { createHash } from 'node:crypto'
 import path from 'node:path'
@@ -32,6 +32,7 @@ const MIME_BY_EXT = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',

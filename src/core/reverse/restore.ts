@@ -1,13 +1,10 @@
 /**
  * 未改页整页恢复（spec §10.4）——逆向工程的导出保真轨。
  *
- * 问题：逆向导入把 chart / custGeom / connector 等 PPTD 模型承载不了的部件
- * 记成 dropped + 占位；若导出时一律按 PPTD 元素重建，这些部件就永远丢了。
- *
- * 解法：导入时把原始 pptx 原样存到 source/original.pptx（deck.source.archive /
- * originalSha1 记账）。导出时逐页判定「这一页自导入后是否被编辑过」：
- *   未改 → 从存档 importSlide 整页并入（chart/workbook/notes/media/未知部件全保留）；
- *   改过 → 按 PPTD 元素逐页重建（现状行为，占位仍是占位，报告已如实记账）。
+ * 逆向导入将 PPTD 未建模部件记录为 dropped + 占位，并把原始 pptx
+ * 存档至 source/original.pptx（deck.source.archive / originalSha1）。
+ * 全部页未改时，导出从存档整份逐页恢复；任一页有编辑痕迹时，
+ * 整份按 PPTD 元素重建，占位与报告保留。
  *
  * 「未改」的判定（保守，fail-closed）：
  *   1. deck.profile === 'reverse' 且 deck.source.archive/originalSha1 齐全；
@@ -21,7 +18,7 @@
  * 当前实现的边界：判定依据是 sourceRef 完整性，不是内容 diff——「改了一个
  * 元素的 text 但 sourceRef 还在」不会被识别为已改。因此本轨默认只在
  * 「整份 deck 自导入后零编辑」时启用整页恢复（restorePage 全 true 才生效），
- * 部分页编辑的场景整份回退逐页重建。内容 diff 级判定留待指纹方案落地。
+ * 部分页编辑的场景整份回退逐页重建。
  *
  * 上面这段是能力边界的如实说明；真正的保守口径是：
  * 本模块只在「全部页 sourceRef 完整」时返回 archiveReady=true 且

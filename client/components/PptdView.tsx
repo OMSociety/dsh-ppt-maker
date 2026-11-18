@@ -1,10 +1,10 @@
 /**
- * PptdView：把一页 PPTD（页 AST）直接渲染成 DOM——这就是「去光栅化」的核心。
+ * PptdView：把一页 PPTD（页 AST）直接渲染成 DOM。
  *
- * 取代旧的「GET /thumb 光栅化 PNG 底图」：
- *   - 打开即渲染，不等 libreoffice 冷启动；
- *   - 元素与 ElementOverlay 同源同坐标系，选择框永远对齐；
- *   - 用 pt 逻辑坐标 + transform: scale()，无 PNG 的 px:pt 系数问题。
+ * 当前渲染契约：
+ *   - 打开即渲染；
+ *   - 元素与 ElementOverlay 同源同坐标系，选择框对齐；
+ *   - 使用 pt 逻辑坐标 + transform: scale()。
  *
  * 缩放模型（仿 PPTist 的 viewportSize）：
  *   逻辑坐标固定为 deck.size（如 960×540，单位 pt）。容器实际宽度由 ResizeObserver
@@ -111,14 +111,7 @@ export function PptdView({ page, size, theme, resolveMedia, overlay, className }
       >
         {isSvgPage ? (
           svgUrl ? (
-            // SVG 页：源 SVG 直接整页铺底，所见即最终编译的输入。
-            <img
-              src={svgUrl}
-              alt=""
-              draggable={false}
-              style={{ position: 'absolute', inset: 0, width: w, height: h, display: 'block' }}
-              className="pptd-svg-page"
-            />
+            <SvgPageView src={svgUrl} width={w} height={h} />
           ) : (
             <div style={{ position: 'absolute', inset: 0, ...placeholderBox() }}>
               <span style={placeholderLabel()}>SVG 页：缺少 svgSource.ref</span>
@@ -133,6 +126,54 @@ export function PptdView({ page, size, theme, resolveMedia, overlay, className }
       </div>
     </div>
   )
+}
+
+/** SVG 页预览：显式用 image/svg+xml 构造 Blob，避免宿主 MIME 推断影响 <img> 解码。 */
+function SvgPageView({ src, width, height }: { src: string; width: number; height: number }) {
+  const [objectUrl, setObjectUrl] = React.useState<string | null>(null)
+  const [failed, setFailed] = React.useState(false)
+
+  React.useEffect(() => {
+    const controller = new AbortController()
+    let url: string | null = null
+    setObjectUrl(null)
+    setFailed(false)
+    void fetch(src, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.arrayBuffer()
+      })
+      .then((bytes) => {
+        if (controller.signal.aborted) return
+        url = URL.createObjectURL(new Blob([bytes], { type: 'image/svg+xml' }))
+        setObjectUrl(url)
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) setFailed(true)
+      })
+    return () => {
+      controller.abort()
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [src])
+
+  if (failed) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, ...placeholderBox() }}>
+        <span style={placeholderLabel()}>SVG 页加载失败</span>
+      </div>
+    )
+  }
+  return objectUrl ? (
+    <img
+      src={objectUrl}
+      alt=""
+      draggable={false}
+      style={{ position: 'absolute', inset: 0, width, height, display: 'block' }}
+      className="pptd-svg-page"
+      onError={() => setFailed(true)}
+    />
+  ) : null
 }
 
 /** 单个元素：绝对定位 + 旋转 + 不透明度，再按 elementType 分发渲染内容。 */
@@ -174,22 +215,18 @@ function ElementView({
       return <LineView el={el} style={style} theme={theme} />
     case 'image':
       return <ImageView el={el} style={style} resolveMedia={resolveMedia} />
-    case 'table': {
-      const content = (el.content ?? {}) as Record<string, unknown>
+    case 'table':
       return (
         <div style={style} data-element-type={type}>
-          <TableView content={content} theme={theme} />
+          <TableView content={el} theme={theme} />
         </div>
       )
-    }
-    case 'chart': {
-      const content = (el.content ?? {}) as Record<string, unknown>
+    case 'chart':
       return (
         <div style={style} data-element-type={type}>
-          <ChartView content={content} theme={theme} />
+          <ChartView content={el} theme={theme} />
         </div>
       )
-    }
     default:
       // icon / smartArt / placeholder 等：灰底占位（与逆向引擎 placeholder 口径一致）。
       return (

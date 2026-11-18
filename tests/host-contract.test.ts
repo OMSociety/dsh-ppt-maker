@@ -242,7 +242,7 @@ describe('宿主注册契约（严格桩，照抄 dsh-tools register/createSucce
     const { ctx, fire } = strictCtx(cwd)
     apply(ctx)
     reveal(fire)
-    // 关键判据：数量 + 名字集合，缺一个即红。曾经的 P0 正是这里从 11 变 0。
+    // 关键判据：工具数量与名称集合必须同时匹配，缺一个即失败。
     expect([...defs.keys()].sort()).toEqual([
       'ppt_check',
       'ppt_create',

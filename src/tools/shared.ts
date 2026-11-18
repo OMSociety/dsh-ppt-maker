@@ -1,5 +1,5 @@
 /**
- * Shared plumbing for the eleven ppt_* tools.
+ * Shared plumbing for the thirteen ppt_* tools.
  *
  * Raw JSON-Schema registration only (plan §2: `ctx.tools.register({name,
  * description, parameters, output, execute})`) — no `defineTool` import, the
@@ -107,10 +107,8 @@ export function resolveSessionCwd(exec: unknown, sessions: SessionsLike | undefi
 /**
  * Build the host-facing `output.render` projection for one tool.
  *
- * The host calls this as `render(exec.arguments, value)` and requires the
- * return value to be lossless JSON — an array of content blocks, the shape
- * every shipped DSH plugin uses. Returning a bare string (as this module did
- * before) is not a content-block projection.
+ * The host calls this as `render(exec.arguments, value)` and requires a
+ * lossless JSON array of content blocks, the shape every shipped DSH plugin uses.
  *
  * `line` keeps its one-argument shape: it receives the committed result value.
  */

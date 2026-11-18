@@ -1,11 +1,8 @@
 /**
  * 字体解析：族名索引与 slot 判定
  *
- * 回归案例（真实缺陷）：Typeface 声明为中文族名时，索引里只有
- *  - fontkit 取到的 en 族名（Alimama ShuHeiTi），以及
- *  - 注册表值名键（「阿里妈妈数黑体 Bold (TrueType)」）下的**占位条目**（无 fsType/slot/outline）
- * 于是中文族名查到的 face `fsType === null` → 被判为「OS/2 表读不到，保守跳过」→ 导出时静默不嵌。
- * 修法：① name 表全部语言变体都进索引；② 注册表族名键指向同一文件的真实 face，不再造占位条目。
+ * 族名索引覆盖 name 表的全部语言变体；注册表族名键与 Typeface
+ * 中文族名均解析到带 fsType/slot/outline 的同一真实 face。
  *
  * 用例取系统已装的中文字体（中英族名成对；Windows 自带 simhei / Deng / msyh 等）；
  * 一个可用候选都不在位时显式跳过并在运行日志里打印原因。

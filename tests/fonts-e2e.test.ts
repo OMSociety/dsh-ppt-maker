@@ -2,7 +2,7 @@
  * 端到端字体嵌入冒烟（真实 PPTD 工程 → 导出 → 解包核对四件套 → 库回读）
  *
  * 测试字体走系统已装 TTF（环境变量 PPT_TEST_FONT 可覆盖）；找不到可用字体时整条跳过，
- * 并在文件顶层打印一行原因——不用「用例体内提前 return」的假通过写法。
+ * 并在文件顶层打印一行原因。
  *
  * 本测试：
  *  1) 造一个最小 PPTD 工程（theme.textStyles 用该字体的 name 表族名）
@@ -10,8 +10,7 @@
  *  3) 解包断言 fntdata / Content_Types Override / rels / presentation.xml 标记全在
  *  4) 产物能被 @office-kit/pptx 回读
  *
- * 字体字节本身能否被 PowerPoint 的 t2embed 收下，属 spike 期的 headless 裁决范围，
- * 结论记在 docs/DECISIONS.md；本测试只守结构面。
+ * PowerPoint 的 t2embed 字体接收验证结论见 docs/DECISIONS.md；本测试只守结构面。
  */
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'

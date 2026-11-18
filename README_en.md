@@ -31,7 +31,7 @@ The intermediate format is **PPTD**, a self-defined contract in YAML (`deck.pptd
 | **Masters & layouts** | `deck.masters` declares real OOXML masters/layouts (shared decorations + placeholder frames); pages attach via `layoutRef`, so shared decorations across a multi-page deck are declared once |
 | **Two-way workflow** | `ppt_import` reverse-engineers an existing .pptx into a PPTD project and archives the source file; a deck with zero edits since import is restored wholesale from the source archive on export (charts / SmartArt / connectors survive), and any content edit falls the whole deck back to a rebuild; `ppt_patch` performs surgical edits on a .pptx (text / image / page order) without a PPTD round-trip |
 | **PPTD contract** | A YAML DSL (`deck.pptd` + `pages/*.page`), self-contained per page and WYSIWYG; generate / reverse dialects, editable by hand and by machine |
-| **Right-hand workbench** | A custom three-pane editor (thumbnails + canvas + inspector): double-click to edit text in place, drag to reorder pages, one-click image replacement, live table/chart rendering, whole-page SVG preview, plan drawer, QA status badge, undo / redo, version history with live snapshot preview and one-click restore, 409 conflict protection and a "modified externally" banner |
+| **Right-hand workbench** | A custom three-pane editor (thumbnails + canvas + inspector): double-click to edit text in place, drag to reorder pages, one-click image replacement, live table/chart rendering, whole-page SVG preview, plan drawer, undo / redo, version history with live snapshot preview and one-click restore, 409 conflict protection and a "modified externally" banner |
 | **Layered QA** | Rule layer (text overflow measured with real glyph widths / out-of-bounds / overlap / per-run contrast / structure / missing fonts) blocks export; AI layer on demand (`ppt_check ai:true`) sends rendered page PNGs to a multimodal model to review color and layout — suggestions only, never blocking; results are recorded in `manifest.qaReport`, fingerprint-bound to deck + pages + plan + media + checker and converter versions — a stale or partially-covering report refuses export |
 | **Unified release pipeline** | Model export and panel export share one release pipeline: QA gate → build + font embedding → postflight re-read (ZIP re-parse + library validation) → SHA-256 ledger |
 | **Font embedding** | Export embeds the fonts actually used (EOT-wrapped `fntdata` + `embeddedFontLst`), so machines without the fonts installed render without falling back; subset / whole-font / off tiers (`export.fontEmbed`), with a per-font fsType license gate |
@@ -42,9 +42,19 @@ The intermediate format is **PPTD**, a self-defined contract in YAML (`deck.pptd
 
 ## In Action
 
-![PPT Maker workbench: thumbnail strip on the left, SVG page canvas in the middle, inspector and planning contract on the right; the footer status bar shows QA passed and the export ledger](docs/workbench.png)
+### Light workbench · Cover
 
-The workbench has three panes: thumbnails + canvas + inspector. Page 3 in the picture is an SVG-track page (compiled to native DrawingML), the "Plan" toolbar button opens the plan drawer, and the QA badge in the status bar reads "QA passed · 8/8 pages covered". The preview source is [`docs/preview/workbench.html`](docs/preview/workbench.html) (HTML mockup — edit the text and re-screenshot to regenerate).
+![PPT Maker in the DSH light theme: the PPT Maker tab above the workbench, three page thumbnails on the left, and a native cover on the canvas](docs/workbench-light.png)
+
+### Dark workbench · Native chart and table
+
+![PPT Maker in the DSH dark theme: the PPT Maker tab above the workbench and native chart and table elements rendered directly on the canvas](docs/workbench-dark.png)
+
+### Actual export · SVG page track
+
+![Actual rendered export of the third page from the same project: the SVG flow page retains editable text and shapes after DrawingML compilation](docs/export-svg.png)
+
+Both workbench images render the production client components, styles and real three-page PPTD data, replacing only network transport with a local fixture. [`docs/preview/workbench.html`](docs/preview/workbench.html) is self-contained and opens offline; use `#theme=light&page=0` or `#theme=dark&page=1` to select the theme and page. The third image is an actual render of the final PPTX for page three of the same project.
 
 ## Installation
 
@@ -96,7 +106,6 @@ The model's standard sequence is **`ppt_plan` (brief/plan) → `ppt_create` (or 
 
 - **The canvas is the DOM**: the canvas and thumbnails render the PPTD page AST directly to the DOM (`client/components/PptdView.tsx`) — instant, no libreoffice cold start; elements, selection boxes and the in-place editor share one coordinate system and stay aligned. Tables and charts render as real DOM/SVG; SVG pages preview as a full-page backdrop; elements that can't render yet (icon / SmartArt) show gray placeholders.
 - **Plan drawer**: the "Plan" toolbar button opens a read-only drawer showing brief.md and plan.yml (page file / title / track / intent).
-- **QA badge**: the status bar shows the QA ledger state — passed / failed (blocker count) / stale (revision mismatch).
 - **Collapsible side panes**: the left page list is expanded by default and can be collapsed; the right inspector only expands when an element is selected. Collapsed panes leave only an edge handle.
 - **Edit in place**: double-click to edit text / drag to reorder pages / duplicate, delete and add pages / replace images / "Export .pptx" lands in the project directory under `export/` (file name includes the version number).
 - **Version history**: the "History" drawer renders any snapshot live on the canvas and restores it with one click.
@@ -111,11 +120,12 @@ npm install          # install dependencies
 npm test             # full regression suite (set a 12GB heap and run serially, see below)
 npm run typecheck    # two tsconfigs: src/ and client/
 npm run build        # rebuild lib/index.js and lib/client.js (required after touching src/ or client/; commit the artifacts)
+npm run build:preview # rebuild the self-contained preview HTML from production workbench components and docs/preview/fixture.json
 npm run check:build  # verify lib/ matches git
 npm run check:mounts # mount declaration check
 ```
 
-> **Tip:** the full test suite needs a large heap and serial execution (the default heap runs out of memory): set `$env:NODE_OPTIONS='--max-old-space-size=12288'` first, then `npm test -- --no-file-parallelism`. The full acceptance criteria and the don'ts are in [`AGENTS.md`](AGENTS.md).
+> **Tip:** the full test suite needs a large heap and serial execution (the default heap runs out of memory): set `$env:NODE_OPTIONS='--max-old-space-size=12288'` first, then `npx vitest run --no-file-parallelism`. The full acceptance criteria and the don'ts are in [`AGENTS.md`](AGENTS.md).
 
 Directories and where to make changes:
 

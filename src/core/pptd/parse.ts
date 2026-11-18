@@ -987,8 +987,8 @@ export function parseProject(deckText: string, pageEntries: PageEntry[]): Parsed
   issues.push(...deckResult.issues)
   const deck = deckResult.value
 
-  // Spec §2.0 — schema gate runs before everything else; a v1 (or foreign) deck
-  // reports `UnsupportedSchemaError` and skips all further rule validation so
+  // Spec §2.0 — the schema gate runs before everything else; missing or unsupported
+  // schemas report `UnsupportedSchemaError` and skip further rule validation so
   // the caller sees one decisive blocker instead of a cascade of schema violations.
   if (deck) {
     const schemaIssues = validateDeckSchemaVersion(deck as unknown as Record<string, unknown>)

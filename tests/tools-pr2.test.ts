@@ -85,6 +85,24 @@ describe('ppt_import', () => {
     expect(String(result.guidance)).toContain('ppt_patch')
   })
 
+  it.each(['full', 'surgical'] as const)('%s 模式：source 缺失或为空时返回统一参数错误', async (mode) => {
+    const { tools, lastRef } = toolsStub()
+    registerImportTool({ tools: tools, sessions: sessionsStub(cwd, SESSION_ID) })
+    const tool = lastRef.current
+
+    for (const args of [{ mode }, { mode, source: '' }, { mode, source: '   ' }]) {
+      const result = (await tool!.execute(args, { agent: { session: { id: SESSION_ID } } })) as {
+        ok: false
+        error: { code: string; message: string; status?: number }
+      }
+      expect(result.ok).toBe(false)
+      expect(result.error.code).toBe('InvalidArgument')
+      expect(result.error.status).toBe(400)
+      expect(result.error.message).toContain('source')
+      expect(JSON.parse(JSON.stringify(result))).toEqual(result)
+    }
+  })
+
   it('full 模式：导入真实 fixture，回传 projectDir + dropped/degraded 计数', async () => {
     const { buildFixturePptx } = await import('./__fixtures__/pptx-fixtures.js')
     const bytes = await buildFixturePptx()

@@ -1,9 +1,8 @@
 /**
  * Stage：画布——PptdView 把页 AST 直接渲染成 DOM，ElementOverlay 盖透明选择框。
  *
- * 历史：旧版用「GET /thumb 光栅化 PNG」做底图，要点按钮、等 libreoffice 冷启动、
- * 还有 px:pt 系数错位（靠右元素视觉偏移）。现在底图就是 DOM（PptdView），
- * 打开即渲染、与选择框同坐标系、恒清晰（矢量）。
+ * 底图与选择层共用同源 DOM 和逻辑坐标系：打开即渲染，矢量缩放保持清晰，
+ * 选择框不会因独立光栅化链路产生坐标偏差。
  *
  * 坐标系：deck.size（pt）为逻辑坐标。ElementOverlay 作为 PptdView 的 overlay 传进
  * 逻辑画布内部，随整体 scale 缩放——所以 overlay 里的元素直接用 pt 坐标即可对齐。

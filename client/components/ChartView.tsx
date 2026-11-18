@@ -1,192 +1,229 @@
 /**
- * ChartView — chart 元素的 SVG 直渲（工作台预览用）。
+ * 图表的轻量 SVG 直渲。
  *
- * 替代原先的灰底占位：渲染真实数据图形。
- * PPTD chart 方言（docs/pptd-spec.md §图表）：
- *   content = { type:'bar'|'column'|'line'|'area'|'pie'|'donut'|...,
- *               data:{cols, rows}, series:[{x,y,color?}], showLegend? }
- * 预览是「数据形状」近似：柱/条/折线/面积/饼用 SVG 画，
- * 坐标轴、网格线、数据标签的精确样式以导出端（原生 Chart）为准。
- * 配色默认取 theme.colors.primary / accent 轮换，series.color 可覆盖。
+ * PPTD 图表契约是 data:{cols, rows 二维数组} + series[{type, encode:{x,y}}]，不是任意
+ * {x,y} 对象数组。这里直接消费同一份契约，支持柱状/条形、折线、面积与饼图的工作台预览；
+ * 复杂 Excel 图表的最终精确外观仍以「导出 .pptx」的 LibreOffice 渲染为准。
  */
+import * as React from 'react'
+import type { ThemeLike } from '../render/resolve'
+import { CHART_PALETTE, chartModelOf, type ChartSeriesModel } from '../render/chart-model'
+const GRID = 'rgba(60,60,60,0.16)'
+const LABEL = '#5c5c5c'
 
-import type { CSSProperties } from 'react'
-import { resolveColor, type ThemeLike } from '../render/resolve'
-
-interface Pt {
-  x: string | number
-  y: number
-  color?: string
+function niceScale(values: number[]) {
+  const min = Math.min(0, ...values)
+  const max = Math.max(0, ...values)
+  const span = Math.max(1, max - min)
+  const rough = span / 4
+  const power = 10 ** Math.floor(Math.log10(rough))
+  const ratio = rough / power
+  const step = (ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10) * power
+  const low = Math.floor(min / step) * step
+  const high = Math.ceil(max / step) * step
+  const ticks: number[] = []
+  for (let value = low; value <= high + step * 0.001; value += step) ticks.push(Number(value.toFixed(10)))
+  return { min: low, max: high, ticks }
 }
 
-function pointsOf(content: Record<string, unknown>): Pt[] {
-  // 两种合法来源：data.rows 的对象数组 或 series[{x,y}]。
-  const data = content.data as { cols?: string[]; rows?: unknown[] } | undefined
-  if (data && Array.isArray(data.rows) && data.rows.length) {
-    const cols = Array.isArray(data.cols) ? data.cols : []
-    const xKey = cols[0] ?? 'x'
-    const yKey = cols[1] ?? 'y'
-    return (data.rows as Record<string, unknown>[]).map((r) => ({
-      x: (r[xKey] ?? r.x ?? '') as string | number,
-      y: Number(r[yKey] ?? r.y ?? 0),
-    }))
-  }
-  const series = content.series as { x?: unknown; y?: unknown; color?: string }[] | undefined
-  if (Array.isArray(series)) {
-    return series.map((s) => ({ x: (s.x ?? '') as string | number, y: Number(s.y ?? 0), color: s.color }))
-  }
-  return []
+function tickText(value: number): string {
+  return Math.abs(value) >= 1000 ? value.toLocaleString('zh-CN') : String(value)
 }
 
-export function ChartView({
+function CartesianChart({
+  model,
   content,
-  theme,
+  width,
+  height,
 }: {
+  model: ChartSeriesModel[]
   content: Record<string, unknown>
-  theme?: ThemeLike | null
+  width: number
+  height: number
 }) {
-  const kind = typeof content.type === 'string' ? content.type : 'column'
-  const pts = pointsOf(content)
-  if (!pts.length) return <div style={fallbackStyle()}>图表无数据</div>
+  const categories = Array.from(new Set(model.flatMap((series) => series.points.map((point) => point.category))))
+  const horizontal = content.xAxis && typeof content.xAxis === 'object'
+    && (content.xAxis as Record<string, unknown>).type === 'category'
+  const scale = niceScale(model.flatMap((series) => series.points.map((point) => point.value)))
+  const left = horizontal ? 76 : 38
+  const right = 12
+  const top = 14
+  const bottom = 30
+  const plotW = Math.max(10, width - left - right)
+  const plotH = Math.max(10, height - top - bottom)
+  const valueSpan = Math.max(1, scale.max - scale.min)
+  const valuePosition = (value: number) => horizontal
+    ? left + ((value - scale.min) / valueSpan) * plotW
+    : top + plotH - ((value - scale.min) / valueSpan) * plotH
+  const zero = valuePosition(0)
+  const labelEvery = Math.max(1, Math.ceil(categories.length / 8))
 
-  const primary = resolveColor('$primary', theme) ?? '#2563eb'
-  const accent = resolveColor('$accent', theme) ?? '#f59e0b'
-  const muted = resolveColor('$muted', theme) ?? '#94a3b8'
-  const ink = resolveColor('$ink', theme) ?? '#334155'
-
-  const W = 100
-  const H = 100
-  const padL = 6
-  const padB = 12
-  const padT = 4
-
-  if (kind === 'pie' || kind === 'donut') {
-    const total = pts.reduce((s, p) => s + Math.max(0, p.y), 0) || 1
-    let acc = 0
-    const slices = pts.map((p, i) => {
-      const frac = Math.max(0, p.y) / total
-      const start = acc
-      acc += frac
-      return { ...p, start, frac, color: p.color ?? (i % 2 ? accent : primary) }
-    })
-    return (
-      <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }} preserveAspectRatio="xMidYMid meet">
-        {slices.map((s, i) => (
-          <Slice key={i} cx={50} cy={44} r={34} start={s.start} frac={s.frac} color={s.color} donut={kind === 'donut'} />
-        ))}
-        <text x={50} y={96} textAnchor="middle" fontSize={6} fill={muted}>
-          {pts.map((p) => String(p.x)).join(' · ').slice(0, 40)}
-        </text>
-      </svg>
-    )
-  }
-
-  const maxY = Math.max(...pts.map((p) => p.y), 1)
-  const n = pts.length
-  const innerW = W - padL - 2
-  const innerH = H - padB - padT
-
-  if (kind === 'line' || kind === 'area') {
-    const step = n > 1 ? innerW / (n - 1) : 0
-    const coords = pts.map((p, i) => [padL + i * step, padT + innerH * (1 - p.y / maxY)] as const)
-    const linePath = coords.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ')
-    const areaPath = `${linePath} L${padL + (n - 1) * step},${padT + innerH} L${padL},${padT + innerH} Z`
-    return (
-      <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
-        <line x1={padL} y1={padT + innerH} x2={W - 2} y2={padT + innerH} stroke={muted} strokeWidth={0.4} />
-        {kind === 'area' && <path d={areaPath} fill={primary} opacity={0.25} />}
-        <path d={linePath} fill="none" stroke={primary} strokeWidth={1.2} />
-        {coords.map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r={1.4} fill={accent} />
-        ))}
-        <Labels pts={pts} padL={padL} innerW={innerW} y={H - 3} fill={ink} />
-      </svg>
-    )
-  }
-
-  // bar / column（含 engine 的 bar→column 归一）：柱形
-  const horizontal = kind === 'bar'
-  const band = (horizontal ? innerH : innerW) / n
-  const barSize = Math.min(band * 0.62, horizontal ? 8 : 12)
   return (
-    <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
-      <line x1={padL} y1={padT + innerH} x2={W - 2} y2={padT + innerH} stroke={muted} strokeWidth={0.4} />
-      {pts.map((p, i) => {
-        const frac = Math.max(0, p.y) / maxY
-        const color = p.color ?? (i % 2 ? accent : primary)
-        if (horizontal) {
-          const y = padT + i * band + (band - barSize) / 2
-          return <rect key={i} x={padL} y={y} width={innerW * frac} height={barSize} fill={color} rx={0.6} />
-        }
-        const x = padL + i * band + (band - barSize) / 2
-        const h = innerH * frac
-        return <rect key={i} x={x} y={padT + innerH - h} width={barSize} height={h} fill={color} rx={0.6} />
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+      {scale.ticks.map((tick) => {
+        const pos = valuePosition(tick)
+        return horizontal ? (
+          <g key={tick}>
+            <line x1={pos} y1={top} x2={pos} y2={top + plotH} stroke={GRID} strokeWidth={1} />
+            <text x={pos} y={height - 10} textAnchor="middle" fontSize={9} fill={LABEL}>{tickText(tick)}</text>
+          </g>
+        ) : (
+          <g key={tick}>
+            <line x1={left} y1={pos} x2={left + plotW} y2={pos} stroke={GRID} strokeWidth={1} />
+            <text x={left - 5} y={pos + 3} textAnchor="end" fontSize={9} fill={LABEL}>{tickText(tick)}</text>
+          </g>
+        )
       })}
-      {!horizontal && <Labels pts={pts} padL={padL} innerW={innerW} y={H - 3} fill={ink} />}
+      <line
+        x1={horizontal ? zero : left}
+        y1={horizontal ? top : zero}
+        x2={horizontal ? zero : left + plotW}
+        y2={horizontal ? top + plotH : zero}
+        stroke="rgba(0,0,0,0.45)"
+      />
+      {categories.map((category, categoryIndex) => {
+        const slot = (horizontal ? plotH : plotW) / Math.max(1, categories.length)
+        const center = (horizontal ? top : left) + slot * (categoryIndex + 0.5)
+        const groupSize = slot * Math.min(0.72, Math.max(0.35, Number(content.barWidth) || 0.62))
+        const bars = model.filter((series) => series.kind === 'bar')
+        return (
+          <g key={`${category}:${categoryIndex}`}>
+            {model.map((series) => {
+              const point = series.points.find((item) => item.category === category)
+              if (!point) return null
+              if (series.kind === 'bar') {
+                const barIndex = bars.indexOf(series)
+                const thickness = groupSize / Math.max(1, bars.length)
+                const start = center - groupSize / 2 + barIndex * thickness + 1
+                const band = Math.max(1, thickness - 2)
+                const valuePos = valuePosition(point.value)
+                return horizontal ? (
+                  <rect
+                    key={series.name}
+                    x={Math.min(zero, valuePos)}
+                    y={start}
+                    width={Math.max(1, Math.abs(valuePos - zero))}
+                    height={band}
+                    rx={2}
+                    fill={series.color}
+                  />
+                ) : (
+                  <rect
+                    key={series.name}
+                    x={start}
+                    y={Math.min(zero, valuePos)}
+                    width={band}
+                    height={Math.max(1, Math.abs(valuePos - zero))}
+                    rx={2}
+                    fill={series.color}
+                  />
+                )
+              }
+              return null
+            })}
+            {categoryIndex % labelEvery === 0 && (
+              horizontal ? (
+                <text x={left - 7} y={center + 3} textAnchor="end" fontSize={10} fill={LABEL}>{category}</text>
+              ) : (
+                <text x={center} y={height - 10} textAnchor="middle" fontSize={10} fill={LABEL}>{category}</text>
+              )
+            )}
+          </g>
+        )
+      })}
+      {model.filter((series) => series.kind === 'line' || series.kind === 'area').map((series) => {
+        const slot = (horizontal ? plotH : plotW) / Math.max(1, categories.length)
+        const points = categories.map((category, index) => {
+          const point = series.points.find((item) => item.category === category)
+          if (!point) return null
+          const categoryPos = (horizontal ? top : left) + slot * (index + 0.5)
+          const valuePos = valuePosition(point.value)
+          return horizontal ? [valuePos, categoryPos] : [categoryPos, valuePos]
+        })
+        const valid = points.filter((point): point is number[] => point !== null)
+        if (!valid.length) return null
+        const path = valid.map((point, index) => `${index ? 'L' : 'M'}${point[0]},${point[1]}`).join(' ')
+        return (
+          <g key={series.name}>
+            {series.kind === 'area' && (
+              <path
+                d={`${path} L${valid[valid.length - 1][0]},${horizontal ? top + plotH : zero} L${valid[0][0]},${horizontal ? top : zero} Z`}
+                fill={series.color}
+                opacity={0.25}
+              />
+            )}
+            <path d={path} fill="none" stroke={series.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+            {valid.map((point, index) => <circle key={index} cx={point[0]} cy={point[1]} r={3} fill={series.color} />)}
+          </g>
+        )
+      })}
     </svg>
   )
 }
 
-function Labels({ pts, padL, innerW, y, fill }: { pts: Pt[]; padL: number; innerW: number; y: number; fill: string }) {
-  const n = pts.length
-  const step = n > 1 ? innerW / n : innerW
+function PieChart({ series, width, height }: { series: ChartSeriesModel; width: number; height: number }) {
+  const total = series.points.reduce((sum, point) => sum + Math.max(0, point.value), 0) || 1
+  const cx = width / 2
+  const cy = Math.max(35, (height - 24) / 2)
+  const radius = Math.max(12, Math.min(width / 3, height / 3))
+  let angle = -Math.PI / 2
   return (
-    <>
-      {pts.map((p, i) => (
-        <text key={i} x={padL + i * step + step / 2} y={y} textAnchor="middle" fontSize={4.5} fill={fill}>
-          {String(p.x).slice(0, 6)}
-        </text>
-      ))}
-    </>
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+      {series.points.map((point, index) => {
+        const next = angle + (Math.max(0, point.value) / total) * Math.PI * 2
+        const x1 = cx + radius * Math.cos(angle)
+        const y1 = cy + radius * Math.sin(angle)
+        const x2 = cx + radius * Math.cos(next)
+        const y2 = cy + radius * Math.sin(next)
+        const large = next - angle > Math.PI ? 1 : 0
+        const path = `M${cx},${cy} L${x1},${y1} A${radius},${radius} 0 ${large} 1 ${x2},${y2} Z`
+        angle = next
+        return <path key={`${point.category}:${index}`} d={path} fill={index === 0 ? series.color : CHART_PALETTE[index % CHART_PALETTE.length]} stroke="#fff" strokeWidth={1.5} />
+      })}
+      <text x={cx} y={height - 8} textAnchor="middle" fontSize={10} fill={LABEL}>
+        {series.points.map((point) => point.category).join(' · ')}
+      </text>
+    </svg>
   )
 }
 
-function Slice({
-  cx,
-  cy,
-  r,
-  start,
-  frac,
-  color,
-  donut,
-}: {
-  cx: number
-  cy: number
-  r: number
-  start: number
-  frac: number
-  color: string
-  donut: boolean
-}) {
-  const a0 = start * Math.PI * 2 - Math.PI / 2
-  const a1 = (start + frac) * Math.PI * 2 - Math.PI / 2
-  const large = frac > 0.5 ? 1 : 0
-  const x0 = cx + r * Math.cos(a0)
-  const y0 = cy + r * Math.sin(a0)
-  const x1 = cx + r * Math.cos(a1)
-  const y1 = cy + r * Math.sin(a1)
-  const inner = donut ? r * 0.55 : 0
-  const d =
-    frac >= 0.999
-      ? `M${cx},${cy - r} A${r},${r} 0 1 1 ${cx - 0.01},${cy - r} Z`
-      : `M${cx},${cy} L${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} Z`
-  return (
-    <g>
-      <path d={d} fill={color} stroke="#fff" strokeWidth={0.5} />
-      {donut && <circle cx={cx} cy={cy} r={inner} fill="#fff" />}
-    </g>
-  )
+function useElementSize() {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [size, setSize] = React.useState({ width: 400, height: 240 })
+  React.useEffect(() => {
+    const element = ref.current
+    if (!element) return
+    const update = () => {
+      const width = element.clientWidth
+      const height = element.clientHeight
+      if (width > 0 && height > 0) setSize({ width, height })
+    }
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  return { ref, ...size }
 }
 
-function fallbackStyle(): CSSProperties {
-  return {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(0,0,0,0.04)',
-    color: '#94a3b8',
-    fontSize: 12,
+export function ChartView({ content, theme }: { content: Record<string, unknown>; theme?: ThemeLike | null }) {
+  const model = chartModelOf(content, theme)
+  const { ref, width, height } = useElementSize()
+  if (!model.length) {
+    return <div style={{ fontSize: 12, color: '#6b7280', padding: 8 }}>图表无有效数据</div>
   }
+  const kind = model[0].kind
+  const supported = kind === 'pie' || model.every((series) => ['bar', 'line', 'area'].includes(series.kind))
+  return (
+    <div ref={ref} style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      {kind === 'pie' ? (
+        <PieChart series={model[0]} width={width} height={height} />
+      ) : supported ? (
+        <CartesianChart model={model} content={content} width={width} height={height} />
+      ) : (
+        <div style={{ fontSize: 12, color: '#6b7280', padding: 8 }}>{kind} 图请在导出后查看精确外观</div>
+      )}
+    </div>
+  )
 }

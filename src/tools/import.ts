@@ -78,8 +78,11 @@ export function registerImportTool(ctx: PluginToolCtxWithOpen): (() => void) | u
     execute: async (args, exec) => {
       try {
         const cwd = resolveSessionCwd(exec, ctx.sessions)
-        const source = String(args.source ?? '')
+        const source = typeof args.source === 'string' ? args.source : ''
         const mode = (args.mode as 'full' | 'surgical' | undefined) ?? 'full'
+        if (source.trim() === '') {
+          throw new ProjectError('InvalidArgument', 'source 必填且不能为空字符串', { status: 400 })
+        }
 
         if (mode === 'surgical') {
           return {

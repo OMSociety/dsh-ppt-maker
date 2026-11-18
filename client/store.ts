@@ -9,8 +9,7 @@
  *      无草稿才允许静默重载（`refreshProjects`）；有草稿只亮「外部已修改」，绝不吞字。
  *   3. **per-session**：`index.tsx` 的 `Map<sessionId, PptStore>` 持有多个，互不干扰。
  *
- * S6 先空的字段（`selection` / `pagesAst` / `draft`）也是**真字段**：S7–S9 的组件挂上来
- * 就不再动 store 的形状，只往里填值。
+ * `selection` / `pagesAst` / `draft` 是 store 的稳定字段；组件只填值，不改变 store 结构。
  */
 import { api, ConflictError, type StatePayload, type PlanPayload } from './api'
 
@@ -22,7 +21,7 @@ export interface Toast {
   file?: string
 }
 
-/** 选中一扇图形元素（S7 Stage/ElementOverlay 落地后往里写）。 */
+/** 选中图形元素，由 Stage/ElementOverlay 写入。 */
 export interface Selection {
   /** 屏上的页下标（`pageIndex`），不是 1-based 页号——与 PPTD 页数组一致。 */
   page: number
@@ -65,7 +64,7 @@ export interface PptState {
   currentPage: number
   /** 画布上选中的元素；null = 没选。 */
   selection: Selection | null
-  /** 未提交草稿（防轮询覆盖）：S8 TextEditor / Inspector 往里写。 */
+  /** 未提交草稿（防轮询覆盖）：由 TextEditor / Inspector 写入。 */
   draft: { baseRevision: number; ops: unknown[] } | null
   canUndo: boolean
   canRedo: boolean
@@ -238,7 +237,7 @@ export function createPptStore(sessionId: string) {
 
   /**
    * 轮询每次带回的 whole-session state 都走这里。
-   * 三件干净事 + 一件众说纷纭的事：
+   * 轮询状态应用的四条规则：
    *   1. projects / canUndo / canRedo 直接刷；
    *   2. activeKey **只升不降**：轮询发现 host 的活动 key 变了 → 有草稿亮
    *      「外部已修改」、没草稿就切过去；本地没 activeKey（空面板）时跟着 host 走；
@@ -497,7 +496,7 @@ export function createPptStore(sessionId: string) {
     },
 
     /**
-     * S7 起 ThumbStrip 的点选会走这里：翻页不动磁盘、也不动 revision，
+     * ThumbStrip 的点选走这里：翻页不动磁盘、也不动 revision，
      * 只更新屏上的 currentPage（草稿是 per 工程、不是 per 页，不用清）。
      * 顺带把页缓存打上过期标记——面板想看就得重新拉（翻页 → GET /page）。
      */
@@ -508,7 +507,7 @@ export function createPptStore(sessionId: string) {
     },
 
     /**
-     * Stage/ElementOverlay/TextEditor 落地都要页上的元素清单——
+     * Stage/ElementOverlay/TextEditor 都需要页上的元素清单：
      * 走这里拉（已经有就复用，revision 过了就重拉）。
      * `force`：保存成功后必须走这条——合并窗口里的连写不推进 revision，
      * 光比 revision 会以为「磁盘没变」，把后续改动全压在旧 AST 上。
@@ -535,7 +534,7 @@ export function createPptStore(sessionId: string) {
       }
     },
 
-    /** 画布上点了一个元素（S7 ElementOverlay）；空数组 = 取消选择。 */
+    /** 画布上点了一个元素（ElementOverlay）；空数组 = 取消选择。 */
     setSelection(ids: string[]) {
       patch({ selection: ids.length ? { page: state.currentPage, ids } : null })
     },
@@ -611,7 +610,7 @@ export function createPptStore(sessionId: string) {
     },
 
     /**
-     * 累积一杆 op（S8 TextEditor 提交、S9 ThumbStrip 页操作都走这里）：
+     * 累积一杆 op（TextEditor 提交、ThumbStrip 页操作都走这里）：
      * 只是先记入草稿 + 亮「save」，不立即 flush。草稿落地有三条路：
      * ①防抖窗口到期（scheduleFlush，见 STAGE_DEBOUNCE_MS）；②撤销/重做/导出前
      * 主动调 applyDraft；③面板卸载时 dispose 里的 flushNow 兜底。

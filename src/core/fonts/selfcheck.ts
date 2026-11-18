@@ -1,5 +1,5 @@
 /**
- * selfcheck.ts — 注入后自检（与 spike verify.mjs 口径对齐）
+ * selfcheck.ts — 注入后自检
  *
  * 在 embedFontsPostProcess 收口阶段调用；发现任何一条断言失败即 throw。
  * 这是导出失败的最便宜兜底 —— 在写盘前发现嵌入损坏。

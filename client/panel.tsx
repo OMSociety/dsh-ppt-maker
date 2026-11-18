@@ -94,9 +94,7 @@ function BlankEmpty() {
 /**
  * 页脚状态条（面板最后一行）：保存态与 store 的 toast 都落在这里。
  *
- * 用「常驻固定高度」而不是「有内容才出现的横幅」——保存是每次编辑都会发生的事，
- * 从顶栏弹出一条横幅会把画布整体顶下去（用户报的「每编辑一次页面弹动」就是这个）。
- * 常量高度 + 只换文字 = 出现/消失都不动布局。
+ * 页脚状态条使用常驻固定高度，仅更新文字；保存与 toast 的出现/消失不改变顶栏和画布布局。
  * toast 带 file（导出产物）时右侧出「打开 ▾」——与 DSH「已编辑」文件菜单同款的
  * 打开方式选择（关联应用 + 「显示文件位置」固定在底部）。
  */
@@ -109,41 +107,10 @@ function StatusBar({ store }: { store: PptStore }) {
   return (
     <div className="ppt-statusbar" data-kind={kind} role="status" aria-live="polite">
       <span className="ppt-statusbar-text">{text}</span>
-      <QaBadge manifest={state.manifest} currentRevision={state.lastSeenRevision} />
       {file && state.activeKey ? (
         <ExportOpenMenu file={file} sessionId={state.sessionId} sessionKey={state.activeKey} />
       ) : null}
     </div>
-  )
-}
-
-/**
- * QA 状态徽标：manifest.qaReport 的最近一次落账（ppt_check / ppt_export 刷新）。
- * revision ≠ 当前游标时标「已过期」——内容在质检后又改过，结论不再作数。
- */
-function QaBadge({ manifest, currentRevision }: { manifest: unknown; currentRevision: number }) {
-  const qa = (manifest as { qaReport?: Record<string, unknown> | null } | null)?.qaReport
-  if (!qa || typeof qa !== 'object') return null
-  const pass = qa.pass === true
-  const rev = typeof qa.revision === 'number' ? qa.revision : null
-  const stale = rev !== null && rev !== currentRevision
-  const issues = Array.isArray(qa.issues) ? qa.issues : []
-  const blockers = issues.filter(
-    (i) => i && typeof i === 'object' && (i as { severity?: string }).severity === 'blocker',
-  ).length
-  const label = stale
-    ? '质检已过期'
-    : pass
-      ? '质检通过'
-      : `质检未过${blockers ? `（${blockers} 阻断）` : ''}`
-  return (
-    <span
-      className="ppt-qa-badge"
-      data-state={stale ? 'stale' : pass ? 'pass' : 'fail'}
-      title={typeof qa.checkedAt === 'string' ? `质检时间 ${qa.checkedAt}` : undefined}
-    >
-      {label}
-    </span>
   )
 }
 

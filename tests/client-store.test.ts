@@ -77,7 +77,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('PptStore（S6 骨架纪律）', () => {
+describe('PptStore 状态纪律', () => {
   it('init 拉 /state：projects 进来，activeKey 成为活动工程，status 变 ready', async () => {
     const store = seedStore()
     await store.actions.init()
@@ -381,7 +381,7 @@ describe('PptStore（S6 骨架纪律）', () => {
     })
     await store.actions.updateElement('el-1', { content: { text: '改了' } })
     await vi.runAllTimersAsync()
-    // revision 没前进：旧实现据此认定「磁盘没变」，屏上永远停在旧 AST
+    // revision 停在旧值时也强制重拉页 AST，并同步 currentPageData
     expect(store.getSnapshot().lastSeenRevision).toBe(1)
     await Promise.resolve()
     await vi.runAllTimersAsync()

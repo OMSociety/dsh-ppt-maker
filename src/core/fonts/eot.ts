@@ -1,13 +1,11 @@
 /**
  * eot.ts — TTF → EOT (Embedded OpenType) 封装
  *
- * 实测依据（spike 六轮攻坚，每轮都由本机自编的 headless 裁决器调 t2embed 验证）：
+ * t2embed 的外部约束：
  *  - fntdata 必须是 EOT 封装；裸 TTF/CFF 均被 t2embed!TTLoadEmbeddedFont 拒载（「一般错误」根因）
- *  - EOT Version 必须是 0x00020001；真件 0x00020002 是 MicroType 压缩通道版本号，配未压缩数据必死（0x0102）
- *  - flags=0（不子集、不压缩、不加密）对整字体与 hb-subset 产物均通过
- *  - fsType 不设卡：0x0000/0x0004/0x0008 均成功加载，仅 privStatus 不同（P&P 只读提示属预期）
- *
- * 依据出自 spike 期暂存区的纯 JS 原型（19/19 断言），原型与裁决器均不在本仓。
+ *  - EOT Version 必须是 0x00020001；0x00020002 对应 MicroType 压缩通道，配未压缩数据会失败（0x0102）
+ *  - flags=0（不子集、不压缩、不加密）适用于整字体与 hb-subset 产物
+ *  - fsType 不设卡：0x0000/0x0004/0x0008 均可加载，仅 privStatus 不同（P&P 只读提示属预期）
  */
 
 const EOT_VERSION = 0x00020001

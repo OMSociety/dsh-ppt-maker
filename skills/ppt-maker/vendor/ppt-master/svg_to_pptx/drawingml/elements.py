@@ -3753,9 +3753,11 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             f'anchor="t" anchorCtr="0">\n{paragraph_autofit}\n</a:bodyPr>'
         )
     else:
+        # LibreOffice re-wraps spAutoFit boxes despite wrap="none". A fixed
+        # frame preserves SVG's unwrapped text semantics across renderers.
         body_pr_xml = (
             '<a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" '
-            'anchor="t" anchorCtr="0">\n<a:spAutoFit/>\n</a:bodyPr>'
+            'anchor="t" anchorCtr="0">\n<a:noAutofit/>\n</a:bodyPr>'
         )
 
     def _shape_xml(sp_id: int, sp_paragraphs_xml: str) -> str:

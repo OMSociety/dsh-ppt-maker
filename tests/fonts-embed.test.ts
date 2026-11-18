@@ -7,8 +7,8 @@
  *  - selfCheckEmbedded 在正向产物上 0 fail
  *
  * 真件字体取系统已装 TTF（环境变量 PPT_TEST_FONT 可覆盖）；TTC 另列候选。找不到对应字体
- * 的用例用 it.skip 显式跳过并在顶层打印原因——不再用「用例体内提前 return」的假通过写法。
- * 需要特定 fsType 的断言由 withFsType() 改写 OS/2 字节得到，不再依赖专备字体文件。
+ * 的用例用 it.skip 显式跳过并在顶层打印原因。
+ * 需要特定 fsType 的断言由 withFsType() 改写 OS/2 字节得到。
  */
 import { readFileSync, existsSync } from 'node:fs'
 import os from 'node:os'

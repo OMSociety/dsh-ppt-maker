@@ -1,5 +1,5 @@
 /**
- * embed.ts — OOXML 字体嵌入后处理（spike 六轮实测背书）
+ * embed.ts — OOXML 字体嵌入后处理
  *
  * 每次调用都写一整套新部件：
  *   1) [Content_Types].xml  加 per-part Override

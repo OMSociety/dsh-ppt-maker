@@ -161,6 +161,7 @@ export async function renderPptxImages(
 ): Promise<RenderedImages> {
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'ppt-maker-render-'))
   const inputPath = path.join(tmp, 'deck.pptx')
+  const pdfPath = path.join(tmp, 'deck.pdf')
   // libreoffice-kit owns outputDir: it creates the directory itself and
   // deletes it whole on failure — pre-creating it trips EEXIST.
   const outputDir = path.join(tmp, 'out')
@@ -169,8 +170,11 @@ export async function renderPptxImages(
   let conv: Converter | null = null
   try {
     conv = await createConverter()
+    // PDFium rasterizes the PDF at the requested DPI. Direct Office painting
+    // inherits Windows display scaling (125% turns into cropped 1.25× content).
+    await conv.render({ inputPath, outputPath: pdfPath })
     const result = await conv.renderImages({
-      inputPath,
+      inputPath: pdfPath,
       outputDir,
       pages: options.pages && options.pages.length > 0 ? options.pages : 'all',
       dpi: options.dpi ?? 96

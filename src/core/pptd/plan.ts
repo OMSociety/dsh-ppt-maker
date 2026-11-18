@@ -1,9 +1,8 @@
 /**
  * src/core/pptd/plan.ts — PPTD protocol: `schema` gate + brief.md / plan.yml.
  *
- * Schema gate (`validateDeckSchemaVersion`): a project stamps `schema: 2` on
- * deck.pptd; any deck without it is refused with `UnsupportedSchemaError` —
- * v1 decks are not opened by this tool layer (clean break, spec §2.0).
+ * `validateDeckSchemaVersion` 只接受 deck.pptd 的 `schema: 2`；缺失或不支持的
+ * schema 返回 `UnsupportedSchemaError`（spec §2.0）。
  *
  * brief.md (Markdown, agent-written, human-reviewable) and plan.yml (YAML,
  * machine-checked) are the planning contract: brief records purpose /
