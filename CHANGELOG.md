@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 工作台按 PPTD 顶层的 `data` / `series` / `rows` 渲染 chart/table；SVG 页在缩略图与画布中直渲；PPTX 预览统一经 PDF 渲染，按请求 DPI 输出完整画布。
 - SVG 源页导入主画布时统一页面尺寸与坐标单位；无换行文本在 LibreOffice 与 PDF 渲染中保持单行。
 - `ppt_import` 对缺失或空白 `source` 返回可序列化的 `InvalidArgument`；同页重复 `shapeId` 生成唯一元素 ID 并保持占位、报告与动画引用一致；`transition.effect` 为 `none` 时省略页面转场，点击动画映射为 `onClick`（#13）。
+- 原生横向柱图按类目轴交换数据通道，堆叠、系列配色、数值标签、坐标轴开关与空值在工作台和 PPTX 导出中保持一致；表格末行未单独设置样式时继续应用 `bodyStyles`。
 
 ## [1.0.1] - 2026-11-02
 

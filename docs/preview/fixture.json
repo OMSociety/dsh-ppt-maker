@@ -11,7 +11,7 @@
     "activeKey": "preview",
     "openRequests": [],
     "manifest": {
-      "revision": 6,
+      "revision": 10,
       "title": "构成主义 · 功能演示",
       "designSystem": "work",
       "theme": "blue-flame-brand",
@@ -26,27 +26,51 @@
   "project": {
     "key": "preview",
     "dir": "demo-deck",
-    "revision": 6,
+    "revision": 10,
     "manifest": {
-      "revision": 6,
+      "revision": 10,
       "createdAt": "2026-11-17T21:10:27.804Z",
-      "updatedAt": "2026-11-17T22:26:39.094Z",
+      "updatedAt": "2026-11-19T06:22:40.252Z",
       "designSystem": "work",
       "theme": "blue-flame-brand",
-      "checksum": "2daa1b044d9d3dd00fad79b8fbf50edb909f7467",
+      "checksum": "d00b770ca0756166a03136a1e26d91fa1d95a49d",
       "qaReport": {
-        "revision": 4,
-        "checkedAt": "2026-11-17T21:21:03.864Z",
+        "revision": 10,
+        "checkedAt": "2026-11-19T06:22:51.318Z",
         "tool": "ppt_check",
         "pass": true,
-        "issueCount": 15,
+        "issueCount": 63,
         "blockerCount": 0,
         "issues": [
           {
             "page": 1,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "bg / sq",
+            "elementId": "bg / rail",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / mark",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / brand",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / folio",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -62,7 +86,7 @@
             "page": 1,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "bg / sub",
+            "elementId": "bg / subtitle",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -70,7 +94,7 @@
             "page": 1,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "bg / circle",
+            "elementId": "bg / red-rule",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -78,7 +102,7 @@
             "page": 1,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "bg / yellow",
+            "elementId": "bg / yellow-rule",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -86,7 +110,103 @@
             "page": 1,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "bg / bar",
+            "elementId": "bg / hero-circle",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / hero-line",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / hero-square",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / hero-caption",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / footer",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / footer-text",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / footer-link",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "rail / footer",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "hero-circle / hero-line",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "hero-line / hero-square",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "footer / footer-text",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "footer / footer-link",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 1,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "footer-text / footer-link",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -94,7 +214,31 @@
             "page": 2,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "bg / header",
+            "elementId": "bg / rail",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / mark",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / brand",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / folio",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -103,6 +247,38 @@
             "severity": "warning",
             "category": "overlap",
             "elementId": "bg / title",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / subtitle",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / geometry-red",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / geometry-yellow",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / geometry-blue",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -118,7 +294,47 @@
             "page": 2,
             "severity": "warning",
             "category": "overlap",
+            "elementId": "bg / chart-label",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / chart-note",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
             "elementId": "bg / chart",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / table-card",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / table-accent",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / table-label",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -139,10 +355,90 @@
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
           {
-            "page": 3,
+            "page": 2,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "TextBox 3 / TextBox 4",
+            "elementId": "bg / footer",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / footer-text",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "bg / footer-link",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "rail / footer",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "chart-label / chart-note",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "table-card / table-accent",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "table-card / table-label",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "table-card / table",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "footer / footer-text",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "footer / footer-link",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 2,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "footer-text / footer-link",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -150,7 +446,7 @@
             "page": 3,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "Ellipse 5 / Line 6",
+            "elementId": "Rectangle 2 / Rectangle 28",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           },
@@ -158,14 +454,102 @@
             "page": 3,
             "severity": "warning",
             "category": "overlap",
-            "elementId": "Freeform 7 / Rectangle 8",
+            "elementId": "TextBox 5 / Ellipse 9",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Ellipse 9 / Line 10",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 13 / TextBox 14",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 13 / TextBox 15",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Line 16 / Freeform 17",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 18 / TextBox 19",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 18 / TextBox 20",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Line 21 / Freeform 22",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 23 / TextBox 24",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 23 / TextBox 25",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 28 / TextBox 29",
+            "description": "两个形状的包围盒重叠",
+            "suggestion": "确认是否为有意层叠；否则错开位置"
+          },
+          {
+            "page": 3,
+            "severity": "warning",
+            "category": "overlap",
+            "elementId": "Rectangle 28 / TextBox 30",
             "description": "两个形状的包围盒重叠",
             "suggestion": "确认是否为有意层叠；否则错开位置"
           }
         ],
         "pages": null,
         "ai": null,
-        "fingerprint": "b78c76d95691547086fc422dec203c31602cadcbb7d8d9cfe1292b221743dc61"
+        "fingerprint": "592de63291dbfff17d8371422a15ba09d2df2d3b90d2972487e817a14856f21c"
       },
       "exportReport": {
         "revision": 5,
@@ -191,7 +575,7 @@
           "rawBytes": 24624,
           "finalBytes": 251858,
           "warnings": [
-            "Noto Sans SC(bold)：实际解析到 regular 槽位，与请求的 bold 不符",
+            "Noto Sans SC(bold)：实际解析到 regular 槽位（本机路径），与请求的 bold 不符",
             "Noto Sans SC(regular) → rId10 @ fonts/font1.fntdata",
             "Microsoft YaHei(regular) → rId11 @ fonts/font2.fntdata",
             "presentation.xml 新建 p:embeddedFontLst",
@@ -216,7 +600,7 @@
             {
               "typeface": "Noto Sans SC",
               "slot": "bold",
-              "reason": "实际解析到 regular 槽位，与请求的 bold 不符"
+              "reason": "实际解析到 regular 槽位（本机路径），与请求的 bold 不符"
             }
           ]
         },
@@ -283,7 +667,7 @@
       "status": "confirmed",
       "version": 1
     },
-    "brief": "- **purpose**：功能演示\n- **audience**：开发者\n- **coreMessage**：原生页面、数据视图与 SVG 导出\n- **mode**：deck\n"
+    "brief": "- **purpose**：功能演示\n- **audience**：开发者\n- **coreMessage**：v2.0 全部新特性\n- **mode**：deck\n"
   },
   "pages": {
     "pages/01.page": {
@@ -381,7 +765,7 @@
               64,
               132,
               590,
-              150
+              170
             ],
             "content": {
               "text": "把演示文稿，\n做成可编辑的原生作品",
@@ -399,7 +783,7 @@
               68,
               310,
               520,
-              66
+              90
             ],
             "content": {
               "text": "从规划、生成到质检与导出，\n一条管线完成。",
@@ -497,7 +881,7 @@
               664,
               374,
               230,
-              58
+              66
             ],
             "content": {
               "text": "PLAN  /  BUILD\nREVIEW  /  EXPORT",
@@ -529,9 +913,9 @@
             "elementType": "text",
             "bounds": [
               64,
-              518,
+              515,
               620,
-              18
+              24
             ],
             "content": {
               "text": "十三个工具 · 原生 PPTX · 本地构建",
@@ -545,9 +929,9 @@
             "elementType": "text",
             "bounds": [
               610,
-              518,
+              515,
               286,
-              18
+              24
             ],
             "content": {
               "text": "github.com/OMSociety/dsh-ppt-maker",
@@ -562,7 +946,7 @@
           }
         ]
       },
-      "revision": 6
+      "revision": 10
     },
     "pages/02.page": {
       "path": "pages/02.page",
@@ -570,53 +954,51 @@
         "pageType": "content",
         "elements": [
           {
-            "elementId": "bg",
-            "elementType": "shape",
-            "shapeName": "rect",
             "bounds": [
               0,
               0,
               960,
               540
             ],
+            "elementId": "bg",
+            "elementType": "shape",
             "fill": {
-              "type": "solid",
-              "color": "#f5f2ea"
-            }
+              "color": "#f5f2ea",
+              "type": "solid"
+            },
+            "shapeName": "rect"
           },
           {
-            "elementId": "rail",
-            "elementType": "shape",
-            "shapeName": "rect",
             "bounds": [
               0,
               0,
               18,
               540
             ],
+            "elementId": "rail",
+            "elementType": "shape",
             "fill": {
-              "type": "solid",
-              "color": "#1a1a1a"
-            }
+              "color": "#1a1a1a",
+              "type": "solid"
+            },
+            "shapeName": "rect"
           },
           {
-            "elementId": "mark",
-            "elementType": "shape",
-            "shapeName": "rect",
             "bounds": [
               64,
               42,
               22,
               22
             ],
+            "elementId": "mark",
+            "elementType": "shape",
             "fill": {
-              "type": "solid",
-              "color": "#1a1a1a"
-            }
+              "color": "#1a1a1a",
+              "type": "solid"
+            },
+            "shapeName": "rect"
           },
           {
-            "elementId": "brand",
-            "elementType": "text",
             "bounds": [
               100,
               37,
@@ -624,17 +1006,17 @@
               32
             ],
             "content": {
-              "text": "02 / NATIVE DATA",
+              "bold": true,
+              "color": "#1a1a1a",
               "fontFamily": "Noto Sans SC",
               "fontSize": 13,
-              "bold": true,
               "letterSpacing": 2,
-              "color": "#1a1a1a"
-            }
+              "text": "02 / NATIVE DATA"
+            },
+            "elementId": "brand",
+            "elementType": "text"
           },
           {
-            "elementId": "folio",
-            "elementType": "text",
             "bounds": [
               800,
               37,
@@ -642,371 +1024,548 @@
               32
             ],
             "content": {
-              "text": "02 — 03",
-              "fontFamily": "Noto Sans SC",
-              "fontSize": 13,
               "align": [
                 "right",
                 "top"
               ],
-              "color": "#6b665c"
-            }
+              "color": "#6b665c",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "text": "02 — 03"
+            },
+            "elementId": "folio",
+            "elementType": "text"
           },
           {
-            "elementId": "title",
-            "elementType": "text",
             "bounds": [
               64,
-              88,
-              720,
-              58
+              86,
+              690,
+              62
             ],
             "content": {
-              "text": "数据与结构，保持原生",
-              "fontFamily": "Noto Sans SC",
-              "fontSize": 38,
               "bold": true,
-              "color": "#1a1a1a"
-            }
+              "color": "#1a1a1a",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 34,
+              "text": "13 个工具，三段完成交付"
+            },
+            "elementId": "title",
+            "elementType": "text"
           },
           {
-            "elementId": "subtitle",
-            "elementType": "text",
             "bounds": [
               66,
-              151,
-              650,
+              154,
+              690,
               32
             ],
             "content": {
-              "text": "十三个工具各司其职；图表和表格仍可继续编辑。",
+              "color": "#6b665c",
               "fontFamily": "Noto Sans SC",
-              "fontSize": 16,
-              "color": "#6b665c"
-            }
+              "fontSize": 14,
+              "text": "从规划到导出，原生图表与表格呈现同一份 PPTD 数据。"
+            },
+            "elementId": "subtitle",
+            "elementType": "text"
           },
           {
-            "elementId": "accent",
+            "bounds": [
+              842,
+              96,
+              34,
+              34
+            ],
+            "elementId": "geometry-red",
             "elementType": "shape",
-            "shapeName": "rect",
+            "fill": {
+              "color": "#c8102e",
+              "type": "solid"
+            },
+            "shapeName": "ellipse"
+          },
+          {
+            "bounds": [
+              810,
+              139,
+              20,
+              20
+            ],
+            "elementId": "geometry-yellow",
+            "elementType": "shape",
+            "fill": {
+              "color": "#f2b705",
+              "type": "solid"
+            },
+            "shapeName": "rect"
+          },
+          {
+            "bounds": [
+              850,
+              145,
+              46,
+              6
+            ],
+            "elementId": "geometry-blue",
+            "elementType": "shape",
+            "fill": {
+              "color": "#2456c4",
+              "type": "solid"
+            },
+            "shapeName": "rect"
+          },
+          {
             "bounds": [
               64,
-              198,
-              92,
+              196,
+              96,
               5
             ],
-            "fill": {
-              "type": "solid",
-              "color": "#c8102e"
-            }
-          },
-          {
-            "elementId": "chart-card",
+            "elementId": "accent",
             "elementType": "shape",
-            "shapeName": "rect",
-            "bounds": [
-              54,
-              230,
-              410,
-              242
-            ],
             "fill": {
-              "type": "solid",
-              "color": "#fffdf7"
+              "color": "#c8102e",
+              "type": "solid"
             },
-            "border": {
-              "style": "solid",
-              "width": 1,
-              "color": "#d8d2c4"
-            }
+            "shapeName": "rect"
           },
           {
-            "elementId": "table-card",
-            "elementType": "shape",
-            "shapeName": "rect",
             "bounds": [
-              510,
-              230,
-              386,
-              242
+              64,
+              216,
+              300,
+              28
             ],
-            "fill": {
-              "type": "solid",
-              "color": "#fffdf7"
+            "content": {
+              "bold": true,
+              "color": "#1a1a1a",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "letterSpacing": 1,
+              "text": "01 / 工具分布"
             },
-            "border": {
-              "style": "solid",
-              "width": 1,
-              "color": "#d8d2c4"
-            }
-          },
-          {
             "elementId": "chart-label",
-            "elementType": "text",
-            "bounds": [
-              70,
-              240,
-              300,
-              24
-            ],
-            "content": {
-              "text": "01 / 工具覆盖",
-              "fontFamily": "Noto Sans SC",
-              "fontSize": 12,
-              "bold": true,
-              "letterSpacing": 1,
-              "color": "#1a1a1a"
-            }
+            "elementType": "text"
           },
           {
-            "elementId": "table-label",
-            "elementType": "text",
             "bounds": [
-              526,
-              240,
-              300,
-              24
+              350,
+              218,
+              194,
+              22
             ],
             "content": {
-              "text": "02 / 统一管线",
+              "align": [
+                "right",
+                "top"
+              ],
+              "color": "#6b665c",
               "fontFamily": "Noto Sans SC",
-              "fontSize": 12,
-              "bold": true,
+              "fontSize": 9,
               "letterSpacing": 1,
-              "color": "#1a1a1a"
-            }
+              "text": "NATIVE CHART"
+            },
+            "elementId": "chart-note",
+            "elementType": "text"
           },
           {
-            "elementId": "chart",
-            "elementType": "chart",
+            "barWidth": 0.52,
             "bounds": [
-              70,
-              272,
-              378,
-              184
+              64,
+              250,
+              480,
+              202
             ],
             "data": {
               "cols": [
                 "环节",
-                "工具数"
+                "创作",
+                "质量",
+                "交付"
               ],
               "rows": [
                 [
                   "创作",
-                  8
+                  8,
+                  null,
+                  null
                 ],
                 [
                   "质量",
-                  3
+                  null,
+                  3,
+                  null
                 ],
                 [
                   "交付",
+                  null,
+                  null,
                   2
                 ]
               ]
             },
+            "dataLabels": {
+              "color": "#1a1a1a",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "show": true
+            },
+            "elementId": "chart",
+            "elementType": "chart",
+            "fontFamily": "Noto Sans SC",
+            "legend": {
+              "show": false
+            },
             "series": [
               {
-                "name": "工具数",
-                "type": "bar",
-                "encode": {
-                  "x": "环节",
-                  "y": "工具数"
+                "dataLabels": {
+                  "color": "#1a1a1a",
+                  "fontSize": 12,
+                  "show": true
                 },
-                "fill": "#2456c4"
+                "encode": {
+                  "x": "创作",
+                  "y": "环节"
+                },
+                "fill": "#c8102e",
+                "name": "创作",
+                "stack": "value",
+                "type": "bar"
+              },
+              {
+                "dataLabels": {
+                  "color": "#1a1a1a",
+                  "fontSize": 12,
+                  "show": true
+                },
+                "encode": {
+                  "x": "质量",
+                  "y": "环节"
+                },
+                "fill": "#f2b705",
+                "name": "质量",
+                "stack": "value",
+                "type": "bar"
+              },
+              {
+                "dataLabels": {
+                  "color": "#1a1a1a",
+                  "fontSize": 12,
+                  "show": true
+                },
+                "encode": {
+                  "x": "交付",
+                  "y": "环节"
+                },
+                "fill": "#2456c4",
+                "name": "交付",
+                "stack": "value",
+                "type": "bar"
               }
             ],
-            "barWidth": 0.48
+            "xAxis": {
+              "axisLine": false,
+              "gridLine": false,
+              "label": false,
+              "max": 9,
+              "min": 0,
+              "type": "value"
+            },
+            "yAxis": {
+              "axisLine": false,
+              "gridLine": false,
+              "label": {
+                "color": "#1a1a1a",
+                "fontFamily": "Noto Sans SC",
+                "fontSize": 12
+              },
+              "type": "category"
+            }
           },
           {
-            "elementId": "table",
-            "elementType": "table",
             "bounds": [
-              526,
-              272,
-              354,
-              184
+              584,
+              206,
+              312,
+              238
+            ],
+            "elementId": "table-card",
+            "elementType": "shape",
+            "fill": {
+              "color": "#fffdf7",
+              "type": "solid"
+            },
+            "shapeName": "rect"
+          },
+          {
+            "bounds": [
+              584,
+              206,
+              48,
+              5
+            ],
+            "elementId": "table-accent",
+            "elementType": "shape",
+            "fill": {
+              "color": "#c8102e",
+              "type": "solid"
+            },
+            "shapeName": "rect"
+          },
+          {
+            "bounds": [
+              606,
+              216,
+              250,
+              28
+            ],
+            "content": {
+              "bold": true,
+              "color": "#1a1a1a",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "letterSpacing": 1,
+              "text": "02 / 关键职责"
+            },
+            "elementId": "table-label",
+            "elementType": "text"
+          },
+          {
+            "bounds": [
+              606,
+              252,
+              274,
+              180
             ],
             "columnWidths": [
-              0.43,
-              0.57
+              0.2,
+              0.45,
+              0.35
             ],
+            "elementId": "table",
+            "elementType": "table",
             "rowHeights": [
-              0.2,
-              0.2,
-              0.2,
-              0.2,
-              0.2
+              0.18,
+              0.205,
+              0.205,
+              0.205,
+              0.205
             ],
             "rows": [
               [
                 {
-                  "text": "工具",
-                  "color": "#ffffff",
                   "bold": true,
+                  "color": "#ffffff",
                   "fill": {
-                    "type": "solid",
-                    "color": "#1a1a1a"
+                    "color": "#1a1a1a",
+                    "type": "solid"
                   },
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 13
+                  "fontSize": 11,
+                  "text": "阶段"
                 },
                 {
-                  "text": "职责",
-                  "color": "#ffffff",
                   "bold": true,
+                  "color": "#ffffff",
                   "fill": {
-                    "type": "solid",
-                    "color": "#1a1a1a"
+                    "color": "#1a1a1a",
+                    "type": "solid"
                   },
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 13
+                  "fontSize": 11,
+                  "text": "工具"
+                },
+                {
+                  "bold": true,
+                  "color": "#ffffff",
+                  "fill": {
+                    "color": "#1a1a1a",
+                    "type": "solid"
+                  },
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 11,
+                  "text": "职责"
                 }
               ],
               [
                 {
-                  "text": "ppt_plan",
+                  "color": "#6b665c",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "创作"
                 },
                 {
-                  "text": "规划契约",
+                  "bold": true,
+                  "color": "#1a1a1a",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "ppt_plan"
+                },
+                {
+                  "color": "#6b665c",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 11,
+                  "text": "规划契约"
                 }
               ],
               [
                 {
-                  "text": "ppt_svg",
+                  "color": "#6b665c",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "创作"
                 },
                 {
-                  "text": "复杂视觉",
+                  "bold": true,
+                  "color": "#1a1a1a",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "ppt_svg"
+                },
+                {
+                  "color": "#6b665c",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 11,
+                  "text": "复杂视觉"
                 }
               ],
               [
                 {
-                  "text": "ppt_check",
+                  "color": "#6b665c",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "质量"
                 },
                 {
-                  "text": "统一质检",
+                  "bold": true,
+                  "color": "#1a1a1a",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "ppt_check"
+                },
+                {
+                  "color": "#6b665c",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 11,
+                  "text": "统一质检"
                 }
               ],
               [
                 {
-                  "text": "ppt_export",
+                  "color": "#6b665c",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "交付"
                 },
                 {
-                  "text": "发布交付",
+                  "bold": true,
+                  "color": "#1a1a1a",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 12
+                  "fontSize": 11,
+                  "text": "ppt_export"
+                },
+                {
+                  "color": "#6b665c",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 11,
+                  "text": "发布交付"
                 }
               ]
             ],
             "style": {
-              "cellStyle": {
-                "border": {
-                  "color": "#d8d2c4",
-                  "style": "solid",
-                  "width": 1
-                }
-              },
               "bodyStyles": [
                 {
                   "fill": {
-                    "type": "solid",
-                    "color": "#fffdf7"
-                  }
-                },
-                {
-                  "fill": {
-                    "type": "solid",
-                    "color": "#ece8dd"
+                    "color": "#fffdf7",
+                    "type": "solid"
                   }
                 }
-              ]
+              ],
+              "cellStyle": {
+                "border": [
+                  null,
+                  null,
+                  {
+                    "color": "#d8d2c4",
+                    "style": "solid",
+                    "width": 1
+                  },
+                  null
+                ]
+              }
             }
           },
           {
-            "elementId": "caption",
-            "elementType": "text",
             "bounds": [
               64,
-              480,
-              680,
-              24
+              476,
+              760,
+              26
             ],
             "content": {
-              "text": "同一份 PPTD 数据，同时驱动画布预览与最终 PPTX。",
+              "color": "#6b665c",
               "fontFamily": "Noto Sans SC",
-              "fontSize": 12,
-              "color": "#6b665c"
-            }
+              "fontSize": 11,
+              "text": "图表看分工，表格查职责；两者均保留原生编辑能力。"
+            },
+            "elementId": "caption",
+            "elementType": "text"
           },
           {
-            "elementId": "footer",
-            "elementType": "shape",
-            "shapeName": "rect",
             "bounds": [
               0,
               516,
               960,
               24
             ],
+            "elementId": "footer",
+            "elementType": "shape",
             "fill": {
-              "type": "solid",
-              "color": "#1a1a1a"
-            }
+              "color": "#1a1a1a",
+              "type": "solid"
+            },
+            "shapeName": "rect"
           },
           {
-            "elementId": "footer-text",
-            "elementType": "text",
             "bounds": [
               64,
-              518,
+              515,
               620,
-              18
+              24
             ],
             "content": {
-              "text": "PPTD → OFFICEKIT → PPTX",
+              "color": "#f5f2ea",
               "fontFamily": "Noto Sans SC",
               "fontSize": 10,
               "letterSpacing": 1,
-              "color": "#f5f2ea"
-            }
+              "text": "PPTD → OFFICEKIT → PPTX"
+            },
+            "elementId": "footer-text",
+            "elementType": "text"
           },
           {
-            "elementId": "footer-link",
-            "elementType": "text",
             "bounds": [
               610,
-              518,
+              515,
               286,
-              18
+              24
             ],
             "content": {
-              "text": "github.com/OMSociety/dsh-ppt-maker",
-              "fontFamily": "Noto Sans SC",
-              "fontSize": 10,
               "align": [
                 "right",
                 "top"
               ],
-              "color": "#f5f2ea"
-            }
+              "color": "#f5f2ea",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "text": "github.com/OMSociety/dsh-ppt-maker"
+            },
+            "elementId": "footer-link",
+            "elementType": "text"
           }
         ]
       },
-      "revision": 6
+      "revision": 10
     },
     "pages/03.page": {
       "path": "pages/03.page",
@@ -1017,10 +1576,10 @@
         },
         "elements": []
       },
-      "revision": 6
+      "revision": 10
     }
   },
   "media": {
-    "media/svg/03-visual.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 540\" width=\"960\" height=\"540\">\n  <rect width=\"960\" height=\"540\" fill=\"#f5f2ea\"/>\n  <rect width=\"18\" height=\"540\" fill=\"#1a1a1a\"/>\n  <rect x=\"64\" y=\"42\" width=\"22\" height=\"22\" fill=\"#1a1a1a\"/>\n  <text x=\"100\" y=\"57\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"13\" font-weight=\"700\" letter-spacing=\"2\" fill=\"#1a1a1a\">03 / SVG TRACK</text>\n  <text x=\"896\" y=\"57\" text-anchor=\"end\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"13\" fill=\"#6b665c\">03 — 03</text>\n  <text x=\"64\" y=\"132\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"38\" font-weight=\"700\" fill=\"#1a1a1a\">复杂视觉，也可回到原生</text>\n  <text x=\"66\" y=\"174\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"16\" fill=\"#6b665c\">整页 SVG 编译为 DrawingML，文本与形状继续可编辑。</text>\n  <rect x=\"64\" y=\"202\" width=\"92\" height=\"5\" fill=\"#c8102e\"/>\n  <circle cx=\"792\" cy=\"132\" r=\"72\" fill=\"#d42b1e\"/>\n  <line x1=\"694\" y1=\"218\" x2=\"850\" y2=\"88\" stroke=\"#1a1a1a\" stroke-width=\"10\"/>\n  <rect x=\"820\" y=\"222\" width=\"48\" height=\"48\" fill=\"#2456c4\"/>\n  <text x=\"64\" y=\"282\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"12\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#1a1a1a\">从源文件到可交付作品</text>\n  <rect x=\"64\" y=\"306\" width=\"250\" height=\"116\" fill=\"#1a1a1a\"/>\n  <text x=\"88\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#f5f2ea\">01 / SOURCE</text>\n  <text x=\"88\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"30\" font-weight=\"700\" fill=\"#f5f2ea\">SVG</text>\n  <line x1=\"322\" y1=\"364\" x2=\"344\" y2=\"364\" stroke=\"#1a1a1a\" stroke-width=\"3\"/>\n  <path d=\"M344 364 L334 358 L334 370 Z\" fill=\"#1a1a1a\"/>\n  <rect x=\"355\" y=\"306\" width=\"250\" height=\"116\" fill=\"#2456c4\"/>\n  <text x=\"379\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#ffffff\">02 / COMPILE</text>\n  <text x=\"379\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"27\" font-weight=\"700\" fill=\"#ffffff\">DrawingML</text>\n  <line x1=\"613\" y1=\"364\" x2=\"635\" y2=\"364\" stroke=\"#1a1a1a\" stroke-width=\"3\"/>\n  <path d=\"M635 364 L625 358 L625 370 Z\" fill=\"#1a1a1a\"/>\n  <rect x=\"646\" y=\"306\" width=\"250\" height=\"116\" fill=\"#fffdf7\" stroke=\"#1a1a1a\" stroke-width=\"2\"/>\n  <text x=\"670\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#6b665c\">03 / NATIVE</text>\n  <text x=\"670\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"27\" font-weight=\"700\" fill=\"#1a1a1a\">可编辑 PPT</text>\n  <rect x=\"64\" y=\"450\" width=\"144\" height=\"12\" fill=\"#f2b705\"/>\n  <text x=\"230\" y=\"462\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"12\" fill=\"#6b665c\">ppt_svg · 编译缓存 · 统一质量门</text>\n  <rect x=\"0\" y=\"516\" width=\"960\" height=\"24\" fill=\"#1a1a1a\"/>\n  <text x=\"64\" y=\"533\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"10\" letter-spacing=\"1\" fill=\"#f5f2ea\">SVG / DRAWINGML</text>\n  <text x=\"896\" y=\"533\" text-anchor=\"end\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"10\" fill=\"#f5f2ea\">github.com/OMSociety/dsh-ppt-maker</text>\n</svg>"
+    "media/svg/03-visual.svg": "<svg xmlns=\"htt本机路径\" viewBox=\"0 0 960 540\" width=\"960\" height=\"540\">\n  <rect width=\"960\" height=\"540\" fill=\"#f5f2ea\"/>\n  <rect width=\"18\" height=\"540\" fill=\"#1a1a1a\"/>\n  <rect x=\"64\" y=\"42\" width=\"22\" height=\"22\" fill=\"#1a1a1a\"/>\n  <text x=\"100\" y=\"57\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"13\" font-weight=\"700\" letter-spacing=\"2\" fill=\"#1a1a1a\">03 / SVG TRACK</text>\n  <text x=\"896\" y=\"57\" text-anchor=\"end\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"13\" fill=\"#6b665c\">03 — 03</text>\n  <text x=\"64\" y=\"132\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"38\" font-weight=\"700\" fill=\"#1a1a1a\">复杂视觉，也可回到原生</text>\n  <text x=\"66\" y=\"174\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"16\" fill=\"#6b665c\">整页 SVG 编译为 DrawingML，文本与形状继续可编辑。</text>\n  <rect x=\"64\" y=\"202\" width=\"92\" height=\"5\" fill=\"#c8102e\"/>\n  <circle cx=\"792\" cy=\"132\" r=\"72\" fill=\"#d42b1e\"/>\n  <line x1=\"694\" y1=\"218\" x2=\"850\" y2=\"88\" stroke=\"#1a1a1a\" stroke-width=\"10\"/>\n  <rect x=\"820\" y=\"222\" width=\"48\" height=\"48\" fill=\"#2456c4\"/>\n  <text x=\"64\" y=\"282\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"12\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#1a1a1a\">从源文件到可交付作品</text>\n  <rect x=\"64\" y=\"306\" width=\"250\" height=\"116\" fill=\"#1a1a1a\"/>\n  <text x=\"88\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#f5f2ea\">01 / SOURCE</text>\n  <text x=\"88\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"30\" font-weight=\"700\" fill=\"#f5f2ea\">SVG</text>\n  <line x1=\"322\" y1=\"364\" x2=\"344\" y2=\"364\" stroke=\"#1a1a1a\" stroke-width=\"3\"/>\n  <path d=\"M344 364 L334 358 L334 370 Z\" fill=\"#1a1a1a\"/>\n  <rect x=\"355\" y=\"306\" width=\"250\" height=\"116\" fill=\"#2456c4\"/>\n  <text x=\"379\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#ffffff\">02 / COMPILE</text>\n  <text x=\"379\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"27\" font-weight=\"700\" fill=\"#ffffff\">DrawingML</text>\n  <line x1=\"613\" y1=\"364\" x2=\"635\" y2=\"364\" stroke=\"#1a1a1a\" stroke-width=\"3\"/>\n  <path d=\"M635 364 L625 358 L625 370 Z\" fill=\"#1a1a1a\"/>\n  <rect x=\"646\" y=\"306\" width=\"250\" height=\"116\" fill=\"#fffdf7\" stroke=\"#1a1a1a\" stroke-width=\"2\"/>\n  <text x=\"670\" y=\"340\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"11\" letter-spacing=\"2\" fill=\"#6b665c\">03 / NATIVE</text>\n  <text x=\"670\" y=\"390\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"27\" font-weight=\"700\" fill=\"#1a1a1a\">可编辑 PPT</text>\n  <rect x=\"64\" y=\"450\" width=\"144\" height=\"12\" fill=\"#f2b705\"/>\n  <text x=\"230\" y=\"462\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"12\" fill=\"#6b665c\">ppt_svg · 编译缓存 · 统一质量门</text>\n  <rect x=\"0\" y=\"516\" width=\"960\" height=\"24\" fill=\"#1a1a1a\"/>\n  <text x=\"64\" y=\"533\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"10\" letter-spacing=\"1\" fill=\"#f5f2ea\">SVG / DRAWINGML</text>\n  <text x=\"896\" y=\"533\" text-anchor=\"end\" font-family=\"Noto Sans SC, Microsoft YaHei, sans-serif\" font-size=\"10\" fill=\"#f5f2ea\">github.com/OMSociety/dsh-ppt-maker</text>\n</svg>"
   }
 }

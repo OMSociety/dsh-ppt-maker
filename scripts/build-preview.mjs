@@ -23,9 +23,21 @@ function projectArgument() {
   return path.resolve(ROOT, value)
 }
 
+function sanitizePreviewPaths(value) {
+  if (typeof value === 'string') {
+    return value.replace(/[A-Za-z]:[\\/][^\s"'，），\]】]+/g, '本机路径')
+  }
+  if (Array.isArray(value)) return value.map(sanitizePreviewPaths)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizePreviewPaths(item)]))
+  }
+  return value
+}
+
 function captureFixture(projectDir) {
   const deck = parseYaml(fs.readFileSync(path.join(projectDir, 'deck.pptd'), 'utf8'))
   const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, 'manifest.json'), 'utf8'))
+  if (manifest.exportReport) manifest.exportReport.out = `${path.basename(projectDir)}.pptx`
   const planPath = path.join(projectDir, 'plan.yml')
   const briefPath = path.join(projectDir, 'brief.md')
   const plan = fs.existsSync(planPath) ? parseYaml(fs.readFileSync(planPath, 'utf8')) : null
@@ -57,7 +69,7 @@ function captureFixture(projectDir) {
     canUndo: true,
     canRedo: false,
   }
-  return {
+  return sanitizePreviewPaths({
     key,
     state: {
       cwd: path.basename(projectDir),
@@ -82,7 +94,7 @@ function captureFixture(projectDir) {
     },
     pages,
     media,
-  }
+  })
 }
 
 const projectDir = projectArgument()

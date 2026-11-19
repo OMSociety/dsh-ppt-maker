@@ -11,16 +11,16 @@ import { CHART_PALETTE, chartModelOf, type ChartSeriesModel } from '../render/ch
 const GRID = 'rgba(60,60,60,0.16)'
 const LABEL = '#5c5c5c'
 
-function niceScale(values: number[]) {
-  const min = Math.min(0, ...values)
-  const max = Math.max(0, ...values)
+function niceScale(values: number[], minOverride?: number, maxOverride?: number) {
+  const min = minOverride ?? Math.min(0, ...values)
+  const max = maxOverride ?? Math.max(0, ...values)
   const span = Math.max(1, max - min)
   const rough = span / 4
   const power = 10 ** Math.floor(Math.log10(rough))
   const ratio = rough / power
   const step = (ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10) * power
-  const low = Math.floor(min / step) * step
-  const high = Math.ceil(max / step) * step
+  const low = minOverride ?? Math.floor(min / step) * step
+  const high = maxOverride ?? Math.ceil(max / step) * step
   const ticks: number[] = []
   for (let value = low; value <= high + step * 0.001; value += step) ticks.push(Number(value.toFixed(10)))
   return { min: low, max: high, ticks }
@@ -28,6 +28,19 @@ function niceScale(values: number[]) {
 
 function tickText(value: number): string {
   return Math.abs(value) >= 1000 ? value.toLocaleString('zh-CN') : String(value)
+}
+
+function recordOf(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function axisTextStyle(axis: Record<string, unknown>, defaultSize: number) {
+  const label = recordOf(axis.label)
+  return {
+    fontSize: typeof label.fontSize === 'number' ? label.fontSize : defaultSize,
+    fill: typeof label.color === 'string' ? label.color : LABEL,
+    ...(typeof label.fontFamily === 'string' ? { fontFamily: label.fontFamily } : {}),
+  }
 }
 
 function CartesianChart({
@@ -41,10 +54,33 @@ function CartesianChart({
   width: number
   height: number
 }) {
-  const categories = Array.from(new Set(model.flatMap((series) => series.points.map((point) => point.category))))
-  const horizontal = content.xAxis && typeof content.xAxis === 'object'
-    && (content.xAxis as Record<string, unknown>).type === 'category'
-  const scale = niceScale(model.flatMap((series) => series.points.map((point) => point.value)))
+  const categories = Array.from(new Set(model.flatMap((series) => series.categories)))
+  const horizontal = model[0]?.kind === 'bar' && recordOf(content.yAxis).type === 'category'
+  const categoryAxis = recordOf(horizontal ? content.yAxis : content.xAxis)
+  const valueAxis = recordOf(horizontal ? content.xAxis : content.yAxis)
+  const bars = model.flatMap((series, seriesIndex) => series.kind === 'bar' ? [{
+    series,
+    key: series.stack ? `stack:${series.stack}` : `series:${seriesIndex}`,
+  }] : [])
+  const slotKeys = Array.from(new Set(bars.map((bar) => bar.key)))
+  const stackKeys = Array.from(new Set(bars.filter((bar) => bar.series.stack).map((bar) => bar.key)))
+  const scaleValues = model.flatMap((series) => series.points.map((point) => point.value))
+  for (const category of categories) {
+    for (const key of stackKeys) {
+      let positive = 0
+      let negative = 0
+      for (const bar of bars.filter((item) => item.key === key)) {
+        const value = bar.series.points.find((point) => point.category === category)?.value
+        if (value === undefined) continue
+        if (value >= 0) positive += value
+        else negative += value
+      }
+      scaleValues.push(positive, negative)
+    }
+  }
+  const minOverride = typeof valueAxis.min === 'number' && Number.isFinite(valueAxis.min) ? valueAxis.min : undefined
+  const maxOverride = typeof valueAxis.max === 'number' && Number.isFinite(valueAxis.max) ? valueAxis.max : undefined
+  const scale = niceScale(scaleValues, minOverride, maxOverride)
   const left = horizontal ? 76 : 38
   const right = 12
   const top = 14
@@ -55,77 +91,125 @@ function CartesianChart({
   const valuePosition = (value: number) => horizontal
     ? left + ((value - scale.min) / valueSpan) * plotW
     : top + plotH - ((value - scale.min) / valueSpan) * plotH
-  const zero = valuePosition(0)
+  const zero = valuePosition(Math.max(scale.min, Math.min(0, scale.max)))
   const labelEvery = Math.max(1, Math.ceil(categories.length / 8))
+  const valueGrid = valueAxis.show !== false && valueAxis.gridLine !== false
+  const valueLabels = valueAxis.show !== false && valueAxis.label !== false
+  const categoryLabels = categoryAxis.show !== false && categoryAxis.label !== false
+  const categoryAxisLine = categoryAxis.show !== false && categoryAxis.axisLine !== false
+  const valueLabelStyle = axisTextStyle(valueAxis, 9)
+  const categoryLabelStyle = axisTextStyle(categoryAxis, 10)
+  const requestedBarWidth = Number(content.barWidth)
+  const barWidth = Number.isFinite(requestedBarWidth) && requestedBarWidth > 0 && requestedBarWidth <= 1
+    ? requestedBarWidth
+    : 0.62
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
       {scale.ticks.map((tick) => {
+        if (!valueGrid && !valueLabels) return null
         const pos = valuePosition(tick)
         return horizontal ? (
           <g key={tick}>
-            <line x1={pos} y1={top} x2={pos} y2={top + plotH} stroke={GRID} strokeWidth={1} />
-            <text x={pos} y={height - 10} textAnchor="middle" fontSize={9} fill={LABEL}>{tickText(tick)}</text>
+            {valueGrid && <line x1={pos} y1={top} x2={pos} y2={top + plotH} stroke={GRID} strokeWidth={1} />}
+            {valueLabels && <text x={pos} y={height - 10} textAnchor="middle" {...valueLabelStyle}>{tickText(tick)}</text>}
           </g>
         ) : (
           <g key={tick}>
-            <line x1={left} y1={pos} x2={left + plotW} y2={pos} stroke={GRID} strokeWidth={1} />
-            <text x={left - 5} y={pos + 3} textAnchor="end" fontSize={9} fill={LABEL}>{tickText(tick)}</text>
+            {valueGrid && <line x1={left} y1={pos} x2={left + plotW} y2={pos} stroke={GRID} strokeWidth={1} />}
+            {valueLabels && <text x={left - 5} y={pos + 3} textAnchor="end" {...valueLabelStyle}>{tickText(tick)}</text>}
           </g>
         )
       })}
-      <line
-        x1={horizontal ? zero : left}
-        y1={horizontal ? top : zero}
-        x2={horizontal ? zero : left + plotW}
-        y2={horizontal ? top + plotH : zero}
-        stroke="rgba(0,0,0,0.45)"
-      />
+      {categoryAxisLine && (
+        <line
+          x1={horizontal ? zero : left}
+          y1={horizontal ? top : zero}
+          x2={horizontal ? zero : left + plotW}
+          y2={horizontal ? top + plotH : zero}
+          stroke="rgba(0,0,0,0.45)"
+        />
+      )}
       {categories.map((category, categoryIndex) => {
         const slot = (horizontal ? plotH : plotW) / Math.max(1, categories.length)
         const center = (horizontal ? top : left) + slot * (categoryIndex + 0.5)
-        const groupSize = slot * Math.min(0.72, Math.max(0.35, Number(content.barWidth) || 0.62))
-        const bars = model.filter((series) => series.kind === 'bar')
+        const groupSize = slot * barWidth
+        const offsets: Record<string, { positive: number; negative: number }> = {}
         return (
           <g key={`${category}:${categoryIndex}`}>
-            {model.map((series) => {
+            {model.map((series, seriesIndex) => {
               const point = series.points.find((item) => item.category === category)
               if (!point) return null
               if (series.kind === 'bar') {
-                const barIndex = bars.indexOf(series)
-                const thickness = groupSize / Math.max(1, bars.length)
+                const bar = bars.find((item) => item.series === series)!
+                const barIndex = slotKeys.indexOf(bar.key)
+                const thickness = groupSize / Math.max(1, slotKeys.length)
                 const start = center - groupSize / 2 + barIndex * thickness + 1
                 const band = Math.max(1, thickness - 2)
-                const valuePos = valuePosition(point.value)
-                return horizontal ? (
-                  <rect
-                    key={series.name}
-                    x={Math.min(zero, valuePos)}
-                    y={start}
-                    width={Math.max(1, Math.abs(valuePos - zero))}
-                    height={band}
-                    rx={2}
-                    fill={series.color}
-                  />
-                ) : (
-                  <rect
-                    key={series.name}
-                    x={start}
-                    y={Math.min(zero, valuePos)}
-                    width={band}
-                    height={Math.max(1, Math.abs(valuePos - zero))}
-                    rx={2}
-                    fill={series.color}
-                  />
+                const offset = offsets[bar.key] ?? { positive: 0, negative: 0 }
+                const base = series.stack ? (point.value >= 0 ? offset.positive : offset.negative) : 0
+                const end = base + point.value
+                if (series.stack) {
+                  if (point.value >= 0) offset.positive = end
+                  else offset.negative = end
+                  offsets[bar.key] = offset
+                }
+                const valuePos = valuePosition(end)
+                const basePos = valuePosition(base)
+                const labels = series.dataLabels
+                const dataLabel = labels?.show ? (
+                  horizontal ? (
+                    <text
+                      x={series.stack ? (basePos + valuePos) / 2 : valuePos + (point.value >= 0 ? 5 : -5)}
+                      y={start + band / 2 + (labels.fontSize ?? 10) / 3}
+                      textAnchor={series.stack ? 'middle' : point.value >= 0 ? 'start' : 'end'}
+                      fontSize={labels.fontSize ?? 10}
+                      fill={labels.color ?? LABEL}
+                      {...(labels.fontFamily ? { fontFamily: labels.fontFamily } : {})}
+                    >{point.value}</text>
+                  ) : (
+                    <text
+                      x={start + band / 2}
+                      y={valuePos + (point.value >= 0 ? -5 : 12)}
+                      textAnchor="middle"
+                      fontSize={labels.fontSize ?? 10}
+                      fill={labels.color ?? LABEL}
+                      {...(labels.fontFamily ? { fontFamily: labels.fontFamily } : {})}
+                    >{point.value}</text>
+                  )
+                ) : null
+                return (
+                  <g key={`${series.name}:${seriesIndex}`}>
+                    {horizontal ? (
+                      <rect
+                        x={Math.min(basePos, valuePos)}
+                        y={start}
+                        width={Math.max(1, Math.abs(valuePos - basePos))}
+                        height={band}
+                        rx={2}
+                        fill={series.color}
+                      />
+                    ) : (
+                      <rect
+                        x={start}
+                        y={Math.min(basePos, valuePos)}
+                        width={band}
+                        height={Math.max(1, Math.abs(valuePos - basePos))}
+                        rx={2}
+                        fill={series.color}
+                      />
+                    )}
+                    {dataLabel}
+                  </g>
                 )
               }
               return null
             })}
-            {categoryIndex % labelEvery === 0 && (
+            {categoryLabels && categoryIndex % labelEvery === 0 && (
               horizontal ? (
-                <text x={left - 7} y={center + 3} textAnchor="end" fontSize={10} fill={LABEL}>{category}</text>
+                <text x={left - 7} y={center + 3} textAnchor="end" {...categoryLabelStyle}>{category}</text>
               ) : (
-                <text x={center} y={height - 10} textAnchor="middle" fontSize={10} fill={LABEL}>{category}</text>
+                <text x={center} y={height - 10} textAnchor="middle" {...categoryLabelStyle}>{category}</text>
               )
             )}
           </g>

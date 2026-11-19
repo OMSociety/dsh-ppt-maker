@@ -1,7 +1,47 @@
 /** 工作台数据视图直接消费 PPTD 元素顶层契约的回归测试。 */
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { chartModelOf } from '../client/render/chart-model'
+// @ts-expect-error 根 tsconfig 不启用 JSX；组件由 tsconfig.client.json 完整校验。
+import { ChartView } from '../client/components/ChartView'
 import { tableCellViewModel, tableModelOf } from '../client/render/table-model'
+
+const horizontalBars = {
+  elementType: 'chart',
+  data: {
+    cols: ['环节', '创作', '质量', '交付'],
+    rows: [
+      ['创作', 8, null, null],
+      ['质量', null, 3, null],
+      ['交付', null, null, 2],
+    ],
+  },
+  series: [
+    { type: 'bar', name: '创作', encode: { x: '创作', y: '环节' }, fill: '#c8102e', stack: 'value' },
+    { type: 'bar', name: '质量', encode: { x: '质量', y: '环节' }, fill: '#f2b705', stack: 'value' },
+    { type: 'bar', name: '交付', encode: { x: '交付', y: '环节' }, fill: '#2456c4', stack: 'value' },
+  ],
+  yAxis: { type: 'category', label: false, axisLine: false, gridLine: false },
+  xAxis: { type: 'value', min: 0, max: 8, label: false, axisLine: false, gridLine: false },
+  legend: { show: false },
+  dataLabels: { show: true, color: '#333333', fontSize: 11 },
+  barWidth: 0.56,
+}
+
+function chartSvg(content: Record<string, unknown>): string {
+  return renderToStaticMarkup(createElement(ChartView, { content }))
+}
+
+function rects(markup: string): Array<Record<string, number>> {
+  return markup.match(/<rect\b[^>]*>/g)?.map((tag) => {
+    const attrs: Record<string, number> = {}
+    for (const name of ['x', 'y', 'width', 'height']) {
+      attrs[name] = Number(tag.match(new RegExp(`${name}="([^"]+)"`))?.[1])
+    }
+    return attrs
+  }) ?? []
+}
 
 describe('ChartView · PPTD data/series 契约', () => {
   it('从二维 rows 与 series.encode 取类目和数值', () => {
@@ -33,6 +73,90 @@ describe('ChartView · PPTD data/series 契约', () => {
       series: [{ type: 'bar', encode: { x: 'x', y: 'y' }, fill: { type: 'solid', color: '$accent' } }],
     }, { colors: { accent: '#c8102e' } })
     expect(model[0].color).toBe('#c8102e')
+  })
+
+  it('yAxis.category 横向取 x 数值/y 类目，null 不转为零', () => {
+    const model = chartModelOf(horizontalBars)
+    expect(model).toHaveLength(3)
+    expect(model[0].categories).toEqual(['创作', '质量', '交付'])
+    expect(model.map((series) => series.points)).toEqual([
+      [{ category: '创作', value: 8 }],
+      [{ category: '质量', value: 3 }],
+      [{ category: '交付', value: 2 }],
+    ])
+    expect(model.every((series) => series.stack === 'value')).toBe(true)
+    expect(model.every((series) => series.dataLabels?.show === true)).toBe(true)
+  })
+
+  it('横向 SVG 每类目只画非空段和对应数值标签，并隐藏轴线网格及轴标签', () => {
+    const markup = chartSvg(horizontalBars)
+    const bars = rects(markup)
+    expect(bars).toHaveLength(3)
+    expect(bars.every((bar) => bar.width > bar.height)).toBe(true)
+    expect(markup).not.toContain('<line')
+    expect(Array.from(markup.matchAll(/<text\b[^>]*>(.*?)<\/text>/g), (match) => match[1])).toEqual(['8', '3', '2'])
+    const valueLabels = Array.from(markup.matchAll(/<text\b[^>]*>(?:8|3|2)<\/text>/g), (match) => match[0])
+    expect(valueLabels).toHaveLength(3)
+    valueLabels.forEach((label, index) => {
+      expect(label).toContain('text-anchor="middle"')
+      expect(Number(label.match(/x="([^"]+)"/)?.[1])).toBeCloseTo(bars[index].x + bars[index].width / 2)
+    })
+    expect(markup).toContain('fill="#c8102e"')
+    expect(markup).toContain('fill="#f2b705"')
+    expect(markup).toContain('fill="#2456c4"')
+    expect(markup).toContain('font-size="11"')
+    expect(markup).toContain('fill="#333333"')
+  })
+
+  it('逐系列数值标签合并图表级样式，并保留可见类目标签', () => {
+    const markup = chartSvg({
+      ...horizontalBars,
+      series: horizontalBars.series.map((series) => ({
+        ...series,
+        dataLabels: { show: true, color: '#1a1a1a', fontSize: 12 },
+      })),
+      yAxis: {
+        ...horizontalBars.yAxis,
+        label: { color: '#1a1a1a', fontFamily: 'Noto Sans SC', fontSize: 12 },
+      },
+      dataLabels: { show: true, color: '#1a1a1a', fontFamily: 'Noto Sans SC', fontSize: 12 },
+    })
+    expect(rects(markup)).toHaveLength(3)
+    expect(Array.from(markup.matchAll(/<text\b[^>]*>(.*?)<\/text>/g), (match) => match[1])).toEqual([
+      '8', '创作', '3', '质量', '2', '交付',
+    ])
+    expect(markup.match(/font-size="12"/g)).toHaveLength(6)
+    expect(markup.match(/font-family="Noto Sans SC"/g)).toHaveLength(6)
+    expect(markup).not.toContain('<line')
+  })
+
+  it('同组 stack 共用一个类目槽并累计起点，而不是并列占位', () => {
+    const markup = chartSvg({
+      data: { cols: ['环节', '甲', '乙'], rows: [['A', 2, 3], ['B', 4, 1]] },
+      series: [
+        { type: 'bar', name: '甲', encode: { x: '甲', y: '环节' }, stack: 'value' },
+        { type: 'bar', name: '乙', encode: { x: '乙', y: '环节' }, stack: 'value' },
+      ],
+      yAxis: { type: 'category', label: false, axisLine: false, gridLine: false },
+      xAxis: { type: 'value', min: 0, max: 6, label: false, axisLine: false, gridLine: false },
+    })
+    const bars = rects(markup)
+    expect(bars).toHaveLength(4)
+    expect(bars[1].y).toBeCloseTo(bars[0].y)
+    expect(bars[3].y).toBeCloseTo(bars[2].y)
+    expect(bars[1].x).toBeCloseTo(bars[0].x + bars[0].width)
+    expect(bars[3].x).toBeCloseTo(bars[2].x + bars[2].width)
+  })
+
+  it('xAxis.category 保持纵向柱图', () => {
+    const bars = rects(chartSvg({
+      data: { cols: ['环节', '数量'], rows: [['创作', 8], ['质量', 2]] },
+      series: [{ type: 'bar', name: '数量', encode: { x: '环节', y: '数量' } }],
+      xAxis: { type: 'category', label: false, axisLine: false, gridLine: false },
+      yAxis: { type: 'value', min: 0, max: 10, label: false, axisLine: false, gridLine: false },
+    }))
+    expect(bars).toHaveLength(2)
+    expect(bars[0].height).toBeGreaterThan(bars[0].width)
   })
 })
 

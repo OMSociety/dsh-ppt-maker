@@ -865,7 +865,12 @@ function categoryStyleOf(
   lastCol: number
 ): Record<string, unknown> | null {
   if (!style) return null
-  const rowStyle = r === 0 ? style.firstRowStyle : r === lastRow ? style.lastRowStyle : style.bodyStyles?.[(r - 1) % (style.bodyStyles.length || 1)]
+  const bodyStyle = r > 0 ? style.bodyStyles?.[(r - 1) % (style.bodyStyles.length || 1)] : undefined
+  const rowStyle = r === 0
+    ? style.firstRowStyle
+    : r === lastRow && style.lastRowStyle !== undefined
+      ? style.lastRowStyle
+      : bodyStyle
   const colStyle = c === 0 ? style.firstColumnStyle : c === lastCol ? style.lastColumnStyle : null
   const rowOverColumn = style.rowOverColumn !== false
   const merged: Record<string, unknown> = rowOverColumn
@@ -947,6 +952,98 @@ function buildChart(
   return shape
 }
 
+function chartRecordOf(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function chartTextStyleOf(value: unknown, resolver: ThemeResolver): Record<string, unknown> | undefined {
+  const style = chartRecordOf(value)
+  const out: Record<string, unknown> = {}
+  if (typeof style.fontFamily === 'string') out.font = style.fontFamily
+  if (typeof style.fontSize === 'number' && Number.isFinite(style.fontSize)) out.sizePt = style.fontSize
+  if (typeof style.color === 'string') {
+    const color = resolver.color(style.color)
+    if (color !== undefined) out.color = String(color)
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+function chartDataLabelsOf(
+  chartValue: unknown,
+  seriesValue: unknown,
+  resolver: ThemeResolver
+): Record<string, unknown> | undefined {
+  const chart = chartRecordOf(chartValue)
+  const series = chartRecordOf(seriesValue)
+  if (!Object.keys(chart).length && !Object.keys(series).length) return undefined
+  const config = { ...chart, ...series }
+  const show = config.show === true
+  const content = config.content
+  const out: Record<string, unknown> = {
+    showValue: show && (content === undefined || content === 'value'),
+    showCategory: show && content === 'category',
+    showSeriesName: false,
+    showPercent: show && content === 'percentage',
+  }
+  if (typeof config.numberFormat === 'string') out.numberFormat = config.numberFormat
+  const textStyle = chartTextStyleOf(config, resolver)
+  if (textStyle) out.textStyle = textStyle
+  return out
+}
+
+function applyCartesianChartOptions(
+  spec: Record<string, unknown>,
+  element: Record<string, unknown>,
+  series: Array<Record<string, unknown>>,
+  horizontal: boolean,
+  resolver: ThemeResolver
+): void {
+  const categoryAxis = chartRecordOf(horizontal ? element.yAxis : element.xAxis)
+  const valueAxis = chartRecordOf(horizontal ? element.xAxis : element.yAxis)
+  const valueLabel = chartRecordOf(valueAxis.label)
+  const scaling: Record<string, unknown> = {}
+  if (typeof valueAxis.min === 'number' && Number.isFinite(valueAxis.min)) scaling.min = valueAxis.min
+  if (typeof valueAxis.max === 'number' && Number.isFinite(valueAxis.max)) scaling.max = valueAxis.max
+  if (typeof valueLabel.numberFormat === 'string') scaling.numberFormat = valueLabel.numberFormat
+  if (Object.keys(scaling).length) spec.valueAxis = scaling
+
+  if (categoryAxis.show === false) spec.categoryAxisHidden = true
+  if (valueAxis.show === false) spec.valueAxisHidden = true
+  if (categoryAxis.label === false) spec.categoryAxisTickLabelPos = 'none'
+  if (valueAxis.label === false) spec.valueAxisTickLabelPos = 'none'
+  if (categoryAxis.axisLine === false) spec.categoryAxisLineHidden = true
+  if (valueAxis.axisLine === false) spec.valueAxisLineHidden = true
+  if (categoryAxis.gridLine === false) spec.categoryAxisMajorGridlines = false
+  if (valueAxis.gridLine === false) spec.valueAxisMajorGridlines = false
+
+  const categoryLabelStyle = chartTextStyleOf(categoryAxis.label, resolver)
+  const valueLabelStyle = chartTextStyleOf(valueAxis.label, resolver)
+  if (categoryLabelStyle) spec.categoryAxisLabelStyle = categoryLabelStyle
+  if (valueLabelStyle) spec.valueAxisLabelStyle = valueLabelStyle
+  if (horizontal || categoryAxis.reverse === true) {
+    spec.categoryAxisOrientation = horizontal
+      ? (categoryAxis.reverse === true ? 'minMax' : 'maxMin')
+      : 'maxMin'
+  }
+  if (valueAxis.reverse === true) spec.valueAxisOrientation = 'maxMin'
+
+  const legend = element.legend
+  if (legend === false || chartRecordOf(legend).show === false) spec.legend = { position: null }
+
+  const stack = series.find((item) => item.type === 'bar' && (item.stack === 'value' || item.stack === 'percent'))?.stack
+  if (stack) {
+    spec.grouping = stack === 'percent' ? 'percentStacked' : 'stacked'
+    spec.overlapPct = 100
+  }
+  const barWidth = element.barWidth
+  if (typeof barWidth === 'number' && Number.isFinite(barWidth) && barWidth > 0 && barWidth <= 1) {
+    spec.gapWidthPct = Math.round((1 - barWidth) / barWidth * 100)
+  }
+
+  const dataLabels = chartDataLabelsOf(element.dataLabels, undefined, resolver)
+  if (dataLabels) spec.dataLabels = dataLabels
+}
+
 function chartSpecOf(
   element: Record<string, unknown>,
   data: { cols: string[]; rows: Array<Array<number | string | null>> },
@@ -980,7 +1077,8 @@ function chartSpecOf(
     }
   }
 
-  const kind = firstType === 'bar' ? 'column' : firstType // PPTD bar=vertical bars; engine column
+  const horizontal = firstType === 'bar' && chartRecordOf(element.yAxis).type === 'category'
+  const kind = firstType === 'bar' ? (horizontal ? 'bar' : 'column') : firstType
   const mappedSeries = series.map((s) => {
     const encode = (s.encode ?? {}) as Record<string, unknown>
     const xIdx = colIndex(encode.x)
@@ -989,22 +1087,30 @@ function chartSpecOf(
       ctx.warnings.push(`${where}：系列 ${String(s.name ?? '?')} 的 encode 未命中 data.cols`)
       return null
     }
+    const valueIdx = horizontal ? xIdx : yIdx
+    const categoryIdx = horizontal ? yIdx : xIdx
     const out: Record<string, unknown> = {
-      name: typeof s.name === 'string' ? s.name : String(encode.y ?? ''),
-      values: data.rows.map((r) => numOrNull(r[yIdx]))
+      name: typeof s.name === 'string' ? s.name : String((horizontal ? encode.x : encode.y) ?? ''),
+      values: data.rows.map((r) => numOrNull(r[valueIdx]))
     }
     const fill = typeof s.fill === 'string' ? resolver.color(s.fill) : undefined
     if (fill !== undefined) out.color = String(fill)
     if (firstType === 'line' || firstType === 'area') out.chartKind = firstType
-    return { out, xIdx }
+    if (s.dataLabels !== undefined) {
+      const dataLabels = chartDataLabelsOf(element.dataLabels, s.dataLabels, resolver)
+      if (dataLabels) out.dataLabels = dataLabels
+    }
+    return { out, categoryIdx }
   })
   if (mappedSeries.some((s) => s === null)) return null
-  const xIdx = mappedSeries[0]!.xIdx
-  return {
+  const categoryIdx = mappedSeries[0]!.categoryIdx
+  const spec: Record<string, unknown> = {
     kind,
-    categories: data.rows.map((r) => String(r[xIdx] ?? '')),
+    categories: data.rows.map((r) => String(r[categoryIdx] ?? '')),
     series: mappedSeries.map((s) => s!.out)
   }
+  applyCartesianChartOptions(spec, element, series, horizontal, resolver)
+  return spec
 }
 
 function numOrNull(value: number | string | null | undefined): number | null {
