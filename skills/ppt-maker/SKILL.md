@@ -1,124 +1,161 @@
 ---
 name: ppt-maker
-description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：用插件注册的十三个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出，以及把既有 .pptx 逆向成 PPTD 工程或外科手术式轻改（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx）；Python 脚本（pptd_to_pptx.py 等）是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作等设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/讲义、信息图、海报，或要求套用设计风格、转换 .pptd/.pptx 时使用。
+description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：用插件注册的十三个 ppt_* 工具完成规划/创建/编辑/撤销/重做/渲染/质检/导出，以及把既有 .pptx 逆向成 PPTD 工程或外科手术式轻改（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx，成品逐元素可编辑）；Python 脚本是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作五族共 30 套设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/路演/讲义/课件、信息图、海报，或要求套用设计风格、美化或改写已有 PPT、转换 .pptd/.pptx 时使用。
 ---
 
-# ppt-maker：PPT 生成与本地导出
+# ppt-maker：把内容做成好用、好看、好改的 PPT
 
-用 PPTD（YAML 中间格式，单页自包含）写 deck，**工具层直接产出最终 .pptx**。
+你交付的不是「一组填了字的页面」，而是一份**完成度足以直接交付、打开就能接着改**的演示文稿：每页只承载一件事，一眼看出重点，全套视觉像同一个人设计的，导出的 .pptx 里每个字、每个形状都能在 PowerPoint 里直接选中修改。
 
-## 工具优先
+工作方式只有一条主线：**用 PPTD 写页面 → 用工具渲染出真实成品图 → 亲眼看 → 改 → 质检 → 导出**。PPTD 是 YAML 写的中间格式（`deck.pptd` + 每页一个 `pages/*.page`），完整规格在插件包根目录的 `docs/pptd-spec.md`（相对本技能目录为 `../../docs/pptd-spec.md`）；写不确定的字段先查规格，别凭印象猜。
 
-做 PPT 一律先走工具，不要手写脚本调库。十三个工具（全部 raw JSON-Schema 注册，参数里有 `dir` 的都是工程目录，相对会话 cwd）：
+## 一、工具
 
-| 工具 | 干什么 | 关键返回 |
+十三个工具全部由插件注册，参数里的 `dir` 是工程目录（相对会话工作目录）。做 PPT 一律走工具，不要自己写脚本调库。
+
+| 工具 | 用途 | 关键返回 |
 |---|---|---|
-| `ppt_create` | 新建工程 | `{ok, manifest:{revision:0,...}}` |
-| `ppt_themes` | 列设计系统/主题 | `{ok, themes:[...]}` |
-| `ppt_plan` | 读写规划契约 brief.md / plan.yml（get / setBrief / setPlan） | `{ok, brief?, plan?, issues?, revision?}` |
-| `ppt_edit` | 原子编辑（ops 数组批量） | `{ok, revision, appliedOps, warnings}` |
-| `ppt_undo` / `ppt_redo` | 撤销/重做（游标移动，append-only 快照；须带 baseRevision） | `{ok, revision}` |
-| `ppt_render` | 渲染每页 PNG 预览（libreoffice-kit 光栅化最终 pptx） | `{ok, images:[{page,path,absolutePath}]}` |
-| `ppt_check` | 质检（规则层默认跑；`ai:true` 追加 AI 视觉质检） | `{ok, pass, issues:[...]}` |
-| `ppt_export` | 导出 .pptx（需质检通过且指纹未过期；`skipCheck:true` 绕过门禁但 postflight 不跳） | `{ok, path, revision, sha256, postflight, check}` |
-| `ppt_svg` | SVG 页面轨：写 SVG 源（media/svg/）并挂页，或立即编译早检 | `{ok, ref, compiled?, fonts?}` |
-| `ppt_import` | 把既有 .pptx 逆向成 PPTD 工程（`mode:'full'`；`surgical` 只回提示不建工程） | `{ok, dir, report}` |
-| `ppt_patch` | 对 .pptx 外科手术式轻改（改字/换图/调页序），库不建模的部件原样保留 | `{ok, path, lostParts}` |
-| `ppt_open` | 用右侧栏工作台打开一个工程（只登记打开请求，不改工程） | `{ok}` |
+| `ppt_themes` | 列出内置设计系统 | `themes[]`，`executable: true` 的主题能直接写入主题表 |
+| `ppt_create` | 新建工程 | `manifest.revision`（=0，之后所有写操作的基准） |
+| `ppt_plan` | 读写 `brief.md` 与 `plan.yml`（`get` / `setBrief` / `setPlan`） | `revision`、`issues` |
+| `ppt_edit` | 批量原子编辑（一次一串 ops，任一失败整批不落盘） | `revision`、`warnings` |
+| `ppt_undo` / `ppt_redo` | 撤销 / 重做 | `revision` |
+| `ppt_svg` | SVG 页面轨：写 SVG 源并挂页，或立即编译早检 | `ref`、`compiled` |
+| `ppt_render` | 构建最终 pptx 并光栅化成每页 PNG | `images[].absolutePath` |
+| `ppt_check` | 规则质检（`ai: true` 追加 AI 视觉建议） | `pass`、`issues[]` |
+| `ppt_export` | 导出 .pptx（质检门禁 + 字体嵌入 + 回读校验） | `path`、`sha256` |
+| `ppt_import` | 把既有 .pptx 全量逆向成 PPTD 工程 | `dir`、`report` |
+| `ppt_patch` | 对 .pptx 做外科手术式轻改（改字 / 换图 / 调页序） | `path`、`lostParts` |
+| `ppt_open` | 在右侧栏「PPT 工作台」打开工程，用户可在里面直接看、点、改 | `requested` |
 
-**质检分两层**：规则层（文字溢出/出界/重叠/对比度/结构/缺字体）是阻断式，blocker 不修掉就不给导出；AI 层（`ppt_check` 传 `ai: true`）只出建议不阻断——把最终渲染页 PNG 送当前路由的多模态模型看配色/层级/平衡。路由不支持图像输入时，AI 层降级为返回 PNG 路径清单 + 版式指标摘要，由你（主模型）自行 `read_image` 复核。
+**乐观锁**：`ppt_edit`、`ppt_undo`、`ppt_redo`、`ppt_plan` 的 `setBrief` / `setPlan`、带 `page` 的 `ppt_svg` 都必须带 `baseRevision`，值取**上一次写操作返回的 `revision`**（或 `ppt_plan action:get` 的 `revision`）。别自己 +1 推算：30 秒内的连续编辑会合并成一个修订，修订号不一定变。返回 409 说明工程在你之后被改过（多半是用户在工作台里动了手），先重新读再改，不要盲目重试。
 
-**指纹门禁**：`ppt_check` 通过时把「质检那一刻的工程内容指纹」（deck + pages + plan + media + 质检规则版本）写进 `manifest.qaReport`；`ppt_export` 重新计算指纹比对——质检之后工程又有任何改动（编辑、加页、换图）都会判 stale 并拒导出，重新跑一遍 `ppt_check` 即可。这是硬约束：导出的每一份 .pptx 都能回答「它过的是哪一版质检」。
+## 二、工作流
 
-## 交付产物（默认必须齐备）
+### 1. 弄清楚这份 PPT 要做什么
 
-1. **可编辑 PPTD 工程目录**：`deck.pptd` + `pages/*.page` + `media/` + `brief.md` + `plan.yml` + `manifest.json`（账本）+ `.history/`（快照）；
-2. **本地生成的 `.pptx`**（`ppt_export` 产物）。
+动手前先回答四个问题：**给谁看、看完希望他知道或做什么、只能记住一句话的话是哪句、以什么方式被看到**（投屏、发送阅读、打印、展陈、存档……）。答案决定取舍——投屏的页面字少图大、一页一个论点；供阅读的页面可以信息更密，但要有清晰的阅读路径。
 
-## 工作流
+- 先读完用户给的全部文件与链接。材料撑不起页数时先检索补充（用户说不扩展除外）。
+- 页数、风格、受众有冲突或说不清时，用 `ask_user_question` 一次问一件事，把推荐项放第一位并标 `(Recommended)`。不要替用户脑补关键取舍。
 
-### 一、需求确认（先问清，别猜）
+### 2. 落规划契约：brief + plan
 
-| 维度 | 取值 |
-|---|---|
-| 目的 | 新建 / 编辑现有 PPT / 从图片·PDF·大纲复刻 |
-| 设计方向 | 自定 / 指定设计系统 / 套模板 / 风格迁移 |
-| 输入 | 仅主题 / 完整文档 / 逐页大纲 |
-| 页数 | 用户指定优先；只给文档时先给页数估算并确认 |
+1. `ppt_create` 建工程（`dir`、`title`，选了设计系统就带 `designSystem` / `theme`）。
+2. `ppt_plan setBrief` 写 `brief.md`：目的、受众、核心信息、语气、形态（deck / poster / infographic）、页数。它是后面每个取舍的依据，也是质检和改稿的参照。
+3. `ppt_plan setPlan` 写 `plan.yml`：逐页 `{page, title, type: native|svg, intent, module}`。**`title` 写成结论句，不写成话题词**——「三段分工，一条管线」而不是「工具介绍」；把所有页的标题连起来读一遍，应当就是整份内容的提纲。先 `status: draft` 给用户过目，确认后改 `confirmed` 再建页。
 
-- 先读完用户上传的全部文件与 URL。PPTD 的格式约束读全量规格 `docs/pptd-spec.md`（插件包根目录；相对本技能目录为 `../../docs/pptd-spec.md`，自包含）。
-- 内容不足以撑满演示时，先用检索补充材料（除非用户明确说不扩展）。
-- 需求冲突或无法判定时**先问用户**：调用 `ask_user_question` 把冲突项摆成选项（推荐项放首位并加 `(Recommended)`），一次一问；不要自行脑补。
+用户明确说「直接做 / 快速出稿」时可以跳过 plan 确认和前五页早检，但 brief 照写。
 
-### 二、规划契约（brief + plan，默认路径）
+### 3. 定视觉方向，再建页
 
-拿到需求后先落两份工程文件，再动手建页：
+先定一套贯穿全篇的视觉系统，再逐页落地（见第三节）。然后：
 
-1. **brief.md**：写在工程目录根（`ppt_create` 之后就有地方放），散文写清 `目的 / 受众 / 核心信息 / 语气 / 形态（deck|poster|infographic）/ 页数`。它是后续所有取舍的依据。
-2. **plan.yml**：逐页规划 `{page, title, type: native|svg, intent, module}`，用 `ppt_plan` 的 `setPlan` 写入（校验不过会被拒）。先 `status: draft`，**给用户过目确认后**再 `setPlan` 改成 `status: confirmed`，然后按 plan 建页。plan 与 deck 页表不一致时工具会报 warning——以实际页表为准修正 plan，别放着不管。
+- `ppt_edit` 用 `add_page` / `add_element` / `update_element` / `update_page` 批量建页。页面参数写文件相对路径，如 `page: "pages/01.page"`。
+- 选了 `executable` 主题时，`deck.theme` 里已有 colors / textStyles / tableStyles，页内用 `$key` 引用（如 `style: "$title"`、`color: "$primary"`），全篇改色只需改主题表。
+- 共享装饰（品牌色条、页脚、角标）写进 `deck.masters` 母版与版式（规格 §3.5），页用 `layoutRef` 挂接，不要每页复制一遍。
 
-**Quick 路径（显式才走）**：用户明确说「直接做 / 不用规划 / 快速出稿」时跳过 plan 确认与 P01–P05 早检，一把做完再整体质检。brief.md 仍要写（三十秒的事），它是质检与改稿的参照。
+**前五页早检**：页数 ≥ 5 时，做完前五页就停下，`ppt_render` 出图自查，再给用户确认方向。方向错了只浪费五页。
 
-### 三、用工具建工程
+### 4. 看图，改到满意
 
-1. `ppt_themes` 看有哪些设计系统（学术/咨询/金融/促销/工作，每项带 `executable` 标记——为 `true` 时 `ppt_create` 会把该主题的主题表（`theme.yml`：colors/textStyles/tableStyles）直接写进 `deck.theme`，页内用 `$key` 引用即可），用户指定了就用指定族，没指定就按场景挑一个；自定风格不要硬套预设。
-2. `ppt_create` 建工程（给 `dir`/`title`/`designSystem`/`theme`），拿回 `manifest.revision`（乐观锁的基准）。
-3. `ppt_edit` 批量加页加元素：一次调用发一串 ops（`add_page` / `add_element` / `update_element` / …），原子生效。**每次都要带上一次的 `baseRevision`**，返回 409 就是游标过期，重新读再改。
-4. 改错了用 `ppt_undo` / `ppt_redo`（合并窗内的连续编辑算一步），同样必须带当前 `baseRevision`；`ppt_plan` 的 `setBrief` / `setPlan` 与 `ppt_svg` 带 `page` 挂页也一样。修订号取上一次写入返回的 `revision`，或 `ppt_plan action:get` 返回的 `revision`。
+`ppt_render` 渲染的是**最终 pptx 的真实光栅化结果**，不是示意图。对返回的每个 `absolutePath` 调 `read_image` 逐页看，像设计师审稿一样挑毛病：
 
-**P01–P05 早检（默认路径必做）**：页数 ≥ 5 的 deck，先按 plan 做完前 5 页就停下来——`ppt_render` 出这 5 页 PNG，自查后交给用户确认「方向对不对」。确认通过才继续后面页面；要返工也只浪费 5 页。页数 < 5 或 Quick 路径跳过此门。
+- 重点是不是一眼就能看到？视线从哪里进、到哪里结束？
+- 对齐：同一列元素的左边缘是否真的在一条线上？小图标与旁边文字是否垂直居中？
+- 间距是否有节奏（同级间距相等、组间大于组内）？有没有挤在角落或大片无意义的空？
+- 文字有没有被裁、压住画面、和背景对比不足？
+- 换一页看，配色、字号层级、页边距是否一致？
 
-**SVG 页面轨（整页视觉复杂时启用）**：当一页的设计复杂度超出 PPTD 元素的表达力（精细渐变、自由曲线、多层组合的装饰性版面——典型如封面、章节页、海报式单页），把整页画成一份受约束的 SVG（画布 = deck 尺寸，字体用 deck.theme 里声明过的），然后用 `ppt_svg` 落进工程：
+可疑处放大渲染（`dpi: 288`）再判断。改完重渲，直到你自己愿意把它署上名交出去。
 
-1. `ppt_svg` `action:'put'` 写源到 `media/svg/<name>.svg`，带 `page` 参数时直接挂页（页须先用 `ppt_edit` 建成 `pageType: svg`、`svgSource.ref` 指向该源的空页）；
-2. `ppt_svg` `action:'compile'` 立即编译早检（也顺手暖了缓存）；
-3. 引擎导出时整页编译为 DrawingML 原生形状并入成品 deck——成品里仍是可选中、可编辑的文本与形状。
+### 5. 质检
 
-SVG 页是整页编译，不拆成 PPTD 元素；页内元素级编辑（`update_element` 等）对它不适用，改源重挂才是正道。编译失败（源缺失/语法不支持/编译器环境缺失）一律报错拒建，不会静默降级成占位页。首次使用若报 `SvgCompilerMissing`，按报错给出的绝对路径跑 `node <插件包根目录>/scripts/prepare-vendor-env.mjs` 建 Python 环境（需 Python 3.10+，约 50MB，默认清华源，可用环境变量 `PIP_INDEX` 换源）。
+`ppt_check` 默认全页规则质检：文字溢出按工程实际字体的真实字形量宽，对比度逐段判定，另查出界、重叠、结构、缺字体。
 
-### 四、生成内容的纪律
+- **blocker**（溢出 / 出界 / 结构损坏）必须修，否则不能导出。
+- **warning** 逐条过目。有意的叠放（文字压在色块上、斜线穿过圆）会报重叠，确认是设计意图即可。
+- `ai: true` 追加多模态视觉建议，只出建议不阻断；当前模型路由不支持图像时会降级成 PNG 路径清单，由你自己 `read_image` 复核。
+- 只检部分页（带 `pages`）的结果不能放行整份导出。
 
-- **新建**：按场景读 `reference/slides_categories.md` 对应场景的规范；指定设计系统时只读该主题（`reference/design_system/<族>/<子风格>/design.md`），**严禁混搭**。
-- **海报/信息图**：单页、强视觉的交付先读 `reference/general-poster.md`，按其中的画布比例与质量基线设计，不套普通内容页模板。
-- **复刻**（图片/PDF → PPTD）：尽量 1:1。看不清的位置用网格线、放大观察；照片/头像这类无法用图形近似的，存 `media/` 后作为图片元素插入。
-- **编辑现有 PPT**：既有 .pptx 走 `ppt_import`（全量逆向成 PPTD 工程，改完再 `ppt_export`）或 `ppt_patch`（只改字/换图/调页序，不逆向你没动的东西）；已在 PPTD 工程里的直接 `ppt_edit`。
-- **版式纪律**：多页 deck 避免版式雷同——同一套「三张等宽卡片」不要页页复用，按内容换用非对称两栏、Zig-Zag 交错、整幅图配文字条、时间轴等；层级用字重与色彩对比控制，不靠超大字号撑场面。
-- **母版与版式（deck.masters）**：多页 deck 的共享装饰（品牌色条、页脚带、固定角标）写进 `deck.masters`（spec §3.5）而不是每页重复——母版声明 `shapes`（shape/text/line），每个 `layouts[]` 给独立 `name`，页用 `layoutRef: {name: "<版式名>"}` 挂接；占位框（`placeholders`）声明 title/body/picture 等位置。页自身的装饰仍写页内 `elements`；`deck.masters` 仅生成方言可用，版式名全 deck 唯一，挂不存在的版式名会被 `UnknownLayoutError` 拦下。
-- **语体纪律**：少用抽象套话与 AI 腔（"闭环/赋能/解构/主战场/看似…实则…/不是 A 而是 B"），以事实和证据说话。
+### 6. 导出与交付
 
-**配图纪律**
+`ppt_export` 先比对质检指纹：质检之后工程有任何改动都会判过期并拒绝，重新跑一遍 `ppt_check` 即可。随后构建、嵌入字体、回读校验（成品 ZIP 重新解析，有错误就拒绝落盘），成功后返回 SHA-256 并写入 `manifest.exportReport`。`skipCheck: true` 只跳过质检门禁，回读校验照跑。
 
-1. 优先级：用户材料 → 官方/权威来源 → 检索到的相关图 → 生成图。
-2. 涉及产品、人物、地点、事件、界面、实验对象时优先用真实图片。
-3. 先批量备好图再按比例排版；存 `media/`，**严禁拉伸变形**。
-4. 不放与页面结论无关的凑数图。
+用户在工作台里点「导出 .pptx」时，插件会就地补跑全页规则质检，有 blocker 才拦下并列出问题。
 
-### 五、校验（导出前必做）
+交付时给出可点击的绝对路径：工程目录与最终 `.pptx`。需要让用户继续手改时，用 `ppt_open` 把工程打开到右侧栏。
 
-1. **规则质检**：`ppt_check`（默认全页；文字溢出按工程实际字体的真实字形宽度量测，对比度逐 run 判定）。blocker（文字溢出/出界/结构坏）必须修；warning（重叠/对比度/缺字体）逐条过目。**不要只检部分页就导出**——落账带页面覆盖记录，未覆盖全页时 `ppt_export` 会以 `QaCoverageIncomplete` 拒导出。
-2. **视觉 QA**：`ppt_render` 出每页 PNG（最终 pptx 光栅化，所见即所得；结果给出每页图片的 absolutePath，对它调 `read_image` 看图），逐页核对：图片清晰不变形、文字未压住关键画面、元素未越界、文字与背景对比足够、对齐/间距/字号层级统一。可疑页放大确认后再改，改完重跑直到全部通过。
-3. **AI 深检（按需）**：`ppt_check` 传 `ai: true`。路由不支持图像时会降级成 PNG 路径清单 + 版式摘要，由你自行 `read_image` 完成视觉复核。
+## 三、怎样做出好看的页
 
-### 六、导出与交付
+好看不是装饰堆出来的，是取舍出来的。下面是判断标准，不是模板——每份 deck 都应当从它自己的内容里长出视觉。
 
-`ppt_export` 落盘最终 .pptx：先过指纹门禁（qaReport 缺失/未过/过期/未覆盖全页都会拒），再构建 + 嵌字体，最后 postflight 回读校验（重新解析成品 ZIP、库级 validate，任何 error 都会拒落盘）。`skipCheck: true` 只绕门禁，postflight 不跳。成功产出带 SHA-256 摘要，随 `manifest.exportReport` 落账——拿到 sha256 就能核对「交付出去的就是通过质检的那一份」。
+**一页一个焦点**。先问这页最想让人看到什么：一个数字、一个对比、一条流程、一句判断。把它做到最大、最强，其余元素都退后成为它的注脚。一页有三个同样大的东西，等于一个重点都没有。
 
-### 字体嵌入（本地 TS 链路原生，默认开启）
+**从内容里找视觉主张**。「13 个工具」可以是一个占半页的巨大数字；「三段分工」可以是三根长短不一的横条；「把 SVG 编译成 PPTX」可以是一条从左到右的流程。先想清楚这页的信息是**数量、比例、顺序、对比还是层级**，再选形式，不要先选「三卡片」再往里塞字。
 
-导出时自动把 deck 实际用到的字体嵌入 .pptx（`ppt/fonts/*.fntdata` + `embeddedFontLst`，EOT 封装），目标机未装字体也能正确渲染。
+**整套只用一个视觉系统**。定下：一个背景色、一个主文字色、一个强调色（最多再加一个辅助色）、一种字体家族、一套页边距和网格。强调色只用在真正的重点上——满屏都是红色，红色就不再是强调。全篇每页都用同一套边距、同一位置的页眉页脚，翻页时观众才会觉得是「一份」作品。
 
-- **三档模式**（`deck.pptd` 的 `export.fontEmbed`）：`subset`（默认，只嵌用到的字符，体积小；他人在 PowerPoint 里新增未覆盖字符会豆腐块，与 PowerPoint 官方默认一致）、`full`（整字体嵌入，可自由编辑，体积大）、`off`（不嵌入）。
-- **许可闸**：逐字体读 OS/2.fsType——Restricted / BitmapOnly 跳过并在摘要给出警告；Preview & Print 嵌入但目标机只读；No Subset 强制整字体。`ppt_check` 会提前列出每款字体的许可判定与缺失替代建议，不动导出也可见。
-- **授权口径**：嵌入即随文件再分发，字体授权责任在用户侧；内置设计系统推荐的免费商用字体（MiSans / 思源系 / 阿里妈妈系 / 站酷 / LXGW 等）一般可嵌，一律以运行时实测 fsType 为准。
-- **淡入淡出**：`export.transition`（默认 `fade`）页面级转场、`export.animations`（默认 `auto`）按 `.page` 的 `animations` 字段写入元素入场动画，均与既有导出语义一致。
+**网格与对齐**。在 960×540 画布上先定页边距（常用 56–72），所有元素的边缘落在少数几条竖线上。小色块配文字时，用 `align: [left, middle]` 并让文本框与色块垂直中心一致，渲染后放大核对。对齐误差 2px 观众说不出原因，但会觉得「不舒服」。
 
-- **交付清单**：给出绝对路径的可点击链接——工程目录、`.pptd`、`pages/`、`media/`、`.pptx`；结尾补一句后续操作提示。
-- **手动微调**：直接改 `.page` / `.pptd` 文件，然后 `ppt_render` 复核 + `ppt_export` 重出（工具层会发现磁盘内容与账本不一致并给 warning）。
+**字号层级要拉开**。标题与正文的字号比至少 2:1，封面主标题可以到 4:1 以上；同一层级在全篇保持同一字号。层级主要靠字号、字重和颜色深浅区分，不要靠加框、加底色。
 
-### 七、Python 逃生舱（默认不启用）
+**留白是设计的一部分**。不要为了「填满」而加凑数的图标、装饰线或副标题。一页内容少，就把它放大、放稳，让空白托住它。
 
-`scripts/` 下的 Python 脚本（`pptd_to_pptx.py` / `pptd_to_png.py` / `check_fonts.py`）是**逃生舱**：只在引擎库拒收的破损文件、或工具层明确覆盖不了的边角场景启用。常规创建/编辑/导出**不要走这条路**（本地轨道对表格/图表/动画的支持是真子集，会打 `dropped` 降级清单）。运行依赖 pip 包 `PyYAML` / `Pillow` / `python-pptx`（按脚本取用），缺包时先装齐再跑。
+**图表与表格要有观点**。图表只画支撑这页结论的那组数据；最重要的那根柱子用强调色，其余用中性色；能直接在柱子上标数值就去掉网格线和图例。类目名长时用横向条形图。表格用清楚的表头加细横线分隔，去掉竖线、外框和斑马纹，行高给足。
 
-## 动画与备注
+**版式要有变化**。多页 deck 不要页页「标题 + 三张等宽卡片」。按内容换用非对称两栏、大数字配说明、整幅图配文字条、时间轴、左右对比、流程链。封面、章节页、结尾页可以更大胆，内容页保持克制。
 
-默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的速查见 `reference/animation-tokens.md`；完整规范与易混淆 token 辨析见 `docs/pptd-spec.md` 附录 A/B（插件包根目录）。
+**语言克制**。少用「赋能 / 闭环 / 抓手 / 打造 / 不是 A 而是 B」这类空话，用事实、数字和具体例子说话。每页正文能删一半就删一半。
+
+**参考资料**（按需读，不必全读）：
+
+- 场景规范：`reference/slides_categories.md` 及 `reference/slides_categories/` 下的学术、商业计划、管理汇报、技术工程、教育培训、品牌创意、分析决策七类。
+- 设计系统：`reference/design_system/<族>/<主题>/design.md`。用户指定了就只读那一套，**不要混搭**；用户没指定也可以完全自定风格，不必硬套预设。
+- 海报与信息图：`reference/general-poster.md`，单页强视觉交付按它的画布比例与质量基线做。
+- 形状：`reference/shapes.md`（177 个预设形状及调整参数）；字体：`reference/fonts.md`、`reference/local-fonts.md`；动画词表：`reference/animation-tokens.md`。
+
+## 四、一次写对的要点
+
+这些是最常让页面「写了却不显示」或被质检拦下的地方：
+
+- **文本样式写在 `content` 里**：`content: {text, fontSize, color, bold, fontFamily, align, lineHeight, letterSpacing}`；元素顶层只放 `elementId`、`elementType`、`bounds`、`rotation`、`opacity` 等几何属性。
+- **文本框高度给足**：单行高度约为 `fontSize × 1.3`，再留几像素余量；多行按行数乘。框太矮会报溢出 blocker。大字号标题尤其要留够高度。
+- **形状不能内嵌文字**：带字的色块 = 一个 `shape` + 一个叠在上面的 `text`。
+- **填充写成对象**：`fill: {type: "solid", color: "#d0021b"}`；渐变要 ≥2 个停靠点。写成字符串会被拒。
+- **自定义形状**：`shapeName: "custom"` 必须同时给 `viewBox` 与 `path`（支持 `M L H V C S Q A Z`），且 `viewBox` 宽高比等于 `bounds` 宽高比，否则会被拉伸变形。
+- **出血效果**：形状超出画布会被判出界。想要「圆被页边裁掉一角」「斜带贯穿到边」的效果，用 `custom` 路径把形状直接画成裁切后的轮廓，`bounds` 保持在画布内。
+- **线条**：`line` 必须给 `viewBox` 与 `points`（至少两点）；粗斜线用细长的 `custom` 平行四边形更可控。
+- **横向条形图**：`yAxis.type: "category"`，系列的 `encode.x` 指向数值列、`encode.y` 指向类目列。要每个类目一种颜色：每个类目建一个系列、同设 `stack: "value"`，数据行里其他系列的格子留 `null`。关图例用 `legend.show: false`，标数值用 `dataLabels.show: true`。
+- **表格**：`rows` 是二维数组，`columnWidths`、`rowHeights` 是比例且各自加起来为 1，`rowHeights` 的项数等于行数。只要底部细横线：`border: [null, null, {style: solid, width: 1, color: "#c4bcab"}, null]`（顺序为上、右、下、左）。表格不能旋转。
+- **图片**：放进 `media/` 再用相对路径引用；保持原始宽高比，**严禁拉伸变形**。配图优先级：用户材料 → 官方来源 → 检索到的真实图片 → 生成图；不放与页面结论无关的凑数图。
+
+## 五、SVG 页面轨
+
+整页的视觉复杂到 PPTD 元素难以表达时（精细渐变、自由曲线、多层叠加的封面或章节页），把这一页画成一份 SVG：
+
+1. 先用 `ppt_edit` 建一页 `pageType: svg`、`svgSource.ref` 指向源文件的空页。
+2. `ppt_svg action: put` 把 SVG 写到 `media/svg/<名称>.svg`，带 `page` 直接挂页。
+3. `ppt_svg action: compile` 立即编译早检。
+
+SVG 画布用 deck 尺寸（同比例的 `viewBox`），字体用 deck 里声明过的字体。导出时整页编译成 DrawingML 原生形状，成品里的文字和形状依然可选中、可编辑。SVG 页不支持元素级 `update_element`，要改就改源后重新 `put`。编译失败会直接报错，不会悄悄换成占位页。首次使用报 `SvgCompilerMissing` 时，按报错给出的绝对路径运行 `node <插件包根目录>/scripts/prepare-vendor-env.mjs` 建 Python 环境（需 Python 3.10+，约 50MB；默认清华源，可用环境变量 `PIP_INDEX` 换源）。
+
+## 六、改已有的 PPT
+
+- **只改几个字、换张图、调页序**：用 `ppt_patch`。它直接动原文件，不逆向你没碰的部分，SmartArt、嵌入表格等库不建模的部件原样保留。看返回的 `lostParts`，不为 0 时要告诉用户。
+- **要大改或重新设计**：用 `ppt_import` 全量逆向成 PPTD 工程，改完再 `ppt_export`。导入后先读 `import.report.yml`：`dropped` 是没能转换、原位放了灰色占位的元素（原生图表、SmartArt、OLE 等），`degraded` 是转换时有损失的属性（如自动缩字、带字形状被拆成形状加文字）。把这些如实告诉用户，必要时重建。全部页面都没改动时，导出会从原件整份恢复（图表、SmartArt 等原样带回）；只要改了任何一页，就整份按 PPTD 重建，占位仍是占位。所以只是小改字、换图时，优先用 `ppt_patch`。
+- **复刻图片或 PDF**：尽量 1:1。看不清处放大观察；照片、头像等无法用图形近似的内容裁出来存 `media/` 作为图片插入。
+
+## 七、字体嵌入
+
+导出时自动把实际用到的字体嵌入 .pptx，对方电脑没装字体也能正常显示。`deck.pptd` 的 `export.fontEmbed` 有三档：`subset`（默认，只嵌用到的字符；对方新增文字可能缺字）、`full`（整字体嵌入，可自由编辑，体积大）、`off`（不嵌入）。字体文件放在工程的 `assets/fonts/` 下。
+
+嵌入受字体许可约束：禁止嵌入的字体会被跳过并给出警告，`ppt_check` 会提前列出每款字体的判定和替代建议。嵌入意味着随文件分发字体，授权责任在用户；内置设计系统推荐的免费商用字体（思源系、MiSans、阿里妈妈系、站酷、LXGW 等）一般可嵌，以运行时实测结果为准。
+
+## 八、动画与备注
+
+默认不加。只有用户要求或确属现场演示时才加：每页 1–3 组，优先淡入、飞入、缩放，动画服务于信息出现的顺序，不为热闹。页面转场由 `export.transition` 控制（默认 `fade`）。动画词表 95 个、转场 42 个见 `reference/animation-tokens.md`，完整规则见规格附录 A/B。演讲备注写在页的 `notes` 字段，同样按需添加。
+
+## 九、Python 逃生舱
+
+`scripts/` 下的 `pptd_to_pptx.py`、`pptd_to_png.py`、`check_fonts.py` 只用于引擎拒收的破损文件，或工具确实覆盖不了的边角场景。它们对表格、图表、动画只支持一个子集，常规创建、编辑、导出不要走这条路。依赖 `PyYAML`、`Pillow`、`python-pptx`，缺包时先装齐。

@@ -203,11 +203,11 @@ function missingKeyError(key) {
 }
 
 /**
- * 工程 key → 安全文件名主干：挡掉路径分隔符与 Windows 保留字符，空串回落到 `deck`。
- * 面板导出的落盘文件名用它，避免 key 里的怪字符把路径带出 export/ 之外。
+ * 工程目录名 → 安全文件名主干：挡掉路径分隔符与 Windows 保留字符，空串回落到 `deck`。
+ * 面板导出落盘为 `<工程名>-r<修订>.pptx`，避免怪字符把路径带出 export/ 之外。
  */
-function safeFileStem(key) {
-  const stem = String(key || '')
+function safeFileStem(name) {
+  const stem = String(name || '')
     .replace(/[\\/:*?"<>|]+/g, '-')
     .replace(/^[.\-\s]+/, '')
     .trim()
@@ -277,6 +277,44 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
     throw err
   }
   const { editProject, loadProject, undoProject, redoProject, projectUndoState, listProjectHistory, readHistorySnapshot, restoreProject, releaseProject, checkProject, writeQaReport, computeProjectFingerprint, ProjectError } = core
+
+  /** 面板质检：与 ppt_check 同一条规则链（不含 AI 视觉层），全页覆盖，fingerprint 绑定质检那一刻的工程内容。 */
+  async function runPanelCheck(cwd, dir) {
+    const result = await checkProject(cwd, dir, { withMissingFonts: true })
+    const fingerprint = await computeProjectFingerprint(cwd, dir)
+    await writeQaReport(cwd, dir, {
+      tool: 'panel-check',
+      pass: result.pass,
+      issueCount: result.issues.length,
+      blockerCount: result.issues.filter((i) => i.severity === 'blocker').length,
+      issues: result.issues,
+      pages: null,
+      ai: null,
+      fingerprint,
+    })
+    return { result, fingerprint }
+  }
+
+  /** 导出前保证有一份覆盖全页、与当前内容一致且通过的质检落账；不通过时抛 409 QaBlocked。 */
+  async function ensurePanelQa(cwd, dir) {
+    const loaded = await loadProject(cwd, dir)
+    const qa = loaded.manifest.qaReport
+    const fingerprint = await computeProjectFingerprint(cwd, dir)
+    const fullCoverage = qa && (!Array.isArray(qa.pages) || qa.pages.length === 0)
+    if (qa && qa.pass === true && fullCoverage && qa.fingerprint === fingerprint) return
+    const { result } = await runPanelCheck(cwd, dir)
+    if (result.pass) return
+    const blockers = result.issues.filter((i) => i.severity === 'blocker')
+    const head = blockers
+      .slice(0, 3)
+      .map((i) => `第 ${i.page} 页 ${i.description}`)
+      .join('；')
+    const more = blockers.length > 3 ? `；另有 ${blockers.length - 3} 条` : ''
+    throw new ProjectError('QaBlocked', `规则质检有 ${blockers.length} 个阻断，已停止导出：${head}${more}`, {
+      status: 409,
+      detail: { blockers },
+    })
+  }
   const ss = storeOverride || sessionStore
 
   function sessionOf(source, url) {
@@ -514,20 +552,7 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         const { sessionId, cwd } = sessionOf(body, url)
         const key = String(body.key || '')
         const { dir } = projectOf(ss, sessionId, cwd, key)
-        // 面板质检与 ppt_check 同一条规则链（checkProject），不含 AI 视觉层；
-        // 落账口径与工具侧一致：fingerprint 绑定「质检那一刻的工程内容」。
-        const result = await checkProject(cwd, dir, { withMissingFonts: true })
-        const fingerprint = await computeProjectFingerprint(cwd, dir)
-        await writeQaReport(cwd, dir, {
-          tool: 'panel-check',
-          pass: result.pass,
-          issueCount: result.issues.length,
-          blockerCount: result.issues.filter((i) => i.severity === 'blocker').length,
-          issues: result.issues,
-          pages: null,
-          ai: null,
-          fingerprint,
-        })
+        const { result, fingerprint } = await runPanelCheck(cwd, dir)
         return json(res, 200, { ok: true, pass: result.pass, issues: result.issues, fingerprint })
       }
 
@@ -535,8 +560,10 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         const { sessionId, cwd } = sessionOf(body, url)
         const key = String(body.key || '')
         const { dir, abs } = projectOf(ss, sessionId, cwd, key)
-        // v2 统一发布管线：面板导出与 ppt_export 同一条 releaseProject——
-        // QA 指纹门禁（未检/过期 409 由 catch 映射）+ postflight 回读校验 + sha256 落账。
+        // 面板导出与 ppt_export 同一条 releaseProject（QA 指纹门禁 + postflight 回读 + sha256 落账）。
+        // 人在面板里点导出时，落账缺失、只覆盖部分页或已过期，就先就地跑一遍全页规则质检并落账；
+        // 有 blocker 才 409 拦下并列出前几条，门禁语义与工具侧相同。
+        await ensurePanelQa(cwd, dir)
         const saveToProject = body.save === true
         const rel = await releaseProject(cwd, dir, {
           reportExtra: { kind: saveToProject ? 'panel-export' : 'browser-export' }
@@ -546,7 +573,7 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         if (saveToProject) {
           // 面板导出（body.save）落到工程目录 export/ 并回相对路径：桌面外壳的下载没有
           // 可回读的落点，磁盘上的文件 + 可见路径才是「点了就有反应」的确定性口径。
-          const filename = `${safeFileStem(key)}-r${rel.revision}.pptx`
+          const filename = `${safeFileStem(path.basename(abs))}-r${rel.revision}.pptx`
           const outDir = path.join(abs, 'export')
           await fsp.mkdir(outDir, { recursive: true })
           const absolutePath = path.join(outDir, filename)

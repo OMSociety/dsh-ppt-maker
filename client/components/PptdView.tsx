@@ -4,12 +4,12 @@
  * 当前渲染契约：
  *   - 打开即渲染；
  *   - 元素与 ElementOverlay 同源同坐标系，选择框对齐；
- *   - 使用 pt 逻辑坐标 + transform: scale()。
+ *   - 使用 pt 逻辑坐标 + transform: translate() scale()。
  *
  * 缩放模型（仿 PPTist 的 viewportSize）：
- *   逻辑坐标固定为 deck.size（如 960×540，单位 pt）。容器实际宽度由 ResizeObserver
- *   测得，scale = 容器宽 / 逻辑宽。内层 div 用逻辑尺寸铺开元素，再整体 scale。
- *   这样无论侧栏多宽，版面比例恒定、清晰（矢量，非位图放大）。
+ *   逻辑坐标固定为 deck.size（如 960×540，单位 pt）。容器尺寸由 ResizeObserver 测得，
+ *   client/render/canvas-fit.ts 的 fitCanvas 给出 contain 缩放比与居中偏移，二者都对齐到
+ *   设备像素。内层 div 用逻辑尺寸铺开元素，再整体变换；无论侧栏多宽，版面比例恒定、清晰。
  *
  * 坐标约定：PPTD bounds = [x, y, w, h]，单位 pt（1 pt = 1 px 逻辑，spec §1.2）。
  * rotation 单位为度，绕元素中心旋转。
@@ -17,6 +17,7 @@
 import * as React from 'react'
 import { backgroundToCss, borderToCss, fillToCss, resolveTextStyle, type ThemeLike } from '../render/resolve'
 import { pathFromPoints } from '../render/points'
+import { fitCanvas, type CanvasFit } from '../render/canvas-fit'
 import { sanitizeHtml } from '../render/sanitize'
 import { TableView } from './TableView'
 import { ChartView } from './ChartView'
@@ -61,21 +62,17 @@ interface PptdViewProps {
 
 export function PptdView({ page, size, theme, resolveMedia, overlay, className }: PptdViewProps) {
   const wrapRef = React.useRef<HTMLDivElement | null>(null)
-  const [scale, setScale] = React.useState(1)
+  const [fit, setFit] = React.useState<CanvasFit>({ scale: 1, x: 0, y: 0 })
+  const scale = fit.scale
 
-  // 跟随容器尺寸重算 scale：取宽、高两个方向的较小比例（contain），画布完整可见且居中。
+  // 跟随容器尺寸重算缩放：contain 适配后对齐到设备像素，画布完整可见且居中。
   // 逻辑坐标系恒定 = size，缩放只发生在最外层。
   React.useEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const update = () => {
-      const cw = el.clientWidth
-      const ch = el.clientHeight
-      if (cw > 0 && size[0] > 0) {
-        const sx = cw / size[0]
-        const sy = ch > 0 && size[1] > 0 ? ch / size[1] : sx
-        setScale(Math.min(sx, sy))
-      }
+      const next = fitCanvas(el.clientWidth, el.clientHeight, size[0], size[1], window.devicePixelRatio || 1)
+      if (next) setFit(next)
     }
     update()
     if (typeof ResizeObserver === 'undefined') {
@@ -101,11 +98,7 @@ export function PptdView({ page, size, theme, resolveMedia, overlay, className }
         style={{
           width: w,
           height: h,
-          // 注意：不能设 transformOrigin '0 0'。flex 居中把布局盒中心钉在容器中心，
-          // 默认 origin（50% 50%）绕布局盒中心缩放，缩放后视觉盒仍以容器为中心、
-          // 正好填满 min(容器宽/逻辑宽, 容器高/逻辑高) 的可视区；改成 0 0 会把视觉盒
-          // 左上角钉在（必然为负的）布局盒左上角，整块落到视口外。
-          transform: `scale(${scale})`,
+          transform: `translate(${fit.x}px, ${fit.y}px) scale(${scale})`,
           background: bgCss ?? '#FFFFFF',
         }}
       >
@@ -261,7 +254,28 @@ function TextView({
   )
 }
 
-/** 形状元素：rect / ellipse / 其它（path 太深的先按矩形兜底）+ 可选内嵌文本。 */
+/** 预设形状里能用 CSS 多边形精确表达的几种；其余预设按矩形显示。 */
+const PRESET_POLYGONS: Record<string, string> = {
+  triangle: 'polygon(50% 0, 100% 100%, 0 100%)',
+  rtTriangle: 'polygon(0 0, 100% 100%, 0 100%)',
+  diamond: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
+  parallelogram: 'polygon(25% 0, 100% 0, 75% 100%, 0 100%)',
+  pentagon: 'polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%)',
+  hexagon: 'polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%)',
+}
+
+/** custom 形状的 viewBox + path（spec §6.2）；不完整时返回 null。 */
+function customGeometryOf(el: PptdElement): { w: number; h: number; d: string } | null {
+  const vb = el.viewBox
+  const d = el.path
+  if (!Array.isArray(vb) || vb.length < 2 || typeof d !== 'string' || d.trim() === '') return null
+  const w = Number(vb[0])
+  const h = Number(vb[1])
+  if (!(w > 0) || !(h > 0)) return null
+  return { w, h, d }
+}
+
+/** 形状元素：rect / ellipse / custom 路径 / 常见多边形预设 + 可选内嵌文本。 */
 function ShapeView({
   el,
   style,
@@ -274,12 +288,17 @@ function ShapeView({
   resolveMedia?: (src: string) => string
 }) {
   const shapeName = (el.shapeName ?? 'rect') as string
+  const clipId = `pptd-clip-${React.useId().replace(/[^A-Za-z0-9_-]/g, '')}`
   const fillCss = fillToCss(el.fill, theme, resolveMedia)
   const borderCss = borderToCss(el.border, theme)
+  const custom = shapeName === 'custom' ? customGeometryOf(el) : null
+  const polygon = PRESET_POLYGONS[shapeName]
   const css: React.CSSProperties = {
     background: fillCss,
-    border: borderCss,
+    // 裁切后的形状边框无法沿轮廓描出，只给矩形与椭圆画 CSS 边框。
+    border: custom || polygon ? undefined : borderCss,
     borderRadius: shapeName === 'ellipse' ? '50%' : undefined,
+    clipPath: custom ? `url(#${clipId})` : polygon,
   }
   // 形状内嵌文本（content.text 存在时）：与 TextView 一样走 resolveTextStyle + textStyleToCss，
   // 元素级 fontSize/color/align/wrap 不能丢（逆向与 generate 双方都大量产出「形状+文字」）。
@@ -292,6 +311,13 @@ function ShapeView({
     : undefined
   return (
     <div style={{ ...style, ...css }} className="pptd-shape" data-shape={shapeName}>
+      {custom ? (
+        <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+          <clipPath id={clipId} clipPathUnits="objectBoundingBox">
+            <path d={custom.d} transform={`scale(${1 / custom.w} ${1 / custom.h})`} />
+          </clipPath>
+        </svg>
+      ) : null}
       {hasText ? (
         <div style={textCss} className="pptd-text">
           <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(content.text)) }} />

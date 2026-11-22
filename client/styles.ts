@@ -267,16 +267,16 @@ export const CSS = `
 .ppt-thumb-gap-over{background:var(--dsw-alias-interactive-bg-hover)}
 
 /* ── PptdView（DOM 直渲画布）────────────────── */
-/* 外层容器：决定可用空间，内部 flex 居中 */
-.pptd-viewport{position:relative;width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
-/* 逻辑画布：固定 pt 尺寸，transform scale 缩放；transform 不改变布局占位，配合 flex 居中 */
+/* 外层容器：决定可用空间；画布由 PptdView 按设备像素对齐的偏移与缩放放置 */
+.pptd-viewport{position:relative;width:100%;height:100%;overflow:hidden}
+/* 逻辑画布：固定 pt 尺寸，以左上角为原点 translate + scale */
 .pptd-canvas{
-  position:relative;flex:none;
+  position:absolute;left:0;top:0;transform-origin:0 0;
   box-sizing:border-box;
   /* 描边用 outline 而非 border：border 在 border-box 下会往内挤内容盒（0.67px @dpr1.5），
      全幅贴边元素（bottom-bar）四边被缩进 0.45px，露出画布米色页底，在深色界面下形成
      一条「白条」。outline 不占用布局，内容盒保持完整 960pt，贴边元素真正顶到画布边缘。 */
-  box-shadow:var(--dsw-shadow-lv2);outline:1px solid var(--dsw-alias-border-l2);border-radius:2px;
+  box-shadow:var(--dsw-shadow-lv2);outline:1px solid var(--dsw-alias-border-l2);
   /* 排版基线 reset：规格默认 18pt/MiSans/单倍行距。不 reset 会继承工作台 UI 的
      12px/1.6/UI 字体族，未显式设字号的元素整体渲小。 */
   font-size:18px;line-height:1.2;font-family:MiSans,sans-serif;color:#1A1A1A;

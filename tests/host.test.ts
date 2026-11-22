@@ -462,10 +462,6 @@ describe('host 路由', () => {
       body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] },
     })
 
-    // v2 门禁：未质检直接导出 → 409（QaReportMissing）
-    const early = await apiJson(`${API_PREFIX}/export`, { method: 'POST', body: { sessionId: SESSION, key } })
-    expect(early.status).toBe(409)
-
     // 面板质检（与 ppt_check 同规则链，落账 qaReport + 指纹绑定）
     const check = await apiJson(`${API_PREFIX}/check`, { method: 'POST', body: { sessionId: SESSION, key } })
     expect(check.status).toBe(200)
@@ -491,6 +487,7 @@ describe('host 路由', () => {
     const rel = String(saved.json!.relativePath || '')
     expect(rel).toContain('export/')
     expect(rel.endsWith('.pptx')).toBe(true)
+    expect(saved.json!.filename).toBe('proj-r1.pptx')
     expect(Number(saved.json!.revision)).toBe(1)
     expect(Number(saved.json!.bytes)).toBe(bin.body.length)
     const onDisk = await readFile(path.join(cwd, rel))
@@ -500,6 +497,41 @@ describe('host 路由', () => {
     const proj = await apiJson(`${API_PREFIX}/project?sessionId=${SESSION}&key=${key}`)
     const manifest = proj.json!.manifest as Record<string, unknown>
     expect((manifest.exportReport as Record<string, unknown> | undefined)?.kind).toBe('panel-export')
+  })
+
+  it('/export：落账缺失或过期时就地跑全页规则质检；无阻断直接导出，有阻断 409 并列出问题', async () => {
+    await startServer()
+    const { key } = await seedProject()
+    await apiJson(`${API_PREFIX}/edit`, {
+      method: 'POST',
+      body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] },
+    })
+
+    // 从未质检：导出自动补检并成功，qaReport 记为 panel-check、全页覆盖
+    const first = await apiJson(`${API_PREFIX}/export`, { method: 'POST', body: { sessionId: SESSION, key, save: true } })
+    expect(first.status).toBe(200)
+    const proj = await apiJson(`${API_PREFIX}/project?sessionId=${SESSION}&key=${key}`)
+    const qa = (proj.json!.manifest as Record<string, unknown>).qaReport as Record<string, unknown>
+    expect(qa.tool).toBe('panel-check')
+    expect(qa.pass).toBe(true)
+    expect(qa.pages).toBeNull()
+
+    // 改出一个越界文本框（blocker）后再导出：409 QaBlocked，消息带页码与问题描述，且未落盘新文件
+    await apiJson(`${API_PREFIX}/edit`, {
+      method: 'POST',
+      body: {
+        sessionId: SESSION,
+        key,
+        baseRevision: 1,
+        ops: [{ op: 'add_element', page: 'pages/01.page', element: { elementId: 'bleed', elementType: 'text', bounds: [900, 500, 300, 100], content: { text: '越界' } } }],
+      },
+    })
+    const blocked = await apiJson(`${API_PREFIX}/export`, { method: 'POST', body: { sessionId: SESSION, key, save: true } })
+    expect(blocked.status).toBe(409)
+    expect(String(blocked.json!.error ?? blocked.json!.message ?? '')).toMatch(/阻断.*第 1 页/)
+    const after = await apiJson(`${API_PREFIX}/project?sessionId=${SESSION}&key=${key}`)
+    const qa2 = (after.json!.manifest as Record<string, unknown>).qaReport as Record<string, unknown>
+    expect(qa2.pass).toBe(false)
   })
 
   describe('/export/open-menu 与 /export/open（打开方式 / 显示文件位置）', () => {

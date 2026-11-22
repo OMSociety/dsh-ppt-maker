@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **质量门**：文字溢出按工程实际字体的真实字形宽度量测（fontkit 量测器，解析失败自动回退启发式）；对比度判定细化到逐 run 文字颜色；`ppt_render` 结果列出每页预览图的绝对路径，供 `read_image` 看图；质检落账记录页面覆盖，未覆盖全页的落账不能放行整份导出（`QaCoverageIncomplete`）。
 - **统一发布管线**：`src/core/release/` 收口模型导出与面板导出——QA 指纹门禁（deck + pages + plan + media + 检查器版本 + SVG 转换器版本）→ 构建 + 字体嵌入 → postflight 回读（ZIP 重解析 + 库级校验）→ SHA-256 落账。
 - **主题可执行化**：30 个设计系统主题各配机器可读 `theme.yml`（颜色/字体），`ppt_create` 选定主题后真实写入 `deck.theme`。
+- **内置技能重写**：`skills/ppt-maker/SKILL.md` 按「定方向 → 落规划 → 建页 → 看渲染图改稿 → 质检 → 导出」组织，增加视觉设计判断标准与一次写对的字段要点。
 
 ### 变更
 
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 元素字段按规格校验：text 需 `content.text`，shape 需 `shapeName`，line 需 `viewBox` 与 `points`，`fill` 需对象，表格行列比例之和为 1，图表数据按 spec §11.6 的九个错误码校验。文本、备注、标题等字面字段按原文处理，`$` 引用只在样式字段解析。
 - 面板路由的同源判定要求 Origin 与 Host 同主机（局域网地址可用）；内部错误统一返回 500 且不回显路径，缺失文件返回 404；SVG 媒体响应带 `nosniff` 与沙箱 CSP。
 - `ppt_check` 结果标明质检覆盖页；校验阻断的错误消息直接列出前 5 条问题。字体嵌入幂等且产物字节确定，`check:build` 按内容哈希比对 `lib/` 产物。
+- 面板导出在质检落账缺失、只覆盖部分页或已过期时就地跑全页规则质检，有阻断才以 409 `QaBlocked` 拦下并列出问题；导出文件命名为 `<工程目录名>-r<修订>.pptx`，落在工程 `export/` 下。
 
 ### 移除
 
@@ -55,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 质检：对比度在元素无填充时回落到页面、版式、母版背景；`fontEmbed: off` 时许可证检查不误报；母版与版式的字体计入用量；字形量测按实际字重注册字体；SVG 编译缓存计入所引用的媒体文件。
 - 工作台：外部改动与冲突横幅按当前工程重新加载；导出不推进编辑基线；重做后刷新撤销状态；请求超时给出提示；带属性的富文本往返保真，超链接安全渲染，脚本类标签连同内容剔除；版本历史只显示最后一次请求的预览；抽屉支持焦点管理与 Esc；画布元素可键盘操作并带无障碍标签；最后一页不可删且删除前确认；越界元素给出提示；缩略图文字对齐与画布一致；表格按逐边边框渲染；工程读取失败时显示错误。
 - `ppt_open` 与 `ppt_import` 在面板桥晚于工具就绪时仍能发出打开请求；`ppt_open` 无面板桥时如实说明未发出请求；`ppt_patch` 报告保留与丢失的部件数。
+- 文本元素 `content.align` 的水平对齐写入 PPTX；自定义形状路径支持 `S`、`Q`、`A` 指令；工作台按真实轮廓裁切自定义形状与三角、菱形等预设形状。
+- 原生表格挂「无样式、无网格」表格样式，单元格边框逐边显式写出（未写的边按规格默认黑色 1px，`null` 为无线），WPS 与 PowerPoint 不再叠加内置样式的白色网格线；单元格未写 `align` 时按规格默认 `[center, middle]` 写入垂直居中；工作台的默认边框与对齐与规格一致；工作台画布的缩放与位置对齐到设备像素，贴边色块边缘不再透出底色细线。
 
 ### Added
 
@@ -66,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quality gates**: text overflow is measured with real glyph widths from the project's fonts (fontkit measurer, with heuristic fallback when parsing fails); contrast checks use per-run text colors; `ppt_render` lists the absolute path of every preview image for `read_image`; quality-check records include page coverage, and partial-page checks cannot authorize full-deck export (`QaCoverageIncomplete`).
 - **Unified release pipeline**: `src/core/release/` handles both model-driven and panel exports—QA fingerprint gate (deck + pages + plan + media + checker version + SVG converter version) → build + font embedding → postflight readback (ZIP reparse + library validation) → SHA-256 record.
 - **Executable themes**: each of the 30 design-system themes has a machine-readable `theme.yml` (colors/fonts), and `ppt_create` writes the selected theme into `deck.theme`.
+- **Rewritten built-in skill**: `skills/ppt-maker/SKILL.md` follows direction → planning → building pages → reviewing rendered images → quality check → export, with visual design criteria and field-level guidance for getting pages right the first time.
 
 ### Changed
 
@@ -75,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Element fields are validated against the spec: text needs `content.text`, shape needs `shapeName`, line needs `viewBox` and `points`, `fill` must be an object, table row/column ratios sum to 1, and chart data is checked with the nine error codes in spec §11.6. Literal fields such as text, notes, and titles are taken verbatim; `$` references resolve only in style fields.
 - Panel same-origin checks require Origin and Host to name the same host (LAN addresses work); internal errors return 500 without echoing paths, missing files return 404, and SVG media responses carry `nosniff` and a sandbox CSP.
 - `ppt_check` results state which pages were checked; validation-blocker messages list the first five issues. Font embedding is idempotent with byte-deterministic output, and `check:build` compares `lib/` artifacts by content hash.
+- Panel export runs a full-deck rule check on the spot when the QA record is missing, partial, or stale, and only a blocker stops it with 409 `QaBlocked` listing the issues; exported files are named `<project folder>-r<revision>.pptx` under the project's `export/`.
 
 ### Removed
 
@@ -95,6 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Quality checks: contrast falls back to page, layout, and master backgrounds when an element has no fill; license checks no longer misfire with `fontEmbed: off`; fonts used by masters and layouts count toward usage; glyph measurement registers fonts by actual weight; the SVG compile cache includes referenced media files.
 - Workbench: external-change and conflict banners reload the current project; export leaves the edit baseline unchanged; redo refreshes undo state; request timeouts show a message; rich text with attributes round-trips intact, links render safely, and script-like tags are dropped with their content; version history shows only the latest requested preview; drawers manage focus and close on Esc; canvas elements are keyboard-operable with accessible labels; the last page cannot be deleted and deletion asks for confirmation; out-of-canvas elements show a notice; thumbnail text alignment matches the canvas; tables render per-edge borders; project read failures show an error.
 - `ppt_open` and `ppt_import` send open requests even when the panel bridge becomes ready after the tools; without a panel bridge `ppt_open` states that no request was sent; `ppt_patch` reports kept and lost part counts.
+- Horizontal alignment from a text element's `content.align` is written to PPTX; custom shape paths support the `S`, `Q`, and `A` commands; the workbench clips custom shapes and presets such as triangles and diamonds to their real outlines.
+- Native tables use the "No Style, No Grid" table style and write every cell border side explicitly (unwritten sides take the spec default of 1px black, `null` means no line), so WPS and PowerPoint no longer add the built-in style's white grid lines; cells without `align` take the spec default `[center, middle]`, including vertical centering; the workbench default border and alignment match the spec; the workbench canvas scale and position snap to device pixels, so edge-to-edge blocks no longer show a thin line of the background color.
 
 ## [1.0.1] - 2026-11-02
 

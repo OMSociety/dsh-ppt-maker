@@ -114,7 +114,7 @@ npm run check:pack
 NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ```
 
-全量 45 个测试文件 / 347 个用例，约 1 分钟。CI 在 windows-latest 与 ubuntu-latest 上跑全量：ubuntu 先装 `fonts-noto-cjk fonts-wqy-zenhei fonts-dejavu-core`，两端都先执行 `node scripts/prepare-vendor-env.mjs` 备好 SVG 转换器环境；依赖真实字体或 Python 环境的用例在缺件时按 `tests/__fixtures__/venv.ts` 与字体候选表跳过并打印缺项。`npm run check:build` 按内容比对 `lib/index.js`、`lib/client.js` 与 HEAD 的哈希（构建是确定性的）。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
+全量 48 个测试文件 / 363 个用例，约 1 分钟。CI 在 windows-latest 与 ubuntu-latest 上跑全量：ubuntu 先装 `fonts-noto-cjk fonts-wqy-zenhei fonts-dejavu-core`，两端都先执行 `node scripts/prepare-vendor-env.mjs` 备好 SVG 转换器环境；依赖真实字体或 Python 环境的用例在缺件时按 `tests/__fixtures__/venv.ts` 与字体候选表跳过并打印缺项。`npm run check:build` 按内容比对 `lib/index.js`、`lib/client.js` 与 HEAD 的哈希（构建是确定性的）。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
 
 面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 13 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 

@@ -8,6 +8,7 @@ import {
   getTableCellBorders,
   getTableCellFill,
   getTableCellText,
+  getTableStyleId,
   loadPresentation,
 } from '@office-kit/pptx'
 import { createOfficeKitEngine } from '../src/core/engine/officekit.js'
@@ -72,6 +73,56 @@ describe('office-kit 表格样式契约', () => {
     expect(borders.left).toBeNull()
     expect(borders.right).toBeNull()
     expect(borders.bottom?.color).toBe('#D8D2C4')
+  })
+
+  it('表格挂「无样式、无网格」，未写的边按规格默认黑色 1px 显式写出', async () => {
+    const engine = createOfficeKitEngine()
+    const page: Page = {
+      elements: [{
+        elementId: 'plain-table',
+        elementType: 'table',
+        bounds: [70, 100, 300, 120],
+        columnWidths: [0.5, 0.5],
+        rowHeights: [1],
+        rows: [[{ text: '默认' }, { text: '只要底线', border: [null, null, { color: '#c4bcab', style: 'solid', width: 1 }, null] }]],
+      }],
+    }
+    const built = await engine.buildDeck({ deck: deck(), pages: [page] }, ctx())
+    const back = await loadPresentation(await engine.saveDeck(built.native))
+    const table = getSlideTables(getSlides(back)[0])[0]
+    expect(getTableStyleId(table)).toBe('{2D5ABB26-0587-4C30-8999-92F81FD0307C}')
+    const plain = getTableCellBorders(back, getTableCell(table, 0, 0))
+    for (const side of [plain.top, plain.right, plain.bottom, plain.left]) {
+      expect(side?.color).toBe('#000000')
+      expect(side?.widthEmu).toBe(12700)
+    }
+    const underline = getTableCellBorders(back, getTableCell(table, 0, 1))
+    expect(underline.top).toBeNull()
+    expect(underline.right).toBeNull()
+    expect(underline.left).toBeNull()
+    expect(underline.bottom?.color).toBe('#C4BCAB')
+  })
+
+  it('单元格对齐：未写时按规格默认 [center, middle]，样式里写了按样式', async () => {
+    const engine = createOfficeKitEngine()
+    const page: Page = {
+      elements: [{
+        elementId: 'align-table',
+        elementType: 'table',
+        bounds: [70, 100, 300, 120],
+        columnWidths: [0.5, 0.5],
+        rowHeights: [1],
+        rows: [[{ text: '默认' }, { text: '左中', align: ['left', 'middle'] }]],
+      }],
+    }
+    const built = await engine.buildDeck({ deck: deck(), pages: [page] }, ctx())
+    const back = await loadPresentation(await engine.saveDeck(built.native))
+    const xml = getShapeXmlString(getSlideTables(getSlides(back)[0])[0])
+    const cells = xml.split('<a:tc>').slice(1)
+    expect(cells[0]).toMatch(/anchor="ctr"/)
+    expect(cells[0]).toMatch(/algn="ctr"/)
+    expect(cells[1]).toMatch(/anchor="ctr"/)
+    expect(cells[1]).not.toMatch(/algn="ctr"/)
   })
 
   it('rows 省略被合并覆盖的格：后续格按网格列落位', async () => {

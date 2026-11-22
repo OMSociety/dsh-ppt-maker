@@ -77,7 +77,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 1. Say "make me a presentation" in the chat (or explicitly invoke the `ppt-maker` skill) → the thirteen `ppt_*` tools come in
 2. The model writes the brief and page plan with `ppt_plan` (early pages P01–P05 are rendered for your confirmation), creates a project with `ppt_create`, or reverse-engineers an existing .pptx into a project with `ppt_import` → the workbench pops open in the right-hand rail
-3. Double-click to edit text in the panel, drag to reorder pages, click "Export .pptx" → the file lands in the project directory under `export/` (file name includes the version number)
+3. Double-click to edit text in the panel, drag to reorder pages, click "Export .pptx" → the plugin runs a full-deck rule check on the spot, then saves `<project>-r<version>.pptx` under the project's `export/`
 4. Have the model run `ppt_check` for QA and `ppt_render` for per-page PNGs; if the model edits the same project in another session, the panel shows a 409 conflict banner instead of overwriting your edits
 5. Click "Open" in the footer status bar → open the result with the system associated app, or choose "Show in folder"
 
@@ -109,7 +109,7 @@ The "PPT 工作台" tab in the right-hand rail is a three-pane editor: thumbnail
 - **The canvas is the DOM**: the canvas and thumbnails render the PPTD page AST directly to the DOM (`client/components/PptdView.tsx`) — instant, no libreoffice cold start; elements, selection boxes and the in-place editor share one coordinate system and stay aligned. Tables and charts render as real DOM/SVG; SVG pages preview as a full-page backdrop; elements that can't render yet (icon / SmartArt) show gray placeholders.
 - **Plan drawer**: the "Plan" toolbar button opens a read-only drawer showing brief.md and plan.yml (page file / title / track / intent).
 - **Collapsible side panes**: the left page list is expanded by default and can be collapsed; the right inspector only expands when an element is selected. Collapsed panes leave only an edge handle.
-- **Edit in place**: double-click to edit text / drag to reorder pages / duplicate, delete and add pages / replace images / "Export .pptx" lands in the project directory under `export/` (file name includes the version number).
+- **Edit in place**: double-click to edit text / drag to reorder pages / duplicate, delete and add pages / replace images / "Export .pptx" runs the rule check automatically and saves `<project>-r<version>.pptx` under the project's `export/`.
 - **Version history**: the "History" drawer renders any snapshot live on the canvas and restores it with one click.
 - **Footer status bar**: "Saving…" and operation feedback (export destination, failure reasons) live in a permanent bottom bar that doesn't eat canvas height.
 - **Conflict protection**: every write carries `baseRevision`; if the model edits the same project in another session the server returns 409 — the panel only shows a conflict banner and never overwrites your edits; the "modified externally" banner works the same way.

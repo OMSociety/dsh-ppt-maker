@@ -78,6 +78,7 @@ import {
   setSlideTransition,
   setTableCellAnchor,
   setTableCellBorders,
+  setTableStyleId,
   setTableCellFill,
   setTableCellParagraphs,
   type ChartSpec,
@@ -269,7 +270,9 @@ function richRunsToSpecs(
 ): ParagraphSpec[] {
   const specs: ParagraphSpec[] = []
   for (const para of paragraphs) {
-    const alignToken = para.props.align !== undefined ? ALIGN_MAP[para.props.align] : undefined
+    // Paragraph-level align (from markup) wins; otherwise the element's
+    // horizontal content.align applies to every paragraph.
+    const alignToken = ALIGN_MAP[para.props.align ?? base.align[0]]
     const runs = para.runs.flatMap((run) => runToSpecs(run, base, resolver, fonts))
     const spec: ParagraphSpec = {
       ...(alignToken !== undefined ? { align: alignToken } : {}),
@@ -837,6 +840,9 @@ function buildTable(
     firstRow: tableStyle?.firstRowStyle !== undefined,
     bandRow: tableStyle?.bandRow === true
   })
+  // PPTD 表格样式全部按单元格显式写出；OOXML 表格样式必须是「无样式、无网格」，
+  // 否则 PowerPoint / WPS 会把内置样式的白色网格线与填充叠到未写线条的边上。
+  setTableStyleId(shape, 'No Style, No Grid')
 
   applyTableCells(shape, placed, tableStyle, resolver, theme, ctx, fonts, where)
   // Native tables cannot rotate (spec §6.6): geometry is applied without rotation.
@@ -956,7 +962,9 @@ function applyTableCells(
 
     // text paragraphs
     const text = typeof cell.text === 'string' ? cell.text : ''
-    const merged: Record<string, unknown> = { ...baseStyle, ...(textStyleRef ?? {}), ...cell }
+    // 规格 §1.3.2：textStyle 只取文本字段；单元格 align 默认 [center, middle]。
+    const { fill: _tf, border: _tb, align: _ta, ...textOnly } = textStyleRef ?? {}
+    const merged: Record<string, unknown> = { align: CELL_DEFAULT_ALIGN, ...baseStyle, ...textOnly, ...cell }
     const content = resolveContent(merged, theme, resolver, fonts, ctx.warnings, `${where} 单元格(${r},${c})`)
     const parsed = parseRichText(text)
     const specs = richRunsToSpecs(parsed.paragraphs, content, resolver, fonts)
@@ -992,6 +1000,12 @@ function categoryStyleOf(
   return Object.keys(merged).length > 0 ? merged : null
 }
 
+/** 规格 §1.3.2 单元格默认对齐。 */
+const CELL_DEFAULT_ALIGN: [string, string] = ['center', 'middle']
+
+/** 规格 §1.3.2 单元格默认边框；BorderSpec 里写 null 的边无线。 */
+const DEFAULT_CELL_BORDER = { style: 'solid', width: 1, color: '#000000' } as const
+
 function applyCellBorders(
   handle: unknown,
   spec: unknown,
@@ -999,13 +1013,13 @@ function applyCellBorders(
   ctx: BuildContext,
   where: string
 ): void {
-  if (spec === undefined) return
   const cell = handle as Parameters<typeof setTableCellBorders>[0]
   if (spec === null) {
     setTableCellBorders(cell, null)
     return
   }
-  const one = (b: unknown): { color: string; widthEmu: number; dash: string } | null => {
+  const one = (side: unknown): { color: string; widthEmu: number; dash: string } | null => {
+    const b = side === undefined ? DEFAULT_CELL_BORDER : side
     if (!b || typeof b !== 'object') return null
     const rec = b as Record<string, unknown>
     const color = resolver.color(rec.color) ?? ('#000000' as Color)
@@ -1023,9 +1037,9 @@ function applyCellBorders(
       } else {
         ctx.warnings.push(`${where}：BorderSpec 数组长度须为 2 或 4`)
       }
-    } else if (typeof spec === 'object' && spec !== null) {
+    } else {
       const b = one(spec)
-      if (b) setTableCellBorders(cell, { top: b, right: b, bottom: b, left: b })
+      setTableCellBorders(cell, { top: b, right: b, bottom: b, left: b })
     }
   } catch (err) {
     ctx.warnings.push(`${where}：单元格边框设置失败：${(err as Error).message}`)
@@ -1242,13 +1256,18 @@ function svgPathToCustomGeometry(
   ctx: BuildContext,
   where: string
 ): CustomGeometryInput | null {
-  const tokens = path.match(/[MmLlHhVvCcSsQqZzAa]|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g)
+  const tokens = path.match(/[MmLlHhVvCcSsQqZzAa]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g)
   if (!tokens) return null
   // CustomGeometryInput.paths — each path carries its own w/h (viewBox space).
   const paths: CustomGeometryInput['paths'][number][] = []
   let commands: GeomCommand[] = []
   let cx = 0
   let cy = 0
+  let startX = 0
+  let startY = 0
+  // Second control point of the previous C/S segment, for S reflection.
+  let lastCubic: { x: number; y: number } | null = null
+  let nextCubic: { x: number; y: number } | null = null
   let i = 0
   let cmd = ''
   const num = () => Number(tokens[i++])
@@ -1268,14 +1287,15 @@ function svgPathToCustomGeometry(
       i++
       if (cmd === 'Z' || cmd === 'z') {
         commands.push({ kind: 'close' })
+        cx = startX
+        cy = startY
+        lastCubic = null
         continue
-      }
-      if (cmd === 'A' || cmd === 'a') {
-        ctx.warnings.push(`${where}：SVG 弧线命令 A 暂不支持，该段已跳过`)
       }
     }
     const rel = cmd === cmd.toLowerCase()
     const op = cmd.toUpperCase()
+    nextCubic = null
     try {
       if (op === 'M') {
         const x = num()
@@ -1284,6 +1304,8 @@ function svgPathToCustomGeometry(
         cy = rel ? cy + y : y
         if (commands.length > 0) flush() // new subpath starts here
         pushMove(cx, cy)
+        startX = cx
+        startY = cy
         cmd = rel ? 'l' : 'L' // implicit lineTo after M
       } else if (op === 'L') {
         const x = num()
@@ -1312,21 +1334,46 @@ function svgPathToCustomGeometry(
         pushCubic(p1.x, p1.y, p2.x, p2.y, p.x, p.y)
         cx = p.x
         cy = p.y
-      } else if (op === 'S' || op === 'Q') {
-        ctx.warnings.push(`${where}：SVG 命令 ${op} 暂不支持，已中断路径解析`)
-        break
-      } else if (op === 'A') {
-        // rx ry rot large sweep x y — the arc itself is skipped, but the
-        // current point must still move to its endpoint so relative commands
-        // that follow stay anchored correctly.
-        num(); num(); num(); num(); num()
+        nextCubic = p2
+      } else if (op === 'S') {
+        const x2 = num()
+        const y2 = num()
         const x = num()
         const y = num()
-        cx = rel ? cx + x : x
-        cy = rel ? cy + y : y
+        const p1 = lastCubic ? { x: 2 * cx - lastCubic.x, y: 2 * cy - lastCubic.y } : { x: cx, y: cy }
+        const p2 = rel ? { x: cx + x2, y: cy + y2 } : { x: x2, y: y2 }
+        const p = rel ? { x: cx + x, y: cy + y } : { x, y }
+        pushCubic(p1.x, p1.y, p2.x, p2.y, p.x, p.y)
+        cx = p.x
+        cy = p.y
+        nextCubic = p2
+      } else if (op === 'Q') {
+        const x1 = num()
+        const y1 = num()
+        const x = num()
+        const y = num()
+        const q = rel ? { x: cx + x1, y: cy + y1 } : { x: x1, y: y1 }
+        const p = rel ? { x: cx + x, y: cy + y } : { x, y }
+        // Quadratic → cubic: both control points sit 2/3 of the way toward q.
+        pushCubic(cx + (2 / 3) * (q.x - cx), cy + (2 / 3) * (q.y - cy), p.x + (2 / 3) * (q.x - p.x), p.y + (2 / 3) * (q.y - p.y), p.x, p.y)
+        cx = p.x
+        cy = p.y
+      } else if (op === 'A') {
+        const rx = num()
+        const ry = num()
+        const rot = num()
+        const large = num() !== 0
+        const sweep = num() !== 0
+        const x = num()
+        const y = num()
+        const p = rel ? { x: cx + x, y: cy + y } : { x, y }
+        for (const seg of arcToCubics(cx, cy, rx, ry, rot, large, sweep, p.x, p.y)) pushCubic(...seg)
+        cx = p.x
+        cy = p.y
       } else {
         break
       }
+      lastCubic = nextCubic
     } catch {
       ctx.warnings.push(`${where}：SVG 路径解析中断`)
       break
@@ -1335,6 +1382,80 @@ function svgPathToCustomGeometry(
   flush()
   if (paths.length === 0) return null
   return { paths }
+}
+
+type CubicSegment = [number, number, number, number, number, number]
+
+/**
+ * SVG elliptical arc (endpoint parameterization, SVG 1.1 Appendix F.6) →
+ * cubic Bézier segments of at most 90° each. Out-of-range radii are scaled up
+ * per F.6.6; a zero radius degenerates to a straight line.
+ */
+export function arcToCubics(
+  x1: number,
+  y1: number,
+  rxIn: number,
+  ryIn: number,
+  rotationDeg: number,
+  large: boolean,
+  sweep: boolean,
+  x2: number,
+  y2: number
+): CubicSegment[] {
+  if (x1 === x2 && y1 === y2) return []
+  let rx = Math.abs(rxIn)
+  let ry = Math.abs(ryIn)
+  if (rx === 0 || ry === 0) return [[x1, y1, x2, y2, x2, y2]]
+  const phi = (rotationDeg * Math.PI) / 180
+  const cos = Math.cos(phi)
+  const sin = Math.sin(phi)
+  const dx = (x1 - x2) / 2
+  const dy = (y1 - y2) / 2
+  const x1p = cos * dx + sin * dy
+  const y1p = -sin * dx + cos * dy
+  const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
+  if (lambda > 1) {
+    const s = Math.sqrt(lambda)
+    rx *= s
+    ry *= s
+  }
+  const num = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p
+  const den = rx * rx * y1p * y1p + ry * ry * x1p * x1p
+  const coef = (large === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num / den))
+  const cxp = (coef * rx * y1p) / ry
+  const cyp = (-coef * ry * x1p) / rx
+  const cx = cos * cxp - sin * cyp + (x1 + x2) / 2
+  const cy = sin * cxp + cos * cyp + (y1 + y2) / 2
+  const angle = (ux: number, uy: number, vx: number, vy: number) => {
+    const a = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)
+    return a
+  }
+  const theta1 = angle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry)
+  let delta = angle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry)
+  if (!sweep && delta > 0) delta -= 2 * Math.PI
+  if (sweep && delta < 0) delta += 2 * Math.PI
+  const count = Math.max(1, Math.ceil(Math.abs(delta) / (Math.PI / 2) - 1e-9))
+  const step = delta / count
+  const k = (4 / 3) * Math.tan(step / 4)
+  const point = (t: number) => ({
+    x: cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin,
+    y: cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos
+  })
+  const deriv = (t: number) => ({
+    x: -rx * Math.sin(t) * cos - ry * Math.cos(t) * sin,
+    y: -rx * Math.sin(t) * sin + ry * Math.cos(t) * cos
+  })
+  const out: CubicSegment[] = []
+  for (let n = 0; n < count; n++) {
+    const a = theta1 + n * step
+    const b = a + step
+    const pa = point(a)
+    const pb = n === count - 1 ? { x: x2, y: y2 } : point(b)
+    const da = deriv(a)
+    const db = deriv(b)
+    out.push([pa.x + k * da.x, pa.y + k * da.y, pb.x - k * db.x, pb.y - k * db.y, pb.x, pb.y])
+  }
+  return out
 }
 
 /* ------------------------------------------------------------------ *

@@ -49,11 +49,12 @@ export function tableCategoryStyleOf(
   return style.rowOverColumn === false ? { ...row, ...col } : { ...col, ...row }
 }
 
-const DEFAULT_CELL_BORDER = '1px solid rgba(0,0,0,0.15)'
+/** 规格 §1.3.2 单元格默认边框：{style: solid, width: 1, color: #000000}。 */
+const DEFAULT_CELL_BORDER = '1px solid #000000'
 
 type CellBorderCss = Pick<CSSProperties, 'borderTop' | 'borderRight' | 'borderBottom' | 'borderLeft'>
 
-/** 单条边：null 不画，Border 对象画，未写（undefined）用默认细线。 */
+/** 单条边：null 不画，Border 对象画，未写（undefined）用规格默认边框。 */
 function sideCss(side: unknown, theme?: ThemeLike | null): string {
   if (side === null) return 'none'
   if (side && typeof side === 'object') return borderToCss(side, theme) ?? DEFAULT_CELL_BORDER
@@ -80,7 +81,8 @@ export function tableCellViewModel(
 ): CSSProperties & { html: string } {
   const merged: TableStyleMap = { ...base, ...cell }
   const textStyle = resolveTextStyle({ ...merged, style: cell.textStyle }, theme)
-  const align = Array.isArray(merged.align) ? merged.align : []
+  // 规格 §1.3.2：单元格 align 默认 [center, middle]。
+  const align = Array.isArray(merged.align) ? merged.align : ['center', 'middle']
   const fontFamily = typeof textStyle.fontFamily === 'string' ? textStyle.fontFamily : undefined
   const fontSize = typeof textStyle.fontSize === 'number' ? textStyle.fontSize : 14
   return {
