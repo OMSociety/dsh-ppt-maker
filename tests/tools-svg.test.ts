@@ -1,8 +1,8 @@
 /**
- * ppt_plan / ppt_svg 工具契约测试（v2 规划契约 + SVG 页面轨）。
+ * ppt_svg 工具契约测试（SVG 页面轨）。
  * ppt_svg 的 compile 动作依赖 vendor/.venv，缺席时整组 skipped（CI 无 venv 不红）。
  */
-import { access, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -17,7 +17,7 @@ interface ToolResult {
 
 let cwd: string
 let defs: Map<string, ToolDef>
-const exec = { agent: { session: { id: 's-plan-svg' } } }
+const exec = { agent: { session: { id: 's-svg' } } }
 
 function makeCtx(cwdDir: string) {
   defs = new Map()
@@ -34,7 +34,7 @@ function makeCtx(cwdDir: string) {
           return () => defs.delete(def.name)
         }
       },
-      sessions: { get: (id: string) => (id === 's-plan-svg' ? { header: { cwd: cwdDir } } : undefined) },
+      sessions: { get: (id: string) => (id === 's-svg' ? { header: { cwd: cwdDir } } : undefined) },
       skills: { register: () => () => {} },
       logger: { warn: () => {} },
       on: (event: string, handler: (...args: never[]) => void) => {
@@ -57,7 +57,7 @@ async function call(tool: string, args: Record<string, unknown>): Promise<ToolRe
 }
 
 beforeEach(async () => {
-  cwd = await mkdtemp(path.join(tmpdir(), 'ppt-plan-svg-'))
+  cwd = await mkdtemp(path.join(tmpdir(), 'ppt-svg-'))
   const bundle = makeCtx(cwd)
   apply(bundle.ctx)
   bundle.fire('tools/result', { name: 'skill', arguments: { name: 'ppt-maker' } } as never, { isError: false } as never)
@@ -71,40 +71,6 @@ const SVG_DOC =
   '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">' +
   '<rect width="960" height="540" fill="#0b1f3a"/>' +
   '<text x="80" y="120" font-size="40" fill="#ffffff">封面</text></svg>'
-
-describe('ppt_plan', () => {
-  it('setBrief → get 往返；setPlan 写 plan.yml 且进乐观锁', async () => {
-    await call('ppt_create', { dir: 'proj-plan', title: '规划' })
-    const brief = { purpose: '汇报', audience: '导师', coreMessage: '结论先行', mode: 'deck', pageCount: 8 }
-    const noBase = await call('ppt_plan', { dir: 'proj-plan', action: 'setBrief', brief })
-    expect(noBase).toMatchObject({ ok: false, error: { code: 'InvalidArgument', status: 400 } })
-    const staleBrief = await call('ppt_plan', { dir: 'proj-plan', action: 'setBrief', brief, baseRevision: 3 })
-    expect(staleBrief).toMatchObject({ ok: false, error: { code: 'RevisionMismatch', status: 409 } })
-    const r1 = await call('ppt_plan', { dir: 'proj-plan', action: 'setBrief', brief, baseRevision: 0 })
-    expect(r1).toMatchObject({ ok: true, revision: 0 })
-    const raw = await readFile(path.join(cwd, 'proj-plan', 'brief.md'), 'utf8')
-    expect(raw).toContain('汇报')
-
-    const r2 = await call('ppt_plan', { dir: 'proj-plan', action: 'setPlan', baseRevision: 0, plan: { status: 'draft', pages: [{ page: 'pages/01.page', title: '封面' }] } })
-    expect(r2.ok).toBe(true)
-    expect(typeof r2.revision).toBe('number')
-    await access(path.join(cwd, 'proj-plan', 'plan.yml'))
-
-    const r3 = await call('ppt_plan', { dir: 'proj-plan', action: 'get' })
-    expect(r3.ok).toBe(true)
-    expect((r3.brief as { audience?: string }).audience).toBe('导师')
-    expect(((r3.plan as { pages?: unknown[] }).pages ?? []).length).toBe(1)
-  })
-
-  it('setPlan 缺 pages → OpError；plan 里 svg 页缺 svgRef → OpError', async () => {
-    await call('ppt_create', { dir: 'proj-plan2', title: '规划2' })
-    const bad = await call('ppt_plan', { dir: 'proj-plan2', action: 'setPlan', baseRevision: 0, plan: { status: 'draft' } })
-    expect(bad.ok).toBe(false)
-    expect((bad.error as { name?: string; message?: string })?.name ?? (bad.error as { message?: string })?.message).toMatch(/OpError|pages/)
-    const bad2 = await call('ppt_plan', { dir: 'proj-plan2', action: 'setPlan', baseRevision: 0, plan: { pages: [{ page: 'pages/01.page', type: 'svg' }] } })
-    expect(bad2.ok).toBe(false)
-  })
-})
 
 const venvReady = probeVenv().ready
 
@@ -137,7 +103,6 @@ describe('ppt_svg（不依赖编译器环境）', () => {
       baseRevision: 0,
       ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }]
     })
-    expect(await call('ppt_plan', { dir: 'proj-svg2', action: 'get' })).toMatchObject({ ok: true, revision: 1 })
     const r = await call('ppt_svg', { dir: 'proj-svg2', action: 'put', name: 'cover.svg', svg: SVG_DOC, page: 'pages/01.page', baseRevision: 1 })
     expect(r.ok).toBe(false)
     expect((r.error as { code?: string }).code).toBe('SvgSourceInvalid')

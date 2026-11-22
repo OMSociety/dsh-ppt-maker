@@ -30,7 +30,6 @@ import {
   type Presentation
 } from '../pptd/parse.js'
 import { SCHEMA_VERSION, SVG_MEDIA_DIR, SVG_PAGE_TYPE } from '../pptd/schema-v2.js'
-import { PLAN_FILE, crossCheckPlan, parsePlanText, stringifyPlan, validatePlan, type Plan } from '../pptd/plan.js'
 import {
   appendSnapshot,
   hashMediaDir,
@@ -207,10 +206,6 @@ export interface LoadedProject {
   deck: Presentation
   /** Project-relative path -> parsed page. */
   pages: Map<string, Page>
-  /** plan.yml contents, when the project has one (planning contract). */
-  plan: Plan | null
-  /** brief.md raw text, when the project has one (planning contract). */
-  brief: string | null
   manifest: Manifest
   issues: Issue[]
   /** Non-null when the on-disk checksum does not match the manifest (external edit). */
@@ -245,17 +240,6 @@ export async function loadProject(cwd: string, dir: string): Promise<LoadedProje
     throw new ProjectError('DeckParseFailed', 'deck.pptd 无法解析', { status: 409, detail: parsed.issues })
   }
 
-  let plan: Plan | null = null
-  try {
-    const planText = await readFile(path.join(abs, PLAN_FILE), 'utf8')
-    const planParsed = parsePlanText(planText)
-    plan = planParsed.plan
-    parsed.issues.push(...planParsed.issues)
-    if (plan) parsed.issues.push(...crossCheckPlan(plan, parsed.deck))
-  } catch {
-    // plan.yml absent — planning contract is optional at the schema level
-  }
-
   const pages = new Map<string, string>()
   for (const entry of pageEntries) pages.set(entry.path, entry.text)
   const checksumMismatch = checksumOf(deckText, pages) !== manifest.checksum
@@ -267,13 +251,7 @@ export async function loadProject(cwd: string, dir: string): Promise<LoadedProje
       message: '磁盘内容与 manifest.checksum 不一致（工程被工具层之外修改过）'
     })
   }
-  let brief: string | null = null
-  try {
-    brief = await readFile(path.join(abs, 'brief.md'), 'utf8')
-  } catch {
-    // brief.md absent — optional advisory file
-  }
-  return { dir: abs, deck: parsed.deck, pages: parsed.pages, plan, brief, manifest, issues, checksumMismatch }
+  return { dir: abs, deck: parsed.deck, pages: parsed.pages, manifest, issues, checksumMismatch }
 }
 
 /* ------------------------------------------------------------------ *
@@ -283,19 +261,12 @@ export async function loadProject(cwd: string, dir: string): Promise<LoadedProje
 interface ProjectModel {
   deck: Presentation
   pages: Map<string, Page>
-  /**
-   * plan.yml state. Loaded when present; set by the `update_plan` op.
-   * Not part of the undo snapshot or the manifest checksum — the plan is
-   * advisory project metadata, not deck content.
-   */
-  plan?: Plan | null
 }
 
 function cloneModel(model: ProjectModel): ProjectModel {
   return {
     deck: JSON.parse(JSON.stringify(model.deck)) as Presentation,
-    pages: new Map([...model.pages].map(([k, v]) => [k, JSON.parse(JSON.stringify(v)) as Page])),
-    plan: model.plan === undefined || model.plan === null ? model.plan : (JSON.parse(JSON.stringify(model.plan)) as Plan)
+    pages: new Map([...model.pages].map(([k, v]) => [k, JSON.parse(JSON.stringify(v)) as Page]))
   }
 }
 
@@ -321,9 +292,6 @@ async function writeModel(projectDir: string, model: ProjectModel): Promise<void
     const target = path.join(projectDir, rel)
     await mkdir(path.dirname(target), { recursive: true })
     await writeAtomic(target, stringifyPage(page))
-  }
-  if (model.plan) {
-    await writeAtomic(path.join(projectDir, PLAN_FILE), stringifyPlan(model.plan))
   }
 }
 
@@ -394,7 +362,7 @@ export async function createProject(cwd: string, options: CreateProjectOptions):
 
 /**
  * The frozen op vocabulary. `page_add` / `page_delete` are accepted aliases of
- * `add_page` / `remove_page`; the plan's op list names both spellings.
+ * `add_page` / `remove_page`.
  */
 export const OP_NAMES = [
   'add_page',
@@ -406,7 +374,6 @@ export const OP_NAMES = [
   'update_element',
   'remove_element',
   'update_svg_source',
-  'update_plan',
   'page_add',
   'page_delete'
 ] as const
@@ -588,18 +555,6 @@ function applyOp(model: ProjectModel, raw: OpRecord, index: number): string {
       page.svgSource = { ref, ...((src as { viewBox?: unknown }).viewBox !== undefined ? { viewBox: (src as { viewBox: [number, number] }).viewBox } : {}) }
       return `update_svg_source ${key}→${ref}`
     }
-    case 'update_plan': {
-      // plan.yml is advisory metadata: it goes through the same optimistic lock
-      // as page edits, but is excluded from undo snapshots and the manifest
-      // checksum (see ProjectModel.plan).
-      const plan = raw.plan
-      if (typeof plan !== 'object' || plan === null || Array.isArray(plan)) throw opError(index, name, 'update_plan 需要对象 plan {version?, status?, pages: []}')
-      const issues = validatePlan(plan, PLAN_FILE)
-      const blocker = issues.find((i) => i.level === 'blocker')
-      if (blocker) throw opError(index, name, `plan 校验失败：${blocker.message}`)
-      model.plan = plan as Plan
-      return `update_plan (${(plan as Plan).pages?.length ?? 0} pages)`
-    }
     default:
       throw opError(index, name, `未实现的 op：${op}`)
   }
@@ -637,7 +592,7 @@ export async function editProject(cwd: string, options: EditOptions): Promise<Ed
       })
     }
 
-    const model = cloneModel({ deck: loaded.deck, pages: loaded.pages, plan: loaded.plan })
+    const model = cloneModel({ deck: loaded.deck, pages: loaded.pages })
     const appliedOps: string[] = []
     for (let i = 0; i < options.ops.length; i++) {
       appliedOps.push(applyOp(model, options.ops[i], i))
@@ -880,34 +835,4 @@ export async function restoreProject(
         : { target: targetRevision, label: targetRevision < current ? 'undo' : 'redo' },
     options
   )
-}
-
-/* ------------------------------------------------------------------ *
- * brief.md（规划契约里给人读的需求简报）
- * ------------------------------------------------------------------ */
-
-/**
- * 在工程锁内写 brief.md：先比对 baseRevision，与当前 manifest.revision 不符即 409。
- * brief 是散文、不参与构建，因此不推进 revision、不进快照、不入导出指纹；
- * 锁与基线比对保证它不会覆盖并发写入方刚看到的工程状态。
- */
-export async function writeProjectBrief(
-  cwd: string,
-  dir: string,
-  text: string,
-  options: { baseRevision: number }
-): Promise<{ revision: number }> {
-  const abs = resolveProjectDir(cwd, dir)
-  return withProjectLock(abs, async () => {
-    const loaded = await loadProject(cwd, dir)
-    const current = loaded.manifest.revision
-    if (options.baseRevision !== current) {
-      throw new ProjectError('RevisionMismatch', `baseRevision 不匹配：期望 ${current}，收到 ${options.baseRevision}`, {
-        status: 409,
-        detail: { expected: current, actual: options.baseRevision }
-      })
-    }
-    await writeAtomic(path.join(abs, 'brief.md'), text)
-    return { revision: current }
-  })
 }

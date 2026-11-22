@@ -433,13 +433,13 @@ export interface Presentation {
   export?: ExportConfig
   pages: string[]
   source?: DeckSource
-  /** Spec §3.5 — generate-dialect masters/layouts; absent = engine default blank master. */
+  /** Spec §3.4 — generate-dialect masters/layouts; absent = engine default blank master. */
   masters?: MasterSpec[]
   [key: string]: unknown
 }
 
 export interface LayoutRef {
-  /** Generate dialect: layout name resolved against deck.masters[*].layouts[*].name (§3.5). */
+  /** Generate dialect: layout name resolved against deck.masters[*].layouts[*].name (§3.4). */
   partName?: string
   name?: string
   type?: string | null
@@ -448,7 +448,7 @@ export interface LayoutRef {
 }
 
 /* ------------------------------------------------------------------ *
- * Masters & layouts (spec §3.5, generate dialect only)
+ * Masters & layouts (spec §3.4, generate dialect only)
  * ------------------------------------------------------------------ */
 
 export type MasterPlaceholderKind = 'title' | 'body' | 'content' | 'picture' | 'chart' | 'table'
@@ -614,7 +614,7 @@ export const ERROR_CODES = {
   PlaceholderContrastWarning: 'PlaceholderContrastWarning',
   /** Spec §2.0 — deck without `schema: 2` is refused by the tool layer. */
   UnsupportedSchemaError: 'UnsupportedSchemaError',
-  /** Spec §3.5 — Page.layoutRef.name has no match in deck.masters[*].layouts. */
+  /** Spec §3.4 — Page.layoutRef.name has no match in deck.masters[*].layouts. */
   UnknownLayoutError: 'UnknownLayoutError',
   /** Spec §11.6 — chart data integrity. */
   DuplicateColumnError: 'DuplicateColumnError',

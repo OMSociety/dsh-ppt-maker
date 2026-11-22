@@ -1683,7 +1683,7 @@ function applyDeckTheme(pres: PresentationData, theme: Theme | undefined, warnin
 }
 
 /* ------------------------------------------------------------------ *
- * Masters & layouts (spec §3.5, generate dialect)
+ * Masters & layouts (spec §3.4, generate dialect)
  * ------------------------------------------------------------------ */
 
 /**
@@ -1829,7 +1829,7 @@ export function createOfficeKitEngine(): DeckEngine {
         animationsSkipped: 0
       }
 
-      // 母版/版式轨（§3.5）：页循环之前建好，页侧按 layoutRef.name 挂接。
+      // 母版/版式轨（§3.4）：页循环之前建好，页侧按 layoutRef.name 挂接。
       // 仅生成方言；逆向工程走源存档整页恢复（§10.4），不重建母版。
       const layoutByName =
         profile === 'generate' && Array.isArray(deck.masters) && deck.masters.length > 0
@@ -1888,7 +1888,7 @@ export function createOfficeKitEngine(): DeckEngine {
         }
 
         const slide = addBlankSlide(pres)
-        // 挂版式（§3.5）：版式带来装饰图形与占位框；clearSlideShapes 只清
+        // 挂版式（§3.4）：版式带来装饰图形与占位框；clearSlideShapes 只清
         // 页自身的形状，不动版式继承。未知版式名 fail-closed（与校验层一致）。
         if (profile === 'generate' && page.layoutRef?.name) {
           const layout = layoutByName.get(page.layoutRef.name)

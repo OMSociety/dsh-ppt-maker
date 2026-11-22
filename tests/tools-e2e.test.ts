@@ -152,16 +152,16 @@ describe('宿主入口', () => {
     apply(ctxWithGet)
     expect(defs.size).toBe(0)
     revealTools(withGet.fire)
-    expect(defs.size).toBe(13)
+    expect(defs.size).toBe(12)
     expect(getNames.filter((n) => n === 'llm' || n === 'attachments')).toEqual([])
     // 无 get 的宿主（默认 makeCtx）：同样必须全量注册，不抛。
     const plain = makeCtx(cwd)
     apply(plain.ctx)
     revealTools(plain.fire)
-    expect(defs.size).toBe(13)
+    expect(defs.size).toBe(12)
   })
 
-  it('apply 常驻只注册 1 个技能；invoke ppt-maker 技能成功后懒展开 13 个工具', () => {
+  it('apply 常驻只注册 1 个技能；invoke ppt-maker 技能成功后懒展开 12 个工具', () => {
     const { ctx, skillDefs, fire } = makeCtx(cwd)
     apply(ctx)
     expect(skillDefs).toHaveLength(1)
@@ -185,7 +185,6 @@ describe('宿主入口', () => {
       'ppt_import',
       'ppt_open',
       'ppt_patch',
-      'ppt_plan',
       'ppt_redo',
       'ppt_render',
       'ppt_svg',

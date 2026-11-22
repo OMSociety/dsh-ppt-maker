@@ -115,8 +115,6 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 ```
 <工程目录>/
   deck.pptd            # 主入口（必需；固定此文件名）
-  brief.md             # 散文简报（可选；见 §3.4）
-  plan.yml             # 逐页计划（可选；见 §3.4）
   manifest.json        # 工程账本：revision / designSystem / theme / checksum / exportReport（工具层独占写）
   pages/               # 页文件目录，每页一个 .page
     01_cover.page
@@ -133,8 +131,6 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 2. **只支持相对路径**（相对 `deck.pptd` 所在目录）：`pages/01_cover.page`、`media/image1.jpg`；
 3. **素材支持 URL**：`Image.src`、`ImageFill.src` 可为 `https://...`（jpg/jpeg/png/gif）；
 4. **主入口必需且文件名固定为 `deck.pptd`**：一切加载必须经 `deck.pptd`，单个 `.page` 不能直接交给转换/校验命令；文件名固定是因为 `manifest.json` 与 `.history/` 需要稳定的工程根锚点。
-
-`brief.md` 与 `plan.yml` 是规划元数据，不是 deck 内容：**二者不参与 undo 快照与 manifest checksum**（见 §3.4）。
 
 ---
 
@@ -241,8 +237,8 @@ interface Presentation {
 | `Page.svgSource` | 仅 svg 页必填（§4.2） | 不使用 |
 | `Page.transition` | 不允许（`ProfileViolationError`） | 可选，记录源文件页级转场 |
 | `Page.hidden` / `sectionName` | 不允许 | 可选 |
-| `Page.layoutRef` | 可选（`{name}` 挂 deck.masters 版式，§3.5） | 可选（源页版式溯源） |
-| `deck.masters` | 可选（母版/版式声明，§3.5） | 不允许（用源存档整页恢复，§10.4） |
+| `Page.layoutRef` | 可选（`{name}` 挂 deck.masters 版式，§3.4） | 可选（源页版式溯源） |
+| `deck.masters` | 可选（母版/版式声明，§3.4） | 不允许（用源存档整页恢复，§10.4） |
 | 元素类型 | 七类（含 `icon` / `chart`） | `text` / `shape` / `line` / `image` / `table` / `placeholder`（不产出 `icon` / `chart`） |
 | `elementType: "placeholder"` | 不允许（`PlaceholderNotAllowedError`） | 允许，承载 dropped 元素（§10.2） |
 | `Table.builtinStyle` | 不允许 | 可选 |
@@ -422,83 +418,7 @@ interface TableStyleConfig {
 
 ```
 
-### 3.4 工程级文件：brief.md 与 plan.yml
-
-两个**可选**的工程级文件，承载「要做什么」的规划元数据，与「做成了什么」的 deck 内容分离。二者的账本地位：**不参与 undo 快照与 manifest checksum**——它们是建议性（advisory）工程元数据，不是 deck 内容。
-
-#### 3.4.1 brief.md
-
-散文简报，记录这份 deck 的简报（brief）。正文是自由散文；允许出现以下结构化行（每行一个，空值省略）：
-
-```markdown
-# <标题>
-
-- **目的**：这份 deck 要达成什么
-- **受众**：读者是谁
-- **核心信息**：一句话主旨
-- **语气**：正式 / 活泼 / …
-- **形态**：deck | poster | infographic
-- **页数**：12
-```
-
-```ts
-interface Brief {
-  purpose?: string;
-  audience?: string;
-  coreMessage?: string;
-  tone?: string;
-  mode?: "deck" | "poster" | "infographic";
-  pageCount?: number;        // 约束 > 0
-}
-```
-
-校验：`purpose` / `audience` / `coreMessage` / `tone` 必须是字符串；`mode` 必须在三值词表内；`pageCount` 必须是 > 0 的数；违反均为 blocker `SchemaError`。读取是宽容的：散文部分原样保留，只解析上述结构化行。
-
-#### 3.4.2 plan.yml
-
-逐页计划，生成开工前先定页表；先 `status: draft`，确认后改 `confirmed`，再按 plan 建页。
-
-```ts
-interface Plan {
-  version?: 1;                          // 省略即 1；写出时必须为 1
-  status?: "draft" | "confirmed";
-  pages: PlanPage[];                    // 必填，非空
-}
-
-interface PlanPage {
-  page: string;                         // 必填，非空；页文件相对路径，全表查重
-  title?: string;
-  type?: "native" | "svg";              // 默认 "native"
-  svgRef?: string;                      // type 为 svg 时必填（非空）
-  intent?: string;                      // 这页要表达什么
-  module?: string;                      // 所属模块/章节
-}
-```
-
-校验（除注明外均为 blocker `SchemaError`）：顶层必须是映射；`version` 写出时必须为 `1`；`status` 必须在词表内；`pages` 必填非空数组；条目应为映射对象（纯字符串条目给 warning）；`page` 必填非空且全表查重；`type` 在词表内；`type: svg` 必带非空 `svgRef`；`title` 必须是字符串。
-
-plan 与 `deck.pages` 的一致性只做**交叉提醒**：plan 声明的页尚未出现在 `deck.pages`（计划领先于执行）、或 `deck.pages` 里的页未列入 plan，各产生一条 **warning**，不产生 blocker。
-
-示例：
-
-```yaml
-version: 1
-status: draft
-pages:
-  - page: pages/01_cover.page
-    title: 封面
-    type: svg
-    svgRef: media/svg/cover.svg
-    intent: 开场，一句话主旨
-  - page: pages/02_trend.page
-    title: 年度趋势
-    intent: 用折线图讲三年变化
-    module: 证据
-```
-
----
-
-### 3.5 母版与版式（deck.masters，仅生成方言）
+### 3.4 母版与版式（deck.masters，仅生成方言）
 
 PPTD 的元素轨（§6）逐页画全部内容；母版/版式轨解决的是另一半诉求：**跨页共享的装饰图形与占位框只画一次**，各页挂版式后自动继承，且 PowerPoint 的「新建幻灯片」能沿用同一套骨架。
 
@@ -555,7 +475,7 @@ interface Page {
   svgSource?: SvgSource;            // 仅生成方言 svg 页必填（§4.2）
   transition?: PageTransition;      // 仅逆向方言；源文件页级转场记录，见 §8.2
   hidden?: boolean;                 // 仅逆向方言，默认 false；源文件里的隐藏页
-  layoutRef?: LayoutRef;            // 默认无；生成方言挂 deck.masters 的版式（§3.5），逆向方言记录源页版式
+  layoutRef?: LayoutRef;            // 默认无；生成方言挂 deck.masters 的版式（§3.4），逆向方言记录源页版式
   sectionName?: string;             // 仅逆向方言；源文件里的节（section）名
 }
 
@@ -649,13 +569,12 @@ notes: 封面由设计稿直接给出
 elements: []
 ```
 
-### 4.3 编辑 ops：update_plan 与 update_svg_source
+### 4.3 编辑 op：update_svg_source
 
-两个编辑 op（`ppt_edit` 的 `ops[]` 条目）分别维护 §3.4 的 plan 与 §4.2 的 svg 设计源：
+`ppt_edit` 的 `ops[]` 条目 `update_svg_source` 维护 §4.2 的 svg 设计源：
 
 | op | 参数 | 语义 |
 |---|---|---|
-| `update_plan` | `plan: Plan`（对象，见 §3.4.2） | 校验 `plan`（同 §3.4.2 全部规则）后**整体替换** `plan.yml`；任一 blocker 则整个 op 失败、不落盘 |
 | `update_svg_source` | `page: string`（页路径）+ `source: {ref, viewBox?}` | 仅 svg 页可用：目标页必须是 `pageType: svg`，否则 op 失败；`ref` 约束同 §4.2（`media/svg/` 下、`.svg` 结尾、安全相对路径），违反 op 失败；成功即改写该页的 `svgSource` |
 
 ---

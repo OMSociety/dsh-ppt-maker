@@ -1,5 +1,5 @@
 /**
- * deck.masters 母版/版式轨（spec §3.5）回归测试。
+ * deck.masters 母版/版式轨（spec §3.4）回归测试。
  *
  * 覆盖：
  *   1. 声明 masters 的 generate 工程可构建，页挂 layoutRef 后产物含真实版式部件
@@ -54,7 +54,7 @@ async function seed(dir: string, masters: unknown, layoutRefName?: string): Prom
   writeFileSync(join(dir, 'pages', '01.page'), stringifyPage(page as never), 'utf8')
 }
 
-describe('deck.masters（spec §3.5）', () => {
+describe('deck.masters（spec §3.4）', () => {
   it('声明 masters + 页挂 layoutRef：构建产物含真实版式部件', async () => {
     const dir = join(process.cwd(), '.cache', `test-masters-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
     await seed(dir, [

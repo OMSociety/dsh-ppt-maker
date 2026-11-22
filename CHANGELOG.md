@@ -18,21 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 新增
 
-- **规划契约**：工程内 `brief.md`（需求：用途/受众/核心信息）与 `plan.yml`（页面规划：页文件/标题/轨道/意图）成为一等产物；新增 `ppt_plan` 工具（get / setBrief / setPlan），`ppt_edit` 新增 `update_plan` 操作。
 - **SVG 页面轨**：`.page` 支持 `pageType: svg`，整页 SVG 经 vendored 转换器编译为原生 DrawingML（文本框/自选图形，PowerPoint 内可逐元素编辑），与普通页统一构建、统一质检、统一导出。新增 `ppt_svg` 工具（put / compile），`ppt_edit` 新增 `update_svg_source` 操作；编译产物按 SVG 内容 + 转换器版本 + 主题哈希缓存。转换器来自 ppt-master（MIT，Copyright (c) 2025-2026 Hugo He），Python 环境由 `scripts/prepare-vendor-env.mjs` 一键准备。
-- **母版与版式**：`deck.masters` 声明真实 OOXML 母版/版式（共享装饰图形 + 占位框），页以 `layoutRef: {name}` 挂接；挂不存在的版式名会被 `UnknownLayoutError` 拦下（spec §3.5）。
-- **工作台**：SVG 页整页真实预览；table/chart 元素 DOM/SVG 直渲；规划抽屉（brief + plan 只读视图）；README 预览由正式 client 组件与真实 PPTD 数据直接生成。
+- **母版与版式**：`deck.masters` 声明真实 OOXML 母版/版式（共享装饰图形 + 占位框），页以 `layoutRef: {name}` 挂接；挂不存在的版式名会被 `UnknownLayoutError` 拦下（spec §3.4）。
+- **工作台**：SVG 页整页真实预览；table/chart 元素 DOM/SVG 直渲；README 预览由正式 client 组件与真实 PPTD 数据直接生成。
 - **逆向保真**：导入时原始 .pptx 存档至 `source/original.pptx`；自导入后零编辑的 deck 导出时整份从源存档逐页恢复（chart/SmartArt/连接器等对象随源存档保留），任何内容编辑即整份回退 PPTD 重建（spec §10.4）。
 - **质量门**：文字溢出按工程实际字体的真实字形宽度量测（fontkit 量测器，解析失败自动回退启发式）；对比度判定细化到逐 run 文字颜色；`ppt_render` 结果列出每页预览图的绝对路径，供 `read_image` 看图；质检落账记录页面覆盖，未覆盖全页的落账不能放行整份导出（`QaCoverageIncomplete`）。
-- **统一发布管线**：`src/core/release/` 收口模型导出与面板导出——QA 指纹门禁（deck + pages + plan + media + 检查器版本 + SVG 转换器版本）→ 构建 + 字体嵌入 → postflight 回读（ZIP 重解析 + 库级校验）→ SHA-256 落账。
+- **统一发布管线**：`src/core/release/` 收口模型导出与面板导出——QA 指纹门禁（deck + pages + media + 检查器版本 + SVG 转换器版本）→ 构建 + 字体嵌入 → postflight 回读（ZIP 重解析 + 库级校验）→ SHA-256 落账。
 - **主题可执行化**：30 个设计系统主题各配机器可读 `theme.yml`（颜色/字体），`ppt_create` 选定主题后真实写入 `deck.theme`。
-- **内置技能重写**：`skills/ppt-maker/SKILL.md` 按「定方向 → 落规划 → 建页 → 看渲染图改稿 → 质检 → 导出」组织，增加视觉设计判断标准与一次写对的字段要点。
+- **内置技能重写**：`skills/ppt-maker/SKILL.md` 按「定方向 → 建页 → 看渲染图改稿 → 质检 → 导出」组织，增加审稿自问角度与一次写对的字段要点。
 
 ### 变更
 
-- 工具表面从 11 个扩展到 13 个（新增 `ppt_plan`、`ppt_svg`）。
+- 工具表面从 11 个扩展到 12 个（新增 `ppt_svg`）。
 - `docs/pptd-spec.md` 重写为全量自包含规格（§0–§11 + 附录 A/B），不再承继上游快照。
-- 写操作一律必带 `baseRevision`：`ppt_edit`、`ppt_undo`、`ppt_redo`、`ppt_plan` 的 setBrief / setPlan、`ppt_svg` 挂页，以及面板的撤销、重做与历史恢复；基线过期返回 409 `RevisionMismatch` 并附最新 revision。
+- 写操作一律必带 `baseRevision`：`ppt_edit`、`ppt_undo`、`ppt_redo`、`ppt_svg` 挂页，以及面板的撤销、重做与历史恢复；基线过期返回 409 `RevisionMismatch` 并附最新 revision。
 - 元素字段按规格校验：text 需 `content.text`，shape 需 `shapeName`，line 需 `viewBox` 与 `points`，`fill` 需对象，表格行列比例之和为 1，图表数据按 spec §11.6 的九个错误码校验。文本、备注、标题等字面字段按原文处理，`$` 引用只在样式字段解析。
 - 面板路由的同源判定要求 Origin 与 Host 同主机（局域网地址可用）；内部错误统一返回 500 且不回显路径，缺失文件返回 404；SVG 媒体响应带 `nosniff` 与沙箱 CSP。
 - `ppt_check` 结果标明质检覆盖页；校验阻断的错误消息直接列出前 5 条问题。字体嵌入幂等且产物字节确定，`check:build` 按内容哈希比对 `lib/` 产物。
@@ -62,21 +61,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Planning contract**: `brief.md` (requirements: purpose/audience/core message) and `plan.yml` (page plan: page file/title/track/intent) are first-class project artifacts; add the `ppt_plan` tool (get / setBrief / setPlan) and the `update_plan` operation in `ppt_edit`.
 - **SVG page track**: `.page` supports `pageType: svg`; the vendored converter compiles each full-page SVG into native DrawingML (text boxes and shapes, editable element by element in PowerPoint), with the same build, quality-check, and export pipeline as native pages. Add the `ppt_svg` tool (put / compile) and the `update_svg_source` operation in `ppt_edit`; compiled artifacts are cached by SVG content + converter version + theme hash. The converter comes from ppt-master (MIT, Copyright (c) 2025-2026 Hugo He), and `scripts/prepare-vendor-env.mjs` prepares its Python environment.
-- **Masters and layouts**: `deck.masters` declares real OOXML masters/layouts (shared decorative shapes + placeholder frames), and pages attach through `layoutRef: {name}`; unknown layout names raise `UnknownLayoutError` (spec §3.5).
-- **Workbench**: full-page SVG previews; direct DOM/SVG rendering for table/chart elements; a planning drawer (read-only brief + plan views); README previews generated directly from the production client components and real PPTD data.
+- **Masters and layouts**: `deck.masters` declares real OOXML masters/layouts (shared decorative shapes + placeholder frames), and pages attach through `layoutRef: {name}`; unknown layout names raise `UnknownLayoutError` (spec §3.4).
+- **Workbench**: full-page SVG previews; direct DOM/SVG rendering for table/chart elements; README previews generated directly from the production client components and real PPTD data.
 - **Import fidelity**: the original .pptx is archived at `source/original.pptx` during import; exporting an unedited imported deck restores every page from that archive (including chart/SmartArt/connectors), while any content edit rebuilds the complete deck from PPTD (spec §10.4).
 - **Quality gates**: text overflow is measured with real glyph widths from the project's fonts (fontkit measurer, with heuristic fallback when parsing fails); contrast checks use per-run text colors; `ppt_render` lists the absolute path of every preview image for `read_image`; quality-check records include page coverage, and partial-page checks cannot authorize full-deck export (`QaCoverageIncomplete`).
-- **Unified release pipeline**: `src/core/release/` handles both model-driven and panel exports—QA fingerprint gate (deck + pages + plan + media + checker version + SVG converter version) → build + font embedding → postflight readback (ZIP reparse + library validation) → SHA-256 record.
+- **Unified release pipeline**: `src/core/release/` handles both model-driven and panel exports—QA fingerprint gate (deck + pages + media + checker version + SVG converter version) → build + font embedding → postflight readback (ZIP reparse + library validation) → SHA-256 record.
 - **Executable themes**: each of the 30 design-system themes has a machine-readable `theme.yml` (colors/fonts), and `ppt_create` writes the selected theme into `deck.theme`.
-- **Rewritten built-in skill**: `skills/ppt-maker/SKILL.md` follows direction → planning → building pages → reviewing rendered images → quality check → export, with visual design criteria and field-level guidance for getting pages right the first time.
+- **Rewritten built-in skill**: `skills/ppt-maker/SKILL.md` follows direction → building pages → reviewing rendered images → quality check → export, with self-review questions for design and field-level guidance for getting pages right the first time.
 
 ### Changed
 
-- The tool surface expands from 11 to 13 tools with `ppt_plan` and `ppt_svg`.
+- The tool surface expands from 11 to 12 tools with `ppt_svg`.
 - `docs/pptd-spec.md` is now a complete, self-contained specification (§0–§11 + appendices A/B) rather than an extension of an upstream snapshot.
-- Every write requires `baseRevision`: `ppt_edit`, `ppt_undo`, `ppt_redo`, `ppt_plan` setBrief / setPlan, `ppt_svg` page attachment, and the panel's undo, redo, and history restore; a stale baseline returns 409 `RevisionMismatch` with the latest revision.
+- Every write requires `baseRevision`: `ppt_edit`, `ppt_undo`, `ppt_redo`, `ppt_svg` page attachment, and the panel's undo, redo, and history restore; a stale baseline returns 409 `RevisionMismatch` with the latest revision.
 - Element fields are validated against the spec: text needs `content.text`, shape needs `shapeName`, line needs `viewBox` and `points`, `fill` must be an object, table row/column ratios sum to 1, and chart data is checked with the nine error codes in spec §11.6. Literal fields such as text, notes, and titles are taken verbatim; `$` references resolve only in style fields.
 - Panel same-origin checks require Origin and Host to name the same host (LAN addresses work); internal errors return 500 without echoing paths, missing files return 404, and SVG media responses carry `nosniff` and a sandbox CSP.
 - `ppt_check` results state which pages were checked; validation-blocker messages list the first five issues. Font embedding is idempotent with byte-deterministic output, and `check:build` compares `lib/` artifacts by content hash.

@@ -4,7 +4,7 @@
 <h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT 创客"><br>PPT 创客 dsh-ppt-maker</h1>
 
   <p>创建 / 编辑 / 逆向 / 质检 / 导出 PPT 的 DeepSeek Harness 插件，本地纯 TS 引擎直出最终 .pptx。</p>
-  <p>模型用十三个 <code>ppt_*</code> 工具干活，你在右侧栏工作台里同看同改——双击文字就地编辑、拖拽调页序、导出后一键打开成品。</p>
+  <p>模型用十二个 <code>ppt_*</code> 工具干活，你在右侧栏工作台里同看同改——双击文字就地编辑、拖拽调页序、导出后一键打开成品。</p>
 
   <p>
     <a href="https://www.npmjs.com/package/dsh-ppt-maker"><img src="https://img.shields.io/npm/v/dsh-ppt-maker?color=4f6ef7&label=version" alt="Version"></a>
@@ -19,7 +19,7 @@
 
 ## 这是什么
 
-**PPT 创客**是一套长在 DeepSeek Harness 里的 PPT 工作链：模型通过十三个 `ppt_*` 工具创建、编辑、逆向、质检、导出演示文稿；人通过右侧栏工作台与模型接力——面板与模型读写同一份 PPTD 工程。
+**PPT 创客**是一套长在 DeepSeek Harness 里的 PPT 工作链：模型通过十二个 `ppt_*` 工具创建、编辑、逆向、质检、导出演示文稿；人通过右侧栏工作台与模型接力——面板与模型读写同一份 PPTD 工程。
 
 中间的格式是自主契约的 YAML DSL **PPTD**（`deck.pptd` + `pages/*.page`）：单页自包含、可视即所得，双方言（generate 生成 / reverse 逆向超集），完整规格见 [`docs/pptd-spec.md`](docs/pptd-spec.md)（全量自包含）。
 
@@ -27,14 +27,13 @@
 
 | 特性 | 说明 |
 |---|---|
-| **十三个模型工具** | raw JSON-Schema 注册：创建 / 主题 / 规划 / 编辑 / 撤销 / 重做 / 渲染 / 质检 / 导出 / 逆向 / 打开 / 外科手术 / SVG。引擎 `@office-kit/pptx@0.24.0` 本地纯 TS 构建最终 .pptx，主链无 Python |
-| **规划契约** | `brief.md`（用途/受众/核心信息）+ `plan.yml`（页面规划：轨道/意图）是工程一等产物；`ppt_plan` 读写，工作台规划抽屉同看；P01–P05 早期页先渲染确认再铺开全量 |
+| **十二个模型工具** | raw JSON-Schema 注册：创建 / 主题 / 编辑 / 撤销 / 重做 / 渲染 / 质检 / 导出 / 逆向 / 打开 / 外科手术 / SVG。引擎 `@office-kit/pptx@0.24.0` 本地纯 TS 构建最终 .pptx，主链无 Python |
 | **SVG 页面轨** | `pageType: svg` 的页整页编译为原生 DrawingML（文本框/自选图形，PowerPoint 里逐元素可编辑，非贴图），与普通页统一构建、质检、导出；`ppt_svg` 写入与编译，产物按内容+版本+主题哈希缓存。转换器 vendored 自 ppt-master（MIT），环境 `node scripts/prepare-vendor-env.mjs` 一键备好 |
 | **母版与版式** | `deck.masters` 声明真实 OOXML 母版/版式（共享装饰 + 占位框），页用 `layoutRef` 挂接，多页 deck 共享装饰不必逐页重复 |
 | **双向性** | `ppt_import` 把既有 .pptx 全量逆向进 PPTD 工程并原样存档源文件；自导入后零编辑的 deck 导出时整份从源存档恢复（chart/SmartArt/连接器不丢），任何内容编辑即整份回退重建；`ppt_patch` 对 .pptx 外科手术（改字 / 换图 / 调页序），不走 PPTD 往返 |
 | **PPTD 契约** | YAML DSL（`deck.pptd` + `pages/*.page`），单页自包含、可视即所得；generate / reverse 双方言，可手改也可机改 |
-| **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板）：双击文字就地改、拖拽调页序、图片一键替换、table/chart 直渲、SVG 页整页预览、规划抽屉、撤销 / 重做、版本历史直渲快照并一键恢复、409 冲突保护与「外部已修改」提示 |
-| **质检分层** | 规则层（文字溢出按真实字形宽度量测 / 出界 / 重叠 / 逐 run 对比度 / 结构 / 缺字体）阻断导出；AI 层按需（`ppt_check ai:true`）把成品页 PNG 送多模态模型审配色与版式，只出建议不阻断；结果落账 `manifest.qaReport`，指纹绑定 deck+pages+plan+media+检查器与转换器版本，过期或未覆盖全页即拒导出 |
+| **右侧栏工作台** | 自研三栏编辑器（缩略图 + 画布 + 属性面板）：双击文字就地改、拖拽调页序、图片一键替换、table/chart 直渲、SVG 页整页预览、撤销 / 重做、版本历史直渲快照并一键恢复、409 冲突保护与「外部已修改」提示 |
+| **质检分层** | 规则层（文字溢出按真实字形宽度量测 / 出界 / 重叠 / 逐 run 对比度 / 结构 / 缺字体）阻断导出；AI 层按需（`ppt_check ai:true`）把成品页 PNG 送多模态模型审配色与版式，只出建议不阻断；结果落账 `manifest.qaReport`，指纹绑定 deck+pages+media+检查器与转换器版本，过期或未覆盖全页即拒导出 |
 | **统一发布管线** | 模型导出与面板导出同一条 release 管线：QA 门禁 → 构建 + 字体嵌入 → postflight 回读（ZIP 重解析 + 库级校验）→ SHA-256 落账 |
 | **字体嵌入** | 导出自动嵌入实际用到的字体（EOT 封装 `fntdata` + `embeddedFontLst`），未装字体的机器渲染不回落；子集 / 整字体 / 关闭三档（`export.fontEmbed`），逐字体 fsType 许可闸 |
 | **转场与动画** | 页面级转场（fade 默认 / none / auto 策展轮换）与 95 种元素动画 preset，本地链路原生写出 |
@@ -75,8 +74,8 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 **装完怎么用**
 
-1. 对话里说「帮我做一份 PPT」（或显式 invoke `ppt-maker` 技能）→ 十三个 `ppt_*` 工具进场
-2. 模型 `ppt_plan` 写下 brief 与页面规划（P01–P05 早期页先渲染给你过目），`ppt_create` 新建工程，或 `ppt_import` 把现有 .pptx 逆向进工程 → 右侧栏自动弹出工作台
+1. 对话里说「帮我做一份 PPT」（或显式 invoke `ppt-maker` 技能）→ 十二个 `ppt_*` 工具进场
+2. 模型 `ppt_create` 新建工程，或 `ppt_import` 把现有 .pptx 逆向进工程 → 右侧栏自动弹出工作台
 3. 面板里双击文字就地改、拖页序、点「导出 .pptx」→ 插件先就地跑全页规则质检，通过后成品落在工程目录 `export/`，文件名为 `<工程名>-r<版本号>.pptx`
 4. 让模型 `ppt_check` 质检、`ppt_render` 逐页看 PNG；模型在别的会话改了同一工程，面板亮 409 冲突条，不覆盖你的手改
 5. 页脚状态条点「打开」→ 用系统关联应用打开成品，或选「显示文件位置」
@@ -87,8 +86,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 |---|---|---|
 | `ppt_create` | 新建 PPTD 工程（选定主题写入 `deck.theme`） | `dir` · `title` · `size` · `designSystem` · `theme` |
 | `ppt_themes` | 列设计系统与主题（五族 30 套） | `designSystem`（可省） |
-| `ppt_plan` | 读写规划契约：brief（用途/受众/核心信息）与 plan（页面规划） | `dir` · `action`（`get`/`setBrief`/`setPlan`） |
-| `ppt_edit` | 原子编辑：ops 数组批量增删改页面与元素（含 `update_plan`/`update_svg_source`），baseRevision 乐观锁 | `dir` · `ops` · `baseRevision` |
+| `ppt_edit` | 原子编辑：ops 数组批量增删改页面与元素（含 `update_svg_source`），baseRevision 乐观锁 | `dir` · `ops` · `baseRevision` |
 | `ppt_undo` / `ppt_redo` | 撤销 / 重做（游标移动，合并窗内连续编辑算一步） | `dir` · `steps`（1–20，默认 1） |
 | `ppt_render` | 渲染每页 PNG 预览（最终 pptx 光栅化；结果给出每页图片的绝对路径） | `dir` · `pages` · `dpi`（默认 96） |
 | `ppt_check` | 规则质检（默认）+ AI 视觉质检（只出建议不阻断） | `dir` · `pages` · `ai` |
@@ -98,7 +96,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 | `ppt_patch` | 对 .pptx 外科手术：set_text / replace_image / move_page | `source` · `ops` · `out` |
 | `ppt_svg` | SVG 页面轨：写入 SVG 源（`put`）/ 编译为原生 DrawingML 单页（`compile`） | `dir` · `action` · `name` · `svg` · `page` |
 
-模型的标准动作顺序是 **`ppt_plan`（写 brief/plan）→ `ppt_create`（或 `ppt_import`）→ `ppt_edit` 迭代（复杂视觉页走 `ppt_svg`）→ `ppt_check` → `ppt_export`**；技能 `ppt-maker`（随插件注册）写明了设计系统选型与编辑纪律，模型需要时会自己读。轻改既有 .pptx（改字 / 换图 / 调页序）走 `ppt_patch`，不经 PPTD 往返。
+模型的标准动作顺序是 **`ppt_create`（或 `ppt_import`）→ `ppt_edit` 迭代（复杂视觉页走 `ppt_svg`）→ `ppt_check` → `ppt_export`**；技能 `ppt-maker`（随插件注册）写明了设计系统选型与编辑纪律，模型需要时会自己读。轻改既有 .pptx（改字 / 换图 / 调页序）走 `ppt_patch`，不经 PPTD 往返。
 
 > **提示**：导出被规则 blocker 拦住时，按 `ppt_check` 返回的 `issues` 逐条修，或 `skipCheck:true` 强导（不推荐）。`ppt_check ai:true` 返回 `ai.performed:false` 加 PNG 路径清单时，说明当前路由模型不支持图像输入，主模型自行 `read_image` 复核即可。
 
@@ -107,7 +105,6 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 右侧栏「PPT 工作台」是三栏编辑器：缩略图条 + 画布 + 属性面板。
 
 - **底图即 DOM**：画布与缩略图把 PPTD 页 AST 直接渲染成 DOM（`client/components/PptdView.tsx`），打开即出、无需等 libreoffice 冷启动；元素、选择框、就地编辑器同一坐标系，恒对齐。table / chart 直渲为真实 DOM/SVG；SVG 页整页铺底预览；icon / SmartArt 等暂不支持渲染的元素显示灰底占位。
-- **规划抽屉**：工具栏「规划」打开只读抽屉，看 brief.md 与 plan.yml（页文件/标题/轨道/意图）。
 - **左右栏可收缩**：左栏页列表默认展开、可收起；右栏属性面板选中元素才展开。收起态只留边缘把手。
 - **就地编辑**：双击文字就地改 / 拖拽调页序 / 复制删除新增页 / 替换图片 / 「导出 .pptx」自动补跑规则质检后落到工程目录 `export/` 下（`<工程名>-r<版本号>.pptx`）。
 - **版本历史**：「历史」抽屉直渲任意快照的画布预览并一键恢复。
@@ -133,9 +130,9 @@ npm run check:pack   # 发布物清单核对
 目录与「改东西去哪」：
 
 ```text
-src/index.ts       宿主入口：注册技能 + 懒展开 13 个工具 + webServer 前缀路由
+src/index.ts       宿主入口：注册技能 + 懒展开 12 个工具 + webServer 前缀路由
 src/core/          引擎：pptd 契约 / officekit 构建 / 工程存储与快照 / 逆向 / 质检 / 字体嵌入 / release 发布管线 / svg 编译桥
-src/tools/         13 个工具的 raw JSON-Schema 契约
+src/tools/         12 个工具的 raw JSON-Schema 契约
 client/            右侧栏工作台源码（TSX → esbuild 打成 lib/client.js）
 plugin/            装载壳 + host 路由（纯 JS，经 deps.core 注入 core）
 skills/ppt-maker/  ppt-maker 技能：设计系统参考与生成纪律（模型自己会读）；vendor/ 下是 SVG 转换器与 Python 环境
@@ -153,7 +150,7 @@ lib/               构建产物（入库；dsh plugin add 只装不构建）
 - 如果这个插件对你有帮助，欢迎点亮 Star；有问题和建议请提交 [Issue](https://github.com/OMSociety/dsh-ppt-maker/issues) 或 [Pull Request](https://github.com/OMSociety/dsh-ppt-maker/pulls)，开发约定见 [`AGENTS.md`](AGENTS.md)。
 - 基于 [DeepSeek Harness](https://github.com/deepseek-ai/dsh) 插件 / 技能体系。
 - 引擎 [@office-kit/pptx](https://www.npmjs.com/package/@office-kit/pptx)（0.24.0 pin）与预览 [@office-kit/pptx-preview](https://www.npmjs.com/package/@office-kit/pptx-preview)；光栅化 [@deepseek-ai/libreoffice-kit](https://www.npmjs.com/package/@deepseek-ai/libreoffice-kit)（MPL-2.0，仅调用其 API / CLI，不链改源码）。
-- SVG → DrawingML 转换器 vendored 自 [ppt-master](https://github.com/hugohe3/ppt-master)（MIT，© 2025-2026 Hugo He），规划契约与质量门的工作流设计亦受其启发；第三方许可明细见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+- SVG → DrawingML 转换器 vendored 自 [ppt-master](https://github.com/hugohe3/ppt-master)（MIT，© 2025-2026 Hugo He）；第三方许可明细见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 许可证与作者
 

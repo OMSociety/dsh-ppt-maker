@@ -12,33 +12,6 @@ export const SUPPORTED_SCHEMA_VERSIONS: ReadonlySet<number> = new Set([2])
 export const SVG_PAGE_TYPE = 'svg' as const
 export const SVG_MEDIA_DIR = 'media/svg'
 
-export type BriefMode = 'deck' | 'poster' | 'infographic'
-export interface Brief {
-  purpose?: string
-  audience?: string
-  coreMessage?: string
-  tone?: string
-  mode?: BriefMode
-  /** user-approved page count estimate */
-  pageCount?: number
-}
-
-export interface PlanPage {
-  page: string
-  title?: string
-  type?: 'native' | 'svg'
-  svgRef?: string
-  /** communication trace: what the page argues / shows */
-  intent?: string
-  /** thumbnail label / module hint */
-  module?: string
-}
-export interface Plan {
-  version?: 1
-  status?: 'draft' | 'confirmed'
-  pages: PlanPage[]
-}
-
 export interface SvgSource {
   /** project-relative SVG file, e.g. `media/svg/cover.svg` */
   ref: string

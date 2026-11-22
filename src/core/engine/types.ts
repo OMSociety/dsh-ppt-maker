@@ -57,7 +57,7 @@ export interface BuildContext {
   readonly projectDir: string
   /** Async media loader: project-relative path or http(s) URL → bytes. */
   readonly loadMedia: (src: string) => Promise<Uint8Array>
-  /** Collects human-readable capability degradations (plan §5: never silent). */
+  /** Collects human-readable capability degradations (never silent). */
   readonly warnings: string[]
 }
 

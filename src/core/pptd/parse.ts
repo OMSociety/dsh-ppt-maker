@@ -50,10 +50,10 @@ import {
   type Profile,
   type Theme
 } from './schema.js'
-import { validateDeckSchemaVersion } from './plan.js'
+import { validateDeckSchemaVersion } from './schema-version.js'
 import { validateElementFields } from './element-fields.js'
 
-export { validateDeckSchemaVersion } from './plan.js'
+export { validateDeckSchemaVersion } from './schema-version.js'
 
 // Consumers of the parse layer (store, tools, escape hatch) work with these
 // document types — re-export so they never import schema.js directly.
@@ -237,7 +237,7 @@ export function validateDeckShape(deck: Record<string, unknown>, path: string): 
   return issues
 }
 
-/** Spec §3.5 — masters/layouts structural validation (generate dialect only). */
+/** Spec §3.4 — masters/layouts structural validation (generate dialect only). */
 function isBoundsQuad(value: unknown): boolean {
   return Array.isArray(value) && value.length === 4 && value.every((n) => typeof n === 'number' && Number.isFinite(n))
 }
@@ -450,7 +450,7 @@ export interface PageValidationOptions {
    * dialect bans `$key` outright (R2/R4), so the set is irrelevant there.
    */
   themeKeys?: Set<string>
-  /** Spec §3.5 — layout names offered by deck.masters (generate dialect). */
+  /** Spec §3.4 — layout names offered by deck.masters (generate dialect). */
   layoutNames?: Set<string>
 }
 
@@ -476,7 +476,7 @@ export function validatePage(page: Page, options: PageValidationOptions = {}): I
 
   if (page.transition !== undefined) issues.push(...validatePageTransition(page.transition, `${path}#transition`))
 
-  // Spec §3.5 — generate-dialect layoutRef must resolve against deck.masters.
+  // Spec §3.4 — generate-dialect layoutRef must resolve against deck.masters.
   if (profile === 'generate' && page.layoutRef?.name && options.layoutNames) {
     if (!options.layoutNames.has(page.layoutRef.name)) {
       issues.push(

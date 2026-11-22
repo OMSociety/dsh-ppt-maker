@@ -4,8 +4,7 @@
  * 重新计算并比对——不一致说明工程在质检后又有改动（stale），拒导出。
  *
  * 指纹材料：CHECKER_VERSION（规则变更即换指纹）+ deck.pptd 原文 +
- * pages/*.page 原文 + plan.yml 原文 + media/ 全量文件（路径 + 内容 sha256）。
- * brief.md 是给人读的散文，不影响构建产物，不入指纹。
+ * pages/*.page 原文 + media/ 全量文件（路径 + 内容 sha256）。
  */
 import { createHash } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
@@ -15,7 +14,7 @@ import { resolveProjectDir } from '../project/store.js'
 import { SVG_COMPILER_VERSION } from '../svg/compiler.js'
 
 /** review 规则层（review/index.ts）改动判定逻辑时递增——旧指纹立即全部过期。 */
-export const CHECKER_VERSION = '2.1.0'
+export const CHECKER_VERSION = '2.2.0'
 
 async function hashMedia(absDir: string, hash: ReturnType<typeof createHash>): Promise<void> {
   const mediaDir = path.join(absDir, 'media')
@@ -68,15 +67,6 @@ export async function computeProjectFingerprint(cwd: string, dir: string): Promi
     } catch {
       hash.update(`page:${rel}:MISSING\n`)
     }
-  }
-
-  try {
-    const planText = await readFile(path.join(abs, 'plan.yml'), 'utf8')
-    hash.update('plan.yml:')
-    hash.update(planText)
-    hash.update('\n')
-  } catch {
-    /* plan.yml 缺席是合法状态（Quick 路径） */
   }
 
   await hashMedia(abs, hash)

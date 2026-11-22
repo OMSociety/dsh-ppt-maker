@@ -242,7 +242,7 @@ afterEach(async () => {
 })
 
 describe('宿主注册契约（严格桩，照抄 dsh-tools register/createSuccessResult）', () => {
-  it('13 个 ppt_* 工具全部满足 output { schema, render } 契约，一个都不许静默丢失', () => {
+  it('12 个 ppt_* 工具全部满足 output { schema, render } 契约，一个都不许静默丢失', () => {
     const { ctx, fire } = strictCtx(cwd)
     apply(ctx)
     reveal(fire)
@@ -255,14 +255,13 @@ describe('宿主注册契约（严格桩，照抄 dsh-tools register/createSucce
       'ppt_import',
       'ppt_open',
       'ppt_patch',
-      'ppt_plan',
       'ppt_redo',
       'ppt_render',
       'ppt_svg',
       'ppt_themes',
       'ppt_undo'
     ])
-    expect(registered).toHaveLength(13)
+    expect(registered).toHaveLength(12)
   })
 
   it('output.schema 必须落在宿主支持的子集内；parameters 只要求 lossless JSON', () => {

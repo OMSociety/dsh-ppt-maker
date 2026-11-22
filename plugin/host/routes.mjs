@@ -405,8 +405,6 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
           pages: loaded.deck.pages.map((rel) => ({ path: rel })),
           issues: loaded.issues,
           checksumMismatch: loaded.checksumMismatch,
-          plan: loaded.plan ?? null,
-          brief: loaded.brief ?? null,
         })
       }
 
@@ -420,15 +418,6 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         const page = loaded.pages.get(pagePath.replace(/\\/g, '/'))
         if (!page) return fail(res, 404, `页不存在：${pagePath}`)
         return json(res, 200, { ok: true, path: pagePath, page, revision: loaded.manifest.revision })
-      }
-
-      if (route === 'GET /plan') {
-        // 规划契约：brief.md 与 plan.yml 都是 loadProject 顺带读的，路由只透传。
-        const { sessionId, cwd } = sessionOf({}, url)
-        const key = String(url.searchParams.get('key') || '')
-        const { dir } = projectOf(ss, sessionId, cwd, key)
-        const loaded = await loadProject(cwd, dir)
-        return json(res, 200, { ok: true, brief: loaded.brief ?? null, plan: loaded.plan ?? null })
       }
 
       /* ── 版本历史：列表 / 快照预览（只读） ─────────────────────────── */

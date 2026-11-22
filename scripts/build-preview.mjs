@@ -2,7 +2,7 @@
  * 生成 README 的工作台预览 HTML。
  *
  * 默认使用 docs/preview/fixture.json；传入 --project <PPTD目录> 时，先从真实工程
- * 重新采集 deck / pages / plan / SVG，再打包正式 client 组件。产物自包含，可直接打开。
+ * 重新采集 deck / pages / SVG，再打包正式 client 组件。产物自包含，可直接打开。
  */
 import { build } from 'esbuild'
 import fs from 'node:fs'
@@ -39,10 +39,6 @@ function captureFixture(projectDir) {
   const deck = parseYaml(fs.readFileSync(path.join(projectDir, 'deck.pptd'), 'utf8'))
   const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, 'manifest.json'), 'utf8'))
   if (manifest.exportReport) manifest.exportReport.out = `${path.basename(projectDir)}.pptx`
-  const planPath = path.join(projectDir, 'plan.yml')
-  const briefPath = path.join(projectDir, 'brief.md')
-  const plan = fs.existsSync(planPath) ? parseYaml(fs.readFileSync(planPath, 'utf8')) : null
-  const brief = fs.existsSync(briefPath) ? fs.readFileSync(briefPath, 'utf8') : null
   const key = 'preview'
   const revision = Number(manifest.revision || 0)
   const pages = {}
@@ -90,8 +86,6 @@ function captureFixture(projectDir) {
       pages: deck.pages.map((pagePath) => ({ path: pagePath })),
       issues: [],
       checksumMismatch: false,
-      plan,
-      brief,
     },
     pages,
     media,

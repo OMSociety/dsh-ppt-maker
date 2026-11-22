@@ -93,7 +93,7 @@ describe('lib/index.js 随包宿主 bundle 的接线行为', () => {
       effect: (fn: () => void) => fn(),
     })
     for (const fn of handlers.get('tools/result') ?? []) fn({ name: 'skill', arguments: { name: 'ppt-maker' } }, { isError: false })
-    expect(tools.size).toBe(13)
+    expect(tools.size).toBe(12)
     await vi.waitFor(() => expect(routeHandler).toBeTypeOf('function'))
 
     const exec = { agent: { session: { id: 's-bundle' } } }

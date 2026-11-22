@@ -1,7 +1,7 @@
 /**
- * Shared plumbing for the thirteen ppt_* tools.
+ * Shared plumbing for the twelve ppt_* tools.
  *
- * Raw JSON-Schema registration only (plan §2: `ctx.tools.register({name,
+ * Raw JSON-Schema registration only (`ctx.tools.register({name,
  * description, parameters, output, execute})`) — no `defineTool` import, the
  * host adds nothing we rely on.
  */
@@ -86,8 +86,8 @@ export function sessionIdOf(exec: unknown): string | null {
 }
 
 /**
- * Session cwd via `ctx.sessions.get(exec.agent.session.id).header.cwd`
- * (plan §7). No fallback to `process.cwd()` — missing context is an error.
+ * Session cwd via `ctx.sessions.get(exec.agent.session.id).header.cwd`.
+ * No fallback to `process.cwd()` — missing context is an error.
  */
 export function resolveSessionCwd(exec: unknown, sessions: SessionsLike | undefined): string {
   const sessionId = sessionIdOf(exec)

@@ -5,7 +5,7 @@
  *  1. Register the bundled `skills/ppt-maker` directory as a DSH skill so the
  *     model can load it (DSH never discovers skill files shipped inside a
  *     package on its own).
- *  2. Register the thirteen project tools（ppt_create / ppt_themes / ppt_plan /
+ *  2. Register the twelve project tools（ppt_create / ppt_themes /
  *     ppt_edit / ppt_undo / ppt_redo / ppt_render / ppt_export / ppt_check /
  *     ppt_svg / ppt_import / ppt_open / ppt_patch；raw JSON-Schema via
  *     ctx.tools.register）——经 src/lazy-tools.ts 懒展开：技能被 invoke 前工具不进会话工具表。
@@ -49,7 +49,6 @@ import { registerExportTool } from './tools/export.js'
 import { registerImportTool } from './tools/import.js'
 import { registerOpenTool, type PptMakerHostBridge } from './tools/open.js'
 import { registerPatchTool } from './tools/patch.js'
-import { registerPlanTool } from './tools/plan.js'
 import { registerRedoTool } from './tools/redo.js'
 import { registerRenderTool } from './tools/render.js'
 import { registerSvgTool } from './tools/svg.js'
@@ -265,7 +264,7 @@ export function apply(ctx: ApplyCtx): void {
 
   if (ctx.tools) {
     const tools = ctx.tools
-    /** 注册全部 13 个 ppt_* 工具，返回合并注销函数。懒展开触发时整组进场。
+    /** 注册全部 12 个 ppt_* 工具，返回合并注销函数。懒展开触发时整组进场。
      *  任一工具注册失败：先注销本组已注册的工具，再把失败整体抛出——`armLazyTools`
      *  据此置 revealPending 并在下个轮次重试，而不是留下一张残缺的工具表。 */
     const registerToolSuite = (): (() => void) => {
@@ -283,7 +282,6 @@ export function apply(ctx: ApplyCtx): void {
       for (const register of [
         registerCreateTool,
         registerThemesTool,
-        registerPlanTool,
         registerEditTool,
         registerUndoTool,
         registerRedoTool,

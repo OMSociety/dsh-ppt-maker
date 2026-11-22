@@ -27,7 +27,6 @@ import { ThumbStrip } from './components/ThumbStrip'
 import { Stage } from './components/Stage'
 import { Inspector } from './components/Inspector'
 import { HistoryDrawer } from './components/HistoryDrawer'
-import { PlanDrawer } from './components/PlanDrawer'
 import { Toolbar } from './components/Toolbar'
 
 /** 右侧栏标签页（tab chip）里那个小标题：品牌图 + 「PPT 工作台」。 */
@@ -256,8 +255,6 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
   const [rightOpen, setRightOpen] = React.useState(false)
   // 版本历史抽屉：顶栏「历史」按钮开合；恢复成功后抽屉自己关。
   const [historyOpen, setHistoryOpen] = React.useState(false)
-  // 规划契约抽屉：顶栏「规划」按钮开合（只读视图，写入口在 ppt_plan 工具）。
-  const [planOpen, setPlanOpen] = React.useState(false)
   // 右栏「手动收起」的标记：记下被收起时的元素 id——只有改选**别的**元素才重置，
   // 同元素重选不弹开。取消选择（点空白）时清空。
   const rightDismissedFor = React.useRef<string | null>(null)
@@ -288,8 +285,6 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
         store={store}
         historyOpen={historyOpen}
         onShowHistory={() => setHistoryOpen((v) => !v)}
-        planOpen={planOpen}
-        onShowPlan={() => setPlanOpen((v) => !v)}
       />
       {state.status === 'loading' && <BlankLoading hint={state.loadingHint} />}
       {state.status === 'error' && <BlankError error={state.error || '面板载入失败'} onRetry={() => void store.actions.init()} />}
@@ -338,7 +333,6 @@ export function SkeletonPanel({ store }: { store: PptStore }) {
 
           {/* 版本历史抽屉（覆盖在画布之上；预览只读，恢复走游标移动） */}
           {historyOpen ? <HistoryDrawer store={store} onClose={() => setHistoryOpen(false)} /> : null}
-          {planOpen ? <PlanDrawer store={store} onClose={() => setPlanOpen(false)} /> : null}
         </div>
       )}
       {state.status === 'ready' ? <StatusBar store={store} /> : null}

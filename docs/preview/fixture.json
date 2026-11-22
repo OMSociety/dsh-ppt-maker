@@ -11,7 +11,7 @@
     "activeKey": "preview",
     "openRequests": [],
     "manifest": {
-      "revision": 19,
+      "revision": 20,
       "title": "构成主义 · 功能演示",
       "designSystem": "work",
       "theme": "blue-flame-brand",
@@ -26,14 +26,14 @@
   "project": {
     "key": "preview",
     "dir": "demo-deck",
-    "revision": 19,
+    "revision": 20,
     "manifest": {
-      "revision": 19,
+      "revision": 20,
       "createdAt": "2026-11-17T21:10:27.804Z",
-      "updatedAt": "2026-11-22T21:03:29.597Z",
+      "updatedAt": "2026-11-22T21:21:11.422Z",
       "designSystem": "work",
       "theme": "blue-flame-brand",
-      "checksum": "fe7738bc9dc705a99719a04d81fed43c8510f098",
+      "checksum": "c234769b110d545a60cf7e97e6bdc667440b4158",
       "qaReport": {
         "revision": 18,
         "checkedAt": "2026-11-22T20:34:58.557Z",
@@ -690,33 +690,7 @@
       }
     ],
     "issues": [],
-    "checksumMismatch": false,
-    "plan": {
-      "pages": [
-        {
-          "intent": "品牌展示",
-          "page": "pages/01.page",
-          "title": "封面",
-          "type": "native"
-        },
-        {
-          "intent": "原生图表与表格",
-          "page": "pages/02.page",
-          "title": "原生数据",
-          "type": "native"
-        },
-        {
-          "intent": "SVG 编译为 DrawingML",
-          "page": "pages/03.page",
-          "svgRef": "media/svg/03-visual.svg",
-          "title": "SVG 页面轨",
-          "type": "svg"
-        }
-      ],
-      "status": "confirmed",
-      "version": 1
-    },
-    "brief": "- **purpose**：功能演示\n- **audience**：开发者\n- **coreMessage**：v2.0 全部新特性\n- **mode**：deck\n"
+    "checksumMismatch": false
   },
   "pages": {
     "pages/01.page": {
@@ -799,7 +773,7 @@
               56
             ],
             "content": {
-              "text": "13 个 ppt_* 工具  /  PPTD → PPTX",
+              "text": "12 个 ppt_* 工具  /  PPTD → PPTX",
               "fontFamily": "Noto Sans SC",
               "fontSize": 14,
               "bold": true,
@@ -968,7 +942,7 @@
           }
         ]
       },
-      "revision": 19
+      "revision": 20
     },
     "pages/02.page": {
       "path": "pages/02.page",
@@ -1033,7 +1007,7 @@
               298
             ],
             "content": {
-              "text": "13",
+              "text": "12",
               "fontFamily": "Noto Sans SC",
               "fontSize": 180,
               "bold": true,
@@ -1067,7 +1041,7 @@
               26
             ],
             "content": {
-              "text": "创作 8　质量 3　交付 2",
+              "text": "创作 7　质量 3　交付 2",
               "fontFamily": "Noto Sans SC",
               "fontSize": 13,
               "color": "#b5ad9e"
@@ -1116,7 +1090,7 @@
               26
             ],
             "content": {
-              "text": "规划创作、质量门、发布交付；图表与表格都是原生可编辑对象。",
+              "text": "创作编辑、质量门、发布交付；图表与表格都是原生可编辑对象。",
               "fontFamily": "Noto Sans SC",
               "fontSize": 13,
               "color": "#5f594f"
@@ -1161,7 +1135,7 @@
               "rows": [
                 [
                   "创作",
-                  8,
+                  7,
                   null,
                   null
                 ],
@@ -1329,14 +1303,14 @@
                   "fontSize": 11
                 },
                 {
-                  "text": "ppt_plan",
+                  "text": "ppt_edit",
                   "bold": true,
                   "color": "#121212",
                   "fontFamily": "Noto Sans SC",
                   "fontSize": 11
                 },
                 {
-                  "text": "规划契约",
+                  "text": "批量编辑",
                   "color": "#5f594f",
                   "fontFamily": "Noto Sans SC",
                   "fontSize": 11
@@ -1459,7 +1433,7 @@
           }
         ]
       },
-      "revision": 19
+      "revision": 20
     },
     "pages/03.page": {
       "path": "pages/03.page",
@@ -1470,7 +1444,7 @@
         },
         "elements": []
       },
-      "revision": 19
+      "revision": 20
     }
   },
   "media": {

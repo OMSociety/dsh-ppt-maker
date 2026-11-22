@@ -3,7 +3,7 @@
  * 的 lazyTools 机制落地，只用宿主公开 seam，不碰私有 API：
  *
  * 常驻成本只有技能目录里的一行 name+description；当模型调 `skill` 工具
- * invoke 了 "ppt-maker"（工具结果 isError===false），才把 13 个 ppt_* 工具
+ * invoke 了 "ppt-maker"（工具结果 isError===false），才把 12 个 ppt_* 工具
  * 经 ctx.tools.register 注册进场——此后新组装的轮次/会话的工具表即包含它们。
  *
  * 三个进场通道（任一命中即展开，幂等）：

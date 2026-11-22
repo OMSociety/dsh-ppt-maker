@@ -170,7 +170,7 @@ describe('TableView · PPTD rows/style 契约', () => {
         { text: '工具', color: '#fff', fill: { type: 'solid', color: '#1a1a1a' }, fontSize: 16 },
         { text: '功能', color: '#fff', fill: { type: 'solid', color: '#1a1a1a' }, fontSize: 16 },
       ],
-      ['ppt_plan', '规划契约'],
+      ['ppt_check', '规则质检'],
       ['ppt_svg', 'SVG 页面轨'],
     ],
     style: {
@@ -189,7 +189,7 @@ describe('TableView · PPTD rows/style 契约', () => {
     expect(model.columnWidths[0]).toBeCloseTo(0.42)
     expect(model.columnWidths[1]).toBeCloseTo(0.58)
     expect(model.rowHeights.every((height) => Math.abs(height - 1 / 3) < 1e-9)).toBe(true)
-    expect(model.rows[1][0].text).toBe('ppt_plan')
+    expect(model.rows[1][0].text).toBe('ppt_check')
   })
 
   it('rows 省略被覆盖格时按网格列落位', () => {

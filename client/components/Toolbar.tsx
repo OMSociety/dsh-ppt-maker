@@ -7,20 +7,16 @@
  */
 import * as React from 'react'
 import type { PptStore } from '../store'
-import { ExportGlyph, HistoryGlyph, PlanGlyph, RedoGlyph, UndoGlyph } from '../icons'
+import { ExportGlyph, HistoryGlyph, RedoGlyph, UndoGlyph } from '../icons'
 
 export function Toolbar({
   store,
   historyOpen,
   onShowHistory,
-  planOpen,
-  onShowPlan,
 }: {
   store: PptStore
   historyOpen?: boolean
   onShowHistory?: () => void
-  planOpen?: boolean
-  onShowPlan?: () => void
 }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const disabled = !state.activeKey || state.saving
@@ -42,15 +38,6 @@ export function Toolbar({
           </span>
         ) : null}
         <span className="ppt-spacer" />
-        <button
-          type="button"
-          className={`ppt-btn${planOpen ? ' ppt-btn-on' : ''}`}
-          disabled={disabled}
-          onClick={() => onShowPlan?.()}
-          title="规划契约：查看 brief 与页面计划（再点一次收起）"
-        >
-          <PlanGlyph size={13} /> 规划
-        </button>
         <button
           type="button"
           className={`ppt-btn${historyOpen ? ' ppt-btn-on' : ''}`}
