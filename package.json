@@ -96,7 +96,8 @@
     "check:pack": "node scripts/check-pack.mjs"
   },
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=22.19.0",
+    "dsh": "*"
   },
   "allowScripts": {
     "esbuild": true
