@@ -1,11 +1,11 @@
 /**
- * e2e stub：假宿主 ctx（tools/sessions/skills 三个注入服务 + logger + effect），
+ * e2e stub：假宿主 ctx（tools/sessions/skills/webServer/connection + logger + effect），
  * 跑全链 create → edit×3（合并窗内）→ undo → redo，外加 ppt_themes 与错误路径。
  */
 import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apply, name as pluginName, inject } from '../src/index.js'
 import type { ToolDef } from '../src/tools/shared.js'
 
@@ -92,13 +92,43 @@ afterEach(async () => {
 })
 
 describe('宿主入口', () => {
-  it('inject 只声明装载上下文保证存在的服务（llm/attachments 懒取，禁入 inject）', () => {
+  it('inject 声明工具、会话、技能、路由与统一认证服务（llm/attachments 懒取）', () => {
     // llm / attachments 一旦进 inject：Cordis 对注入但缺席的服务把 apply() 静默
     // 挂起——实测症状为技能注册成功而全部 ppt_* 工具消失（P0 事故，见 CHANGELOG）。
-    expect(inject).toEqual(['tools', 'sessions', 'skills', 'webServer'])
+    expect(inject).toEqual(['tools', 'sessions', 'skills', 'webServer', 'connection'])
     expect(inject).not.toContain('llm')
     expect(inject).not.toContain('attachments')
     expect(pluginName).toBe('dsh-ppt-maker')
+  })
+
+  it('webServer 路由使用 connection.requestRejection 做统一访问检查', async () => {
+    const { ctx } = makeCtx(cwd)
+    let handler: ((req: unknown, res: unknown) => Promise<void>) | undefined
+    const requestRejection = vi.fn(() => 401 as const)
+    apply({
+      ...ctx,
+      connection: { requestRejection },
+      webServer: {
+        register: (spec: { kind: 'prefix'; path: string; handler: typeof handler }) => {
+          handler = spec.handler
+          return () => {}
+        },
+      },
+    })
+    await vi.waitFor(() => expect(handler).toBeTypeOf('function'))
+
+    const req = {
+      method: 'GET',
+      url: '/ppt-maker/api/state?sessionId=s-e2e',
+      headers: { host: '127.0.0.1:17507' },
+      on: vi.fn(),
+    }
+    const res = { statusCode: 200, end: vi.fn(), writeHead: vi.fn() }
+    await handler!(req, res)
+    expect(requestRejection).toHaveBeenCalledWith(req)
+    expect(res.statusCode).toBe(401)
+    expect(res.end).toHaveBeenCalledOnce()
+    expect(req.on).not.toHaveBeenCalled()
   })
 
   it('ctx.get 在场或缺席都不影响注册（llm/attachments 走调用时懒取）', () => {

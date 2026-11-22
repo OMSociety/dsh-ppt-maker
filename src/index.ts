@@ -56,7 +56,7 @@ import { registerThemesTool } from './tools/themes.js'
 import { registerUndoTool } from './tools/undo.js'
 
 export const name = 'dsh-ppt-maker'
-export const inject = ['tools', 'sessions', 'skills', 'webServer']
+export const inject = ['tools', 'sessions', 'skills', 'webServer', 'connection']
 export { PACKAGE_ROOT }
 
 const SKILL_DIR = path.join(PACKAGE_ROOT, 'skills', 'ppt-maker')
@@ -94,6 +94,9 @@ interface ApplyCtx {
   webServer?: {
     register(spec: { kind: 'prefix'; path: string; handler: unknown }): () => void
   }
+  connection?: {
+    requestRejection(req: unknown): 401 | 403 | undefined
+  }
   logger?: { warn?: (message: string) => void }
   effect?: (fn: () => void | (() => void)) => void
   /** Cordis `ctx.get(name)`：懒取 inject 之外的可选服务（llm / attachments）。 */
@@ -123,6 +126,7 @@ interface HostRoutesModule {
   API_PREFIX: string
   createApiHandler(deps: {
     resolveCwd(sessionId: string): string | null
+    requestRejection(req: unknown): 401 | 403 | undefined
     log?: (message: string) => void
     core: {
       loadProject: typeof loadProject
@@ -188,6 +192,12 @@ function registerRoutes(ctx: ApplyCtx): () => void {
         if (cancelled) return
         const handler = routes.createApiHandler({
           resolveCwd,
+          // `connection` 是必需注入；缺失时拒绝请求，不回落到仅同源检查。
+          requestRejection: (req) => {
+            const connection = ctx.connection
+            if (!connection || typeof connection.requestRejection !== 'function') return 403
+            return connection.requestRejection(req)
+          },
           log: (message) => ctx.logger?.warn?.(`[dsh-ppt-maker] ${message}`),
           core: {
             loadProject,

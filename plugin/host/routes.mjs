@@ -1,21 +1,21 @@
 /**
- * `/ppt-maker/api/*` HTTP 路由：浏览器侧唯一的读写入口（轨迹对齐
- * fishpai 的 plugin/host/routes.mjs——那份是本任务口径的仲裁参考）。
+ * `/ppt-maker/api/*` HTTP 路由：浏览器侧唯一的读写入口。
  *
  * 安全边界（浏览器与文件系统之间唯一的一道门）：
- *   1. **同源校验**（sameOrigin，逐字口径对齐 fishpai）：拒 `sec-fetch-site: cross-site`、
- *      `Host` 归一后必须环路字面量、拒 `Origin: null`、比 `Origin.host === Host.host`。
- *      写方法额外要求 `content-type: application/json`（415）。
- *   2. **只认 key，不认路径**：客户端传 per-session store 登记过的工程 key，宿主自己
+ *   1. **统一访问检查**：每个请求先交给 `ctx.connection.requestRejection`，由宿主完成
+ *      Host/Origin 与浏览器登录态认证；401/403 立即结束，之后才解析路由、会话与请求体。
+ *   2. **同源校验**：统一访问检查通过后，sameOrigin 再拒 `sec-fetch-site: cross-site`、
+ *      非环路 Host、`Origin: null` 与 Origin/Host 不匹配。写方法要求 `content-type: application/json`（415）。
+ *   3. **只认 key，不认路径**：客户端传 per-session store 登记过的工程 key，宿主自己
  *      查出工程目录，再交给 `src/core/project/store.ts` 的 `resolveProjectDir` 复检
  *      ——必须落在 `sessions.get(sessionId).header.cwd` 内，缺失报错、绝不回落 `process.cwd()`。
- *   3. **revision 守卫**：写必须带 `baseRevision`（数字），缺/非法 400、不匹配 409
+ *   4. **revision 守卫**：写必须带 `baseRevision`（数字），缺/非法 400、不匹配 409
  *      （`ProjectError.status` 的归一映射）；绝不静默覆盖人的手改。
- *   4. **MAX_BODY = 8MB 流式**：超限回 413（超限后继续把流读干，413 才回得出去）。
+ *   5. **MAX_BODY = 8MB 流式**：超限回 413（超限后继续把流读干，413 才回得出去）。
  *
- * 状态码：413 请求体超限 / 404 找不到（工程、页、素材）/ 409 `ProjectError.status`
- * 覆盖层（RevisionMismatch / SnapshotUnavailable / SchemaBlockers / …）/
- * 415 写方法没带 `application/json` / 403 跨站 / 400 其余参数与状态错误。
+ * 状态码：401 未认证 / 403 拒绝访问或跨站 / 413 请求体超限 / 404 找不到（工程、页、素材）/
+ * 409 `ProjectError.status` 覆盖层（RevisionMismatch / SnapshotUnavailable / SchemaBlockers / …）/
+ * 415 写方法没带 `application/json` / 400 其余参数与状态错误。
  * 二进制一律 `res.writeHead(200, {content-type}) + res.end(bytes)`。
  */
 import fsp from 'node:fs/promises'
@@ -104,7 +104,7 @@ function fail(res, code, message) {
 }
 
 /* ------------------------------------------------------------------ *
- * sameOrigin —— 逐字口径照抄 fishpai
+ * sameOrigin —— 环路 Host / Origin 的纵深防御
  * ------------------------------------------------------------------ */
 
 function parseAuthority(authority) {
@@ -217,6 +217,7 @@ function projectOf(ss, sessionId, cwd, key) {
 /**
  * @param {{
  *   resolveCwd: (sessionId: string) => string | null,
+ *   requestRejection: (req: object) => 401 | 403 | undefined,
  *   log?: (msg: string) => void,
  *   core: CoreSurface,
  *   nativeCommand?: { canOpenNativePath(): boolean, nativeFileApplications(p: string, s?: AbortSignal): Promise<Array<{ id: string, name: string, default: boolean, icon: string | null }>>, openNativeAssociatedPath(p: string, s?: AbortSignal): Promise<unknown>, openNativeFileApplication(p: string, app: string, s?: AbortSignal): Promise<unknown>, revealNativePath(p: string, s?: AbortSignal): Promise<unknown> },
@@ -242,7 +243,12 @@ const REQUIRED_CORE = [
   'ProjectError',
 ]
 
-export function createApiHandler({ resolveCwd, log = () => {}, core, nativeCommand: nativeOverride, sessionStore: storeOverride } = {}) {
+export function createApiHandler({ resolveCwd, requestRejection, log = () => {}, core, nativeCommand: nativeOverride, sessionStore: storeOverride } = {}) {
+  if (typeof requestRejection !== 'function') {
+    const err = new Error('createApiHandler 需要 deps.requestRejection（ctx.connection.requestRejection）')
+    err.status = 500
+    throw err
+  }
   if (!core || typeof core !== 'object') {
     const err = new Error(`createApiHandler 需要 deps.core（${REQUIRED_CORE.join(', ')}）`)
     err.status = 500
@@ -274,6 +280,12 @@ export function createApiHandler({ resolveCwd, log = () => {}, core, nativeComma
   }
 
   return async function handle(req, res) {
+    const rejection = requestRejection(req)
+    if (rejection !== undefined) {
+      res.statusCode = rejection
+      res.end()
+      return
+    }
     if (!sameOrigin(req)) return fail(res, 403, '拒绝跨站请求')
     const url = new URL(req.url || '/', 'http://localhost')
     const route = `${req.method} ${url.pathname.slice(API_PREFIX.length)}`

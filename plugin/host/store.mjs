@@ -1,8 +1,7 @@
 /**
  * Per-session 工程 store：`/ppt-maker/api/*` 与模型工具共用的内存状态。
  *
- * 形态（逐字口径对齐 fishpai 的 requestOpen / consumeOpenRequest /
- * pendingOpenRequest）：
+ * 状态形态：
  *   Map<sessionId, {
  *     projects: Map<key, dir>,   // 本会话登记过的工程（key → 相对/工程目录写法）
  *     activeKey: string|null,
@@ -13,7 +12,7 @@
  * 工程键：`key = sha1(cwd + 解析后的绝对工程目录)[:12]`——只认 key 不认路径：
  * 客户端传这个会话登记表里的键，宿主自己查出工程目录，再交给 src/core/project/store.ts
  * 的 `resolveProjectDir` 复检（必须落在会话 cwd 内）。跨会话读要先知道对方的
- * sessionId **与** key；本机单用户场景下这条不是授权边界，同源校验才是（见 routes.mjs）。
+ * sessionId **与** key；本机单用户场景下这条不是授权边界，统一访问检查与同源校验是（见 routes.mjs）。
  *
  * openRequests 由 /state 与 /tab-opened 消费：request 写时间戳，consume 读取后删除，
  * pending 只接受 60s 内未过期的请求。

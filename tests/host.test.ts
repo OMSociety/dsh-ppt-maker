@@ -1,5 +1,6 @@
 /**
  * 宿主路由测试：
+ *  - requestRejection 401/403 在会话解析与请求体读取前短路，通过后正常处理
  *  - sameOrigin 各分支（cross-site / 非环路 Host / Origin:null / Origin 不匹配 / 环路好）
  *  - 413 请求体超限（MAX_BODY 8MB 流式）
  *  - 415 写方法未带 application/json
@@ -76,8 +77,16 @@ interface Capture {
 
 /** Spawn a real HTTP server wrapping the routes handler, so 415 / 413 / 409 等都能过真
  * 浏览器侧的语义。 */
-async function startServer(deps: Parameters<typeof createApiHandler>[0] = {}) {
-  const handler = createApiHandler({ resolveCwd: deps?.resolveCwd ?? (() => cwd), core, log: (m: string) => console.error('[route]', m), ...deps })
+type ApiDeps = NonNullable<Parameters<typeof createApiHandler>[0]>
+
+async function startServer(deps: Partial<ApiDeps> = {}) {
+  const handler = createApiHandler({
+    resolveCwd: deps.resolveCwd ?? (() => cwd),
+    requestRejection: deps.requestRejection ?? (() => undefined),
+    core,
+    log: (m: string) => console.error('[route]', m),
+    ...deps,
+  })
   server = createServer((req, res) => {
     // 只让 /ppt-maker/api/* 才进 handler，其余 404
     if (!String(req.url || '').startsWith(API_PREFIX)) {
@@ -175,6 +184,43 @@ describe('sameOrigin', () => {
 // ── HTTP 层 ───────────────────────────────────────────────────────
 
 describe('host 路由', () => {
+  it.each([401, 403] as const)('统一访问检查返回 %i 时在解析与读请求体前结束', async (code) => {
+    const resolveCwd = vi.fn(() => {
+      throw new Error('认证拒绝时不得解析会话工作目录')
+    })
+    const handler = createApiHandler({
+      resolveCwd,
+      requestRejection: (req: { headers: Record<string, string> }) =>
+        req.headers['x-test-rejection'] === 'yes' ? code : undefined,
+      core,
+    })
+    const req = {
+      method: 'POST',
+      url: `${API_PREFIX}/edit`,
+      headers: { host: '127.0.0.1:3080', 'x-test-rejection': 'yes' },
+      on: vi.fn(() => {
+        throw new Error('认证拒绝时不得订阅请求体')
+      }),
+    }
+    const res = { statusCode: 200, end: vi.fn(), writeHead: vi.fn() }
+    await handler(req as never, res as never)
+
+    expect(res.statusCode).toBe(code)
+    expect(res.end).toHaveBeenCalledOnce()
+    expect(res.writeHead).not.toHaveBeenCalled()
+    expect(resolveCwd).not.toHaveBeenCalled()
+    expect(req.on).not.toHaveBeenCalled()
+  })
+
+  it('统一访问检查通过时正常处理 GET /state', async () => {
+    const requestRejection = vi.fn(() => undefined)
+    await startServer({ requestRejection })
+    const r = await apiJson(`${API_PREFIX}/state?sessionId=${SESSION}`)
+    expect(r.status).toBe(200)
+    expect(r.json!.ok).toBe(true)
+    expect(requestRejection).toHaveBeenCalledOnce()
+  })
+
   it('跨站请求被 403 拦下', async () => {
     await startServer()
     const r = await api(`${API_PREFIX}/state?sessionId=${SESSION}`, {

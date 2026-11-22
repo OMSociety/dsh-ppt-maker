@@ -120,7 +120,7 @@ function makeHandler(cwd: string, abs: string) {
     computeProjectFingerprint: noop,
     ProjectError,
   }
-  return createApiHandler({ resolveCwd: () => cwd, core, sessionStore: ss })
+  return createApiHandler({ resolveCwd: () => cwd, requestRejection: () => undefined, core, sessionStore: ss })
 }
 
 describe('宿主路由：规划透传与 svg 媒体白名单', () => {
