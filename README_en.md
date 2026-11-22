@@ -13,6 +13,8 @@
     <a href="https://github.com/OMSociety/dsh-ppt-maker/stargazers"><img src="https://img.shields.io/github/stars/OMSociety/dsh-ppt-maker?color=4f6ef7" alt="Stars"></a>
     <a href="https://github.com/OMSociety/dsh-ppt-maker/issues"><img src="https://img.shields.io/github/issues/OMSociety/dsh-ppt-maker?color=4f6ef7" alt="Issues"></a>
   </p>
+
+<a href="#what-this-is">What This Is</a> • <a href="#key-features">Key Features</a> • <a href="#in-action">In Action</a> • <a href="#installation">Installation</a> • <a href="#model-tools">Model Tools</a> • <a href="#the-workbench">The Workbench</a> • <a href="#development">Development</a> • <a href="#changelog">Changelog</a> • <a href="#support--acknowledgements">Support &amp; Acknowledgements</a> • <a href="#license--author">License &amp; Author</a>
 </div>
 
 ## What This Is
@@ -38,7 +40,7 @@ The intermediate format is **PPTD**, a self-defined contract in YAML (`deck.pptd
 | **Transitions & animations** | Page-level transitions (fade by default / none / auto curated rotation) and 95 element animation presets, written natively by the local pipeline |
 | **Revisions & snapshots** | Single-writer manifest + append-only snapshots (the cursor model makes undo/redo natural) + baseRevision optimistic locking (409) |
 | **Design system** | Five preset theme families with 30 themes — academic / consulting / finance / promotion / work; machine-readable `theme.yml` (colors / fonts) is written into `deck.theme` on selection, keeping the whole deck's layout, color and hierarchy consistent |
-| **Locally rendered preview** | The canvas and thumbnails render PPTD pages directly to the DOM (vector, instant, same coordinate system as the selection boxes); PNG previews for export and QA rasterize the final pptx via `@deepseek-ai/libreoffice-kit`, disk-cached per (page, revision); when the host supports it, `ppt_render` returns image content blocks alongside the result |
+| **Locally rendered preview** | The canvas and thumbnails render PPTD pages directly to the DOM (vector, instant, same coordinate system as the selection boxes); PNG previews for export and QA rasterize the final pptx via `@deepseek-ai/libreoffice-kit`, written to the project's `.previews/page-NN.png` and overwritten on each render; `ppt_render` lists each page image's absolute path for `read_image` |
 
 ## In Action
 
@@ -65,9 +67,9 @@ Both workbench images render the production client components, styles and real t
 dsh plugin --profile <profile> add "dsh-ppt-maker"
 ```
 
-> **Tip:** after installing, refresh the browser page and open "PPT Maker" from the right-hand rail — restarting the host alone is not enough, the client bundle is fetched when the page loads.
+> **Tip:** after installing, refresh the browser page and open the "PPT 工作台" tab from the right-hand rail — restarting the host alone is not enough, the client bundle is fetched when the page loads.
 
-> **Dependencies:** the main pipeline is pure TypeScript with no Python; `@deepseek-ai/libreoffice-kit@0.1.2`, used by `ppt_render` and QA, is a hard dependency (about 183MB per platform, installed with the package). Only the SVG page track (`ppt_svg`) needs Python 3.10+: run `node scripts/prepare-vendor-env.mjs` once to create the virtual environment and install the pinned dependencies. The Python scripts under `skills/ppt-maker/scripts/` are an escape hatch only — see the "Python escape hatch" section in SKILL.md.
+> **Dependencies:** the main pipeline is pure TypeScript with no Python; `@deepseek-ai/libreoffice-kit@0.1.2`, used by `ppt_render` and QA, is a hard dependency (about 183MB per platform, installed with the package). Only the SVG page track (`ppt_svg`) needs Python 3.10+: run `node scripts/prepare-vendor-env.mjs` once (the script ships with the package, at the plugin package root) to create the virtual environment and install the pinned dependencies (pip uses the Tsinghua mirror by default; override with the `PIP_INDEX` environment variable, and pick the interpreter with `PYTHON`). The Python scripts under `skills/ppt-maker/scripts/` are an escape hatch only — see the "Python escape hatch" section in SKILL.md.
 
 > **Platforms:** the engine ships per platform. Windows (x64/arm64) and macOS (x64/arm64) get native packages; Linux has none (no `libreoffice-kit-linux-*` on npm), so rendering and QA fall back to WASM. CI runs the same suite on `windows-latest` and `ubuntu-latest` (minus the font-embedding assertions) and both pass; exports are produced by the same code path, without a cross-platform byte comparison. macOS has no CI coverage yet.
 
@@ -88,7 +90,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 | `ppt_plan` | Read/write the planning contract: brief (purpose / audience / core message) and plan (page plan) | `dir` · `action` (`get`/`setBrief`/`setPlan`) |
 | `ppt_edit` | Atomic editing: an ops array of page/element additions, removals and updates (incl. `update_plan` / `update_svg_source`), with baseRevision optimistic locking | `dir` · `ops` · `baseRevision` |
 | `ppt_undo` / `ppt_redo` | Undo / redo (cursor moves; consecutive edits within the merge window count as one step) | `dir` · `steps` (1–20, default 1) |
-| `ppt_render` | Render per-page PNG previews (rasterization of the final pptx; image content blocks when the host supports it) | `dir` · `pages` · `dpi` (default 96) |
+| `ppt_render` | Render per-page PNG previews (rasterization of the final pptx; the result lists each page image's absolute path) | `dir` · `pages` · `dpi` (default 96) |
 | `ppt_check` | Rule-based QA (default) + AI visual QA (suggestions only, never blocking) | `dir` · `pages` · `ai` |
 | `ppt_export` | Export .pptx (QA fingerprint gate + postflight re-read; `skipCheck` bypasses) | `dir` · `out` · `skipCheck` |
 | `ppt_import` | .pptx → full PPTD reverse engineering (dropped / degraded two-level report + source archive) | `source` · `targetDir` · `mode` (`full` / `surgical`) · `open` |
@@ -102,7 +104,7 @@ The model's standard sequence is **`ppt_plan` (brief/plan) → `ppt_create` (or 
 
 ## The Workbench
 
-"PPT Maker" in the right-hand rail is a three-pane editor: thumbnail strip + canvas + inspector.
+The "PPT 工作台" tab in the right-hand rail is a three-pane editor: thumbnail strip + canvas + inspector.
 
 - **The canvas is the DOM**: the canvas and thumbnails render the PPTD page AST directly to the DOM (`client/components/PptdView.tsx`) — instant, no libreoffice cold start; elements, selection boxes and the in-place editor share one coordinate system and stay aligned. Tables and charts render as real DOM/SVG; SVG pages preview as a full-page backdrop; elements that can't render yet (icon / SmartArt) show gray placeholders.
 - **Plan drawer**: the "Plan" toolbar button opens a read-only drawer showing brief.md and plan.yml (page file / title / track / intent).
@@ -123,6 +125,7 @@ npm run build        # rebuild lib/index.js and lib/client.js (required after to
 npm run build:preview # rebuild the self-contained preview HTML from production workbench components and docs/preview/fixture.json
 npm run check:build  # verify lib/ matches git
 npm run check:mounts # mount declaration check
+npm run check:pack   # package file-list check
 ```
 
 > **Tip:** the full test suite needs a large heap and serial execution (the default heap runs out of memory): set `$env:NODE_OPTIONS='--max-old-space-size=12288'` first, then `npx vitest run --no-file-parallelism`. The full acceptance criteria and the don'ts are in [`AGENTS.md`](AGENTS.md).
@@ -136,7 +139,7 @@ src/tools/         raw JSON-Schema contracts of the 13 tools
 client/            right-hand workbench source (TSX → esbuild bundles lib/client.js)
 plugin/            loading shell + host routes (plain JS, core injected via deps.core)
 skills/ppt-maker/  the ppt-maker skill: design-system reference and generation discipline (the model reads it on demand); vendor/ holds the SVG converter and its Python environment
-tests/             host contract / tool e2e / reverse / fonts / bundle guards (corpus .pptx not committed)
+tests/             host contract / tool e2e / reverse / fonts / bundle guards (20 anonymized corpus .pptx files are committed; sensitive-words.txt is not)
 docs/              PPTD spec (fully self-contained) / decision log / fallback font table
 lib/               build artifacts (committed; dsh plugin add installs without building)
 ```

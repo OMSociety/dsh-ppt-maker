@@ -407,8 +407,8 @@ export interface DeckSource {
   app?: string
   /**
    * 源文件在工程内的存档位置（source/original.pptx）与其内容指纹。
-   * 导出管线据此做「未改页整页恢复」：页内容与导入时一致（按 originalSha1
-   * 与 sourceRef 完整性判定）时从存档原样并入，chart / custGeom / connector
+   * 导出管线据此做「未改页整页恢复」：存档 sha1 与 originalSha1 一致、每页内容
+   * 与 source/page-fingerprints.json 的导入时指纹一致时从存档原样并入，chart / custGeom / connector
    * 等 PPTD 模型承载不了的部件因此不丢。见 docs/pptd-spec.md §10。
    */
   archive?: string
@@ -422,12 +422,6 @@ export interface Theme {
   [key: string]: unknown
 }
 
-export interface CustomFont {
-  name: string
-  src?: string
-  [key: string]: unknown
-}
-
 /** Spec §3.1 — deck.pptd. */
 export interface Presentation {
   profile?: Profile
@@ -435,7 +429,6 @@ export interface Presentation {
   schema?: number
   title?: string
   size: [number, number]
-  customFonts?: CustomFont[]
   theme?: Theme
   export?: ExportConfig
   pages: string[]
@@ -622,7 +615,17 @@ export const ERROR_CODES = {
   /** Spec §2.0 — deck without `schema: 2` is refused by the tool layer. */
   UnsupportedSchemaError: 'UnsupportedSchemaError',
   /** Spec §3.5 — Page.layoutRef.name has no match in deck.masters[*].layouts. */
-  UnknownLayoutError: 'UnknownLayoutError'
+  UnknownLayoutError: 'UnknownLayoutError',
+  /** Spec §11.6 — chart data integrity. */
+  DuplicateColumnError: 'DuplicateColumnError',
+  EmptyColumnError: 'EmptyColumnError',
+  RowLengthError: 'RowLengthError',
+  UnknownColumnError: 'UnknownColumnError',
+  NonNumericValueError: 'NonNumericValueError',
+  StackModeMismatchError: 'StackModeMismatchError',
+  WaterfallTotalMismatchWarning: 'WaterfallTotalMismatchWarning',
+  InvalidValueError: 'InvalidValueError',
+  CyclicGraphError: 'CyclicGraphError'
 } as const
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]

@@ -14,7 +14,7 @@ import path from 'node:path'
 import { editProject, loadProject, ProjectError } from '../core/project/store.js'
 import { compileSvgPage, themeHashOf } from '../core/svg/compiler.js'
 import { SVG_MEDIA_DIR, SVG_PAGE_TYPE } from '../core/pptd/schema-v2.js'
-import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { requireBaseRevision, renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 const SVG_NAME_RE = /^[a-z0-9][a-z0-9_-]*\.svg$/i
 
@@ -37,7 +37,7 @@ export function registerSvgTool(ctx: PluginToolCtx): (() => void) | undefined {
         svg: { type: 'string', description: 'put 用：完整 SVG 文本' },
         ref: { type: 'string', description: `compile 用：工程相对路径（${SVG_MEDIA_DIR}/ 下 .svg）` },
         page: { type: 'string', description: 'put 可选：同时挂到该页（pages/NN.page）' },
-        baseRevision: { type: 'integer', minimum: 0, description: '挂页时的乐观锁基线修订号' }
+        baseRevision: { type: 'integer', minimum: 0, description: '带 page 挂页时必填的乐观锁基线修订号' }
       }
     },
     output: {
@@ -95,7 +95,7 @@ export function registerSvgTool(ctx: PluginToolCtx): (() => void) | undefined {
           const result = await editProject(cwd, {
             dir,
             ops: [{ op: 'update_svg_source', page, source: { ref } } as never],
-            baseRevision: args.baseRevision as number | undefined,
+            baseRevision: requireBaseRevision(args, '挂页（page）'),
             sessionId: sessionIdOf(exec)
           })
           return { ok: true, ref, page, revision: result.revision }

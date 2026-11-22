@@ -3,26 +3,25 @@
  *
  * 动作：
  *  - get      读当前 brief（解析为结构化字段）与 plan（含交叉检查 issues）
- *  - setBrief 写 brief.md（覆盖式）
+ *  - setBrief 写 brief.md（覆盖式；带 baseRevision，在工程锁内比对）
  *  - setPlan  经 update_plan op 写 plan.yml（进编辑历史；带 baseRevision 乐观锁）
  *
  * plan 的 status 由模型按工作流推进（draft → confirmed），确认动作就是
  * setPlan 一个 status:'confirmed' 的 plan；P01–P05 早检等纪律在 SKILL.md。
  */
-import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { editProject, loadProject, ProjectError } from '../core/project/store.js'
+import { editProject, loadProject, ProjectError, writeProjectBrief } from '../core/project/store.js'
 import { briefFromMarkdown, briefToMarkdown, validateBrief, type Brief } from '../core/pptd/plan.js'
 import type { Plan } from '../core/pptd/schema-v2.js'
 import { readFile } from 'node:fs/promises'
-import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { requireBaseRevision, renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerPlanTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
     name: 'ppt_plan',
     description:
       '读写 PPTD 工程的规划契约：brief.md（设计简报）与 plan.yml（页面计划）。' +
-      'action=get 读当前 brief+plan；setBrief 覆盖写 brief.md（传 brief 对象）；' +
+      'action=get 读当前 brief+plan 与 revision；setBrief 覆盖写 brief.md（传 brief 对象与 baseRevision，不推进 revision）；' +
       'setPlan 写 plan.yml（传 plan 对象，经编辑历史与乐观锁）。' +
       '返回 { ok, brief?, plan?, issues?, revision? }。',
     parameters: {
@@ -42,7 +41,7 @@ export function registerPlanTool(ctx: PluginToolCtx): (() => void) | undefined {
           additionalProperties: true,
           description: 'setPlan 用：{ version?:1, status?:draft|confirmed, pages:[{page,title?,type?,svgRef?,intent?,module?}] }'
         },
-        baseRevision: { type: 'integer', minimum: 0, description: 'setPlan 乐观锁基线修订号' }
+        baseRevision: { type: 'integer', minimum: 0, description: 'setBrief / setPlan 必填的乐观锁基线修订号' }
       }
     },
     output: {
@@ -53,8 +52,8 @@ export function registerPlanTool(ctx: PluginToolCtx): (() => void) | undefined {
         revision: { type: 'integer' }
       }),
       render: renderSummary((r) => {
-        if (typeof r.revision === 'number') return `plan.yml 已更新，revision → ${r.revision}`
-        if (r.brief !== undefined && r.plan === undefined) return 'brief.md 已写入'
+        if (r.plan === undefined && r.brief !== undefined) return `brief.md 已写入（revision ${String(r.revision)}）`
+        if (r.plan === undefined && typeof r.revision === 'number') return `plan.yml 已更新，revision → ${r.revision}`
         const pages = ((r.plan as Plan | null | undefined)?.pages?.length) ?? 0
         return `brief ${r.brief ? '有' : '无'}；plan ${r.plan ? `${pages} 页` : '无'}`
       })
@@ -74,7 +73,7 @@ export function registerPlanTool(ctx: PluginToolCtx): (() => void) | undefined {
           } catch {
             brief = null
           }
-          return { ok: true, brief, plan: loaded.plan, issues: loaded.issues }
+          return { ok: true, brief, plan: loaded.plan, issues: loaded.issues, revision: loaded.manifest.revision }
         }
 
         if (action === 'setBrief') {
@@ -87,16 +86,16 @@ export function registerPlanTool(ctx: PluginToolCtx): (() => void) | undefined {
               detail: blockers.map((b) => b.message)
             })
           }
-          const loaded = await loadProject(cwd, dir)
-          await writeFile(path.join(loaded.dir, 'brief.md'), briefToMarkdown(brief))
-          return { ok: true, brief }
+          const baseRevision = requireBaseRevision(args, 'setBrief ')
+          const written = await writeProjectBrief(cwd, dir, briefToMarkdown(brief), { baseRevision })
+          return { ok: true, brief, revision: written.revision }
         }
 
         // setPlan：走 update_plan op，进编辑历史与乐观锁。
         const result = await editProject(cwd, {
           dir,
           ops: [{ op: 'update_plan', plan: args.plan } as never],
-          baseRevision: args.baseRevision as number | undefined,
+          baseRevision: requireBaseRevision(args, 'setPlan '),
           sessionId: sessionIdOf(exec)
         })
         return { ok: true, revision: result.revision, appliedOps: result.appliedOps, warnings: result.warnings }

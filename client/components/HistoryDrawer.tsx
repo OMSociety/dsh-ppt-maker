@@ -11,6 +11,7 @@ import type { PptStore } from '../store'
 import { PptdView, type PptdPage } from './PptdView'
 
 interface PreviewState {
+  revision: number
   size: [number, number]
   pages: PptdPage[]
   warnings: string[]
@@ -39,6 +40,9 @@ export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: ()
   const [previewPage, setPreviewPage] = React.useState(0)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  // 预览请求序号：连点多个版本时只认最后一次，画面与「恢复到 rN」始终是同一版本。
+  const previewSeq = React.useRef(0)
+  const rootRef = React.useRef<HTMLDivElement | null>(null)
 
   const key = state.activeKey
   const sessionId = state.sessionId
@@ -61,8 +65,16 @@ export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: ()
     }
   }, [key, sessionId])
 
+  React.useEffect(() => {
+    // 打开即把焦点移进抽屉，关闭时还给触发它的按钮。
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    rootRef.current?.focus()
+    return () => opener?.focus()
+  }, [])
+
   const pick = (revision: number) => {
     if (!key || revision === selected) return
+    const seq = ++previewSeq.current
     setSelected(revision)
     setPreview(null)
     setPreviewPage(0)
@@ -70,13 +82,17 @@ export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: ()
     api
       .getHistoryPages(sessionId, key, revision)
       .then((snap) => {
+        if (seq !== previewSeq.current) return
         setPreview({
+          revision,
           size: snap.deck?.size ?? [960, 540],
           pages: snap.pages.map((p) => (p.page ?? {}) as PptdPage),
           warnings: snap.warnings,
         })
       })
-      .catch((err: unknown) => setError(`快照读取失败：${(err as Error).message}`))
+      .catch((err: unknown) => {
+        if (seq === previewSeq.current) setError(`快照读取失败：${(err as Error).message}`)
+      })
   }
 
   const restore = async () => {
@@ -93,7 +109,20 @@ export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: ()
   const pageCount = preview?.pages.length ?? 0
 
   return (
-    <div className="ppt-history" role="dialog" aria-label="版本历史">
+    <div
+      ref={rootRef}
+      className="ppt-history"
+      role="dialog"
+      aria-modal="true"
+      aria-label="版本历史"
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          onClose()
+        }
+      }}
+    >
       <div className="ppt-history-head">
         <strong>版本历史</strong>
         <span className="ppt-history-head-meta">当前 r{cursor}</span>
@@ -113,8 +142,9 @@ export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: ()
 
       {selected !== null ? (
         <div className="ppt-history-preview">
-          {preview ? (
+          {preview && preview.revision === selected ? (
             <>
+              <div className="ppt-history-preview-label">正在预览 r{preview.revision}</div>
               <PptdView
                 page={preview.pages[previewPage] ?? null}
                 size={preview.size}

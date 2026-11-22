@@ -160,12 +160,6 @@ export interface ReverseMapResult {
   pages: Page[]
   media: ReverseMediaAsset[]
   report: ImportReport
-  /**
-   * Per-page fingerprints at import time (sha1 of each element's sourceRef list).
-   * The export-side restore path compares the live page against these to decide
-   * whether the page is untouched and can be re-imported whole (spec §10.4).
-   */
-  pageFingerprints?: string[]
   /** Original pptx bytes, archived verbatim to source/original.pptx by writeProject. */
   sourceBytes?: Uint8Array
 }

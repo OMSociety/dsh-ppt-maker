@@ -286,7 +286,7 @@ describe('runAiReview 门控', () => {
     }
   })
 
-  it('模型输出坏 JSON → 抛（由调用方管线降级成 performed:false）', async () => {
+  it('模型输出坏 JSON → runAiReview 抛错（不把无法解析的回答当成「无问题」）', async () => {
     const d = deps({ llm: llmReturning('我觉得整体还行，不用改。') })
     await expect(runAiReview({ images: [await fakeImage(1)], pres: await fakePres(), pages: [1] }, d)).rejects.toThrow()
   })

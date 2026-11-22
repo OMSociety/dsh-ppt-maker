@@ -29,7 +29,8 @@ const FONT_CANDIDATES = [
   process.env.PPT_TEST_FONT,
   'C:\\Windows\\Fonts\\simhei.ttf',
   'C:\\Windows\\Fonts\\Deng.ttf',
-  'C:\\Windows\\Fonts\\arial.ttf'
+  'C:\\Windows\\Fonts\\arial.ttf',
+  '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 ].filter((p): p is string => typeof p === 'string' && p.length > 0)
 
 // 存在且非空：0 字节的占位文件能过 existsSync，但会在 fontkit 解析处炸掉。

@@ -115,12 +115,40 @@ function ElementOverlay({
               e.stopPropagation()
               if (isText) onEnterEdit(id)
             }}
+            aria-label={elementLabel(el)}
+            title={isText ? '双击、Enter 或 F2 改字' : undefined}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') onSelect([id])
+              if (e.key === 'Enter' || e.key === 'F2') {
+                e.preventDefault()
+                onSelect([id])
+                if (isText) onEnterEdit(id)
+              } else if (e.key === ' ') {
+                e.preventDefault()
+                onSelect([id])
+              }
             }}
           />
         )
       })}
     </div>
   )
+}
+
+const TYPE_NAMES: Record<string, string> = {
+  text: '文本',
+  shape: '形状',
+  line: '线条',
+  image: '图片',
+  icon: '图标',
+  table: '表格',
+  chart: '图表',
+}
+
+/** 元素框的可访问名：类型 + 文字前 20 字（无文字时用元素 ID）。 */
+export function elementLabel(el: { elementType?: string; elementId?: string; content?: unknown }): string {
+  const kind = TYPE_NAMES[el.elementType ?? ''] ?? '元素'
+  const raw = (el.content as { text?: unknown } | undefined)?.text
+  const text = typeof raw === 'string' ? raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : ''
+  if (text) return `${kind}：${text.length > 20 ? `${text.slice(0, 20)}…` : text}`
+  return `${kind} ${el.elementId ?? ''}`.trim()
 }

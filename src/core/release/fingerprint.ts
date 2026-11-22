@@ -10,11 +10,12 @@
 import { createHash } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { isSafeRelativePath, parseDeckText } from '../pptd/parse.js'
 import { resolveProjectDir } from '../project/store.js'
 import { SVG_COMPILER_VERSION } from '../svg/compiler.js'
 
 /** review 规则层（review/index.ts）改动判定逻辑时递增——旧指纹立即全部过期。 */
-export const CHECKER_VERSION = '2.0.0'
+export const CHECKER_VERSION = '2.1.0'
 
 async function hashMedia(absDir: string, hash: ReturnType<typeof createHash>): Promise<void> {
   const mediaDir = path.join(absDir, 'media')
@@ -55,10 +56,10 @@ export async function computeProjectFingerprint(cwd: string, dir: string): Promi
   hash.update(deckText)
   hash.update('\n')
 
-  // 页清单从 deck.pptd 的 pages: 里粗取（指纹只要稳定，不需要完整 YAML 解析：
-  // 同样的文件文本永远产出同样的指纹）。行格式 `- pages/xx.page`。
-  const pageRefs = [...deckText.matchAll(/^\s*-\s+(pages\/\S+\.page)\s*$/gm)].map((m) => m[1])
-  for (const rel of pageRefs.sort()) {
+  // 页清单与质检、构建同源：按 PPTD 解析 deck.pptd 的 pages 列表（任意安全相对路径都入指纹），
+  // 保持声明顺序——页序变化同样意味着产物变化。
+  const pageRefs = (parseDeckText(deckText).value?.pages ?? []).filter((rel) => isSafeRelativePath(rel))
+  for (const rel of pageRefs) {
     try {
       const text = await readFile(path.join(abs, rel), 'utf8')
       hash.update(`page:${rel}:`)

@@ -252,10 +252,10 @@ describe('ppt_patch', () => {
     expect(result.ok).toBe(true)
     expect(typeof result.out).toBe('string')
     // L1 passthrough 的判据是不可建模部件**全部保留**（lostParts 必须为空），
-    // unchangedParts 是保留下来部件的计数。
+    // totalParts 是改写前包内部件总数，keptParts 是其中保留下来的数目。
     expect(result.lostParts).toEqual([])
-    expect(typeof result.unchangedParts).toBe('number')
-    expect(result.unchangedParts as number).toBeGreaterThan(0)
+    expect(result.totalParts as number).toBeGreaterThan(0)
+    expect(result.keptParts).toBe((result.totalParts as number) - (result.lostParts as string[]).length)
     expect(result.appliedOps).toBe(1)
 
     // 源文件未被改写。
@@ -270,14 +270,39 @@ describe('ppt_patch', () => {
     expect(textContent).toContain('换新标题')
   })
 
-  it('ops 空数组 / 未知 op → 400', async () => {
+  it('ops 空数组 → OpsEmpty 400', async () => {
     const { tools, lastRef } = toolsStub()
     registerPatchTool({ tools: tools, sessions: sessionsStub(cwd, SESSION_ID) })
     const tool = lastRef.current
     const empty = (await tool!.execute({ source: 'a.pptx', ops: [] }, { agent: { session: { id: SESSION_ID } } })) as {
       ok: false
-      error: { code: string }
+      error: { code: string; status?: number }
     }
     expect(empty.error.code).toBe('OpsEmpty')
+    expect(empty.error.status).toBe(400)
+  })
+
+  it('合法 op 与未知 op 混在一起 → OpUnknown 400，整批不落盘', async () => {
+    const { buildFixturePptx } = await import('./__fixtures__/pptx-fixtures.js')
+    await writeFile(path.join(cwd, 'mixed.pptx'), await buildFixturePptx())
+    const { tools, lastRef } = toolsStub()
+    registerPatchTool({ tools: tools, sessions: sessionsStub(cwd, SESSION_ID) })
+    const tool = lastRef.current
+    const result = (await tool!.execute(
+      {
+        source: 'mixed.pptx',
+        out: 'mixed-out.pptx',
+        ops: [
+          { op: 'move_page', slide: 1, toIndex: 0 },
+          { op: 'explode', slide: 1 },
+        ],
+      },
+      { agent: { session: { id: SESSION_ID } } }
+    )) as { ok: boolean; error?: { code: string; status?: number; message: string } }
+    expect(result.ok).toBe(false)
+    expect(result.error?.code).toBe('OpUnknown')
+    expect(result.error?.status).toBe(400)
+    expect(result.error?.message).toContain('explode')
+    await expect(readFile(path.join(cwd, 'mixed-out.pptx'))).rejects.toThrow()
   })
 })

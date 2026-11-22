@@ -284,6 +284,15 @@ export async function checkProject(cwd: string, dir: string, options: CheckOptio
   }
 
   const issues: ReviewIssue[] = [...fontLicenseIssues, ...review.issues]
+  for (const face of measurer?.approximated ?? []) {
+    issues.push({
+      page: 0,
+      severity: 'warning',
+      category: 'structure',
+      description: `本机缺少字形 ${face}：溢出量测按最近字形计算，粗/斜体实际宽度可能更大`,
+      suggestion: '安装该字体的对应字重，或为溢出余量留出空间'
+    })
+  }
   for (const family of missingFonts) {
     issues.push({
       page: 0,

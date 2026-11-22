@@ -93,7 +93,7 @@ async function seedProject() {
   return { cwd, abs }
 }
 
-function makeHandler(cwd: string, abs: string) {
+function makeHandler(cwd: string, abs: string, overrides: Record<string, unknown> = {}) {
   const ss = {
     ensureSession() {},
     listSessionProjects: () => [],
@@ -119,6 +119,7 @@ function makeHandler(cwd: string, abs: string) {
     writeQaReport: noop,
     computeProjectFingerprint: noop,
     ProjectError,
+    ...overrides,
   }
   return createApiHandler({ resolveCwd: () => cwd, requestRejection: () => undefined, core, sessionStore: ss })
 }
@@ -150,5 +151,34 @@ describe('宿主路由：规划透传与 svg 媒体白名单', () => {
     const res4 = mockRes()
     await handle(mockReq('GET', '/media', { key: KEY, src: 'media/../../outside.svg' }), res4)
     expect(res4.out.status).toBe(400)
+  })
+})
+
+describe('宿主路由：内部错误映射', () => {
+  it('未知内部异常回 500 固定文案，不把异常原文（含宿主路径）回给浏览器', async () => {
+    const { cwd, abs } = await seedProject()
+    const handle = makeHandler(cwd, abs, {
+      loadProject: async () => {
+        throw new TypeError('boom at D:\\secret\\workspace\\deck.pptd')
+      },
+    })
+    const res = mockRes()
+    await handle(mockReq('GET', '/project', { key: KEY }), res)
+    expect(res.out.status).toBe(500)
+    expect(JSON.stringify(res.out.body)).not.toContain('secret')
+    expect((res.out.body as { error?: string }).error).toBe('插件内部错误，详情见宿主日志')
+  })
+
+  it('ENOENT 映射为 404，同样不回传路径', async () => {
+    const { cwd, abs } = await seedProject()
+    const handle = makeHandler(cwd, abs, {
+      loadProject: async () => {
+        throw Object.assign(new Error("ENOENT: no such file or directory, open 'D:\\secret\\deck.pptd'"), { code: 'ENOENT' })
+      },
+    })
+    const res = mockRes()
+    await handle(mockReq('GET', '/project', { key: KEY }), res)
+    expect(res.out.status).toBe(404)
+    expect(JSON.stringify(res.out.body)).not.toContain('secret')
   })
 })

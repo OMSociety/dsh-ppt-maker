@@ -25,6 +25,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { apply } from '../src/index.js'
 import type { ToolDef } from '../src/tools/shared.js'
+import { neverReturnedFields, resultViolations } from './__fixtures__/schema-check.js'
 
 const CONSTRAINT_KEYWORDS = new Set([
   'type',
@@ -174,7 +175,10 @@ function assertRegistrable(def: ToolDef): void {
   assertSupportedJsonSchema(output.schema)
 }
 
-/** 宿主对每个成功结果做的事：按 schema 校验值 + render 必须回 lossless JSON。 */
+/**
+ * render 必须回 lossless JSON。值级 schema 校验见 tests/__fixtures__/schema-check.ts：
+ * 本文件用最小信封只验 render 形态，真实返回值的校验在 tools-e2e / tools-pr2 的每次调用里做。
+ */
 function assertRenderable(def: ToolDef, value: unknown): unknown {
   const output = def.output as { render: (args: unknown, result: never) => unknown }
   const rendered = output.render({}, value as never)
@@ -312,6 +316,22 @@ describe('宿主注册契约（严格桩，照抄 dsh-tools register/createSucce
       const failRendered = assertRenderable(def, { ok: false, error: { code: 'X', message: 'y' } })
       expect(Array.isArray(failRendered), `${name} 失败 render 必须是内容块数组`).toBe(true)
     }
+  })
+
+  it('值级 schema 校验器自身有效：缺必填、类型错、未声明字段、失败信封缺 error 都报出来', () => {
+    const schema = {
+      type: 'object',
+      required: ['ok', 'path'],
+      additionalProperties: false,
+      properties: { ok: { type: 'boolean' }, path: { type: 'string' }, n: { type: 'integer' }, tags: { type: 'array', items: { type: 'string' } } }
+    }
+    expect(resultViolations({ ok: true, path: 'a', n: 1, tags: ['x'] }, schema)).toEqual([])
+    expect(resultViolations({ ok: true }, schema)).toEqual(['$.path: 必填字段缺失'])
+    expect(resultViolations({ ok: true, path: 'a', n: 1.5 }, schema)[0]).toContain('$.n')
+    expect(resultViolations({ ok: true, path: 'a', tags: [1] }, schema)[0]).toContain('$.tags[0]')
+    expect(resultViolations({ ok: true, path: 'a', extra: 1 }, schema)).toEqual(['$.extra: schema 未声明该字段'])
+    expect(resultViolations({ ok: false }, schema)).toEqual(['$.error: 失败信封缺 error 对象'])
+    expect(neverReturnedFields(schema, [{ ok: true, path: 'a' }])).toEqual(['n', 'tags'])
   })
 
   it('严格桩自身有效：缺 output.schema 的定义会被当场拒收（回归护栏自检）', () => {

@@ -323,15 +323,19 @@ export function Inspector({ store, onCollapse }: { store: PptStore; onCollapse?:
                 onChange={(e) => {
                   const v = Number(e.target.value)
                   if (!Number.isFinite(v)) return
+                  // x/y 允许负值（PPTD 允许越界摆放，导出时裁切）；w/h 必须为正，非法输入不写入。
+                  if (i >= 2 && v <= 0) return
                   const next: [number, number, number, number] = [bx, by, bw, bh]
-                  // x/y 是画布内偏移，不能为负；w/h 是尺寸，必须为正（0 会让元素从画布上消失）。
-                  next[i] = i < 2 ? Math.max(0, v) : v > 0 ? v : 1
+                  next[i] = v
                   setField({ bounds: next })
                 }}
               />
             </label>
           ))}
         </div>
+        {outOfCanvas(target.bounds, state.deck?.size) ? (
+          <span className="ppt-inspector-hint">超出画布：导出时越界部分会被裁切。</span>
+        ) : null}
       </div>
 
       {target.elementType === 'image' && (
@@ -470,4 +474,13 @@ function TableGrid({ rows, onPatch }: { rows: unknown; onPatch: (patch: Record<s
       </span>
     </div>
   )
+}
+
+/** 元素框是否越出画布（任一边超出即算）。 */
+export function outOfCanvas(bounds: unknown, size: [number, number] | undefined): boolean {
+  if (!Array.isArray(bounds) || bounds.length !== 4) return false
+  const [x, y, w, h] = bounds as number[]
+  if (x < 0 || y < 0) return true
+  if (!size) return false
+  return x + w > size[0] || y + h > size[1]
 }

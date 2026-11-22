@@ -4,11 +4,12 @@
  * 覆盖口径（与 fsType.ts / resolver.ts 同源）：
  *  - 收集 deck 用到的全部 typeface
  *  - 逐 typeface 走 resolver（assets/fonts/ → 系统字体）
- *  - 按 fsType 位分级：
- *      Restricted (0x0002) / BitmapOnly (0x0200) → blocker（导不出也用不上）
+ *  - 按 fsType 位分级（deck.export.fontEmbed 为 subset/full 时）：
+ *      Restricted (0x0002) / BitmapOnly (0x0200) → blocker（许可禁止嵌入）
  *      Preview&Print (0x0004) → warning（目标机只读提示）
  *      NoSubset (0x0100) → warning（将整字体嵌入，体积大）
  *      CFF 轮廓（OTTO）→ warning（EOT 只封装 glyf TTF，导出时该字体会被跳过嵌入）
+ *  - fontEmbed: off 时不嵌入：禁嵌字体降为 warning（目标机需自行安装），嵌入类提示不出
  *  - 解析不到（缺字体）→ warning + 替代建议（ALTERNATIVES）
  *
  * 与 review/index.ts 集成：独立于「布局/结构」类，按每条 typeface 一条 issue。
@@ -26,6 +27,7 @@ export async function reviewFontLicenses(
   options: { projectDir?: string } = {}
 ): Promise<ReviewIssue[]> {
   const usage = collectFontUsage(deck, pages)
+  const embedding = deck.export?.fontEmbed !== 'off'
   const issues: ReviewIssue[] = []
   for (const [typeface, slots] of usage.typefaces) {
     const firstSlot: FontSlot = slots.has('regular') ? 'regular' : ([...slots][0] ?? 'regular')
@@ -55,6 +57,19 @@ export async function reviewFontLicenses(
       continue
     }
     const lic = face.license
+    const fsTypeHex = lic.fsType === null ? null : `0x${lic.fsType.toString(16).padStart(4, '0')}`
+    if (!embedding) {
+      if (lic.fsType !== null && ((lic.fsType & 0x0002) !== 0 || (lic.fsType & 0x0200) !== 0)) {
+        issues.push({
+          page: 0,
+          severity: 'warning',
+          category: 'structure',
+          description: `字体 ${typeface} 许可禁止嵌入（fsType=${fsTypeHex}，${lic.label}）；当前 fontEmbed: off，不会嵌入`,
+          suggestion: '目标机需安装该字体，否则回落系统字体'
+        })
+      }
+      continue
+    }
     if (lic.fsType === null) {
       issues.push({
         page: 0,
@@ -70,8 +85,8 @@ export async function reviewFontLicenses(
         page: 0,
         severity: 'blocker',
         category: 'structure',
-        description: `字体 ${typeface} 许可禁止嵌入（fsType=0x${lic.fsType.toString(16).padStart(4, '0')}，${lic.label}）`,
-        suggestion: '改换可嵌入字体（如思源/MiSans/阿里妈妈/站酷/LXGW 等 fsType=0x0000/0x0008 项），或在 deck.export.fontEmbed 设为 off'
+        description: `字体 ${typeface} 许可禁止嵌入（fsType=${fsTypeHex}，${lic.label}）`,
+        suggestion: '改换可嵌入字体（如思源/MiSans/阿里妈妈/站酷/LXGW 等 fsType=0x0000/0x0008 项），或在 deck.export.fontEmbed 设为 off（不嵌入，目标机需安装该字体）'
       })
       continue
     }

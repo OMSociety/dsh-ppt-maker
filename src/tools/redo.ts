@@ -2,7 +2,7 @@
  * ppt_redo — move the revision cursor forwards (`{ ok, revision, redoneOps }`).
  */
 import { redoProject } from '../core/project/store.js'
-import { renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
+import { requireBaseRevision, renderSummary, resultSchema, resolveSessionCwd, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerRedoTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -13,9 +13,10 @@ export function registerRedoTool(ctx: PluginToolCtx): (() => void) | undefined {
     parameters: {
       type: 'object',
       additionalProperties: false,
-      required: ['dir'],
+      required: ['dir', 'baseRevision'],
       properties: {
         dir: { type: 'string', minLength: 1 },
+        baseRevision: { type: 'integer', minimum: 0, description: '必填乐观锁基线修订号；与当前 manifest.revision 不一致返回 409' },
         steps: { type: 'integer', minimum: 1, maximum: 20, description: '重做步数（1–20，默认 1）' }
       }
     },
@@ -30,7 +31,9 @@ export function registerRedoTool(ctx: PluginToolCtx): (() => void) | undefined {
     execute: async (args, exec) => {
       try {
         const cwd = resolveSessionCwd(exec, ctx.sessions)
-        const result = await redoProject(cwd, args.dir as string, (args.steps as number | undefined) ?? 1)
+        const result = await redoProject(cwd, args.dir as string, (args.steps as number | undefined) ?? 1, {
+          baseRevision: requireBaseRevision(args, '重做')
+        })
         return { ok: true, revision: result.revision, redoneOps: result.undoneOps, warnings: result.warnings }
       } catch (err) {
         return toolError(err)

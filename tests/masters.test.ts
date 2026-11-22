@@ -7,7 +7,7 @@
  *   3. 逆向方言出现 masters → ProfileViolationError
  *   4. 版式名重复 → SchemaError
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createProject, loadProject } from '../src/core/project/store.js'
@@ -15,10 +15,16 @@ import { createOfficeKitEngine } from '../src/core/engine/officekit.js'
 import { parseProject, stringifyDeck, stringifyPage } from '../src/core/pptd/parse.js'
 import { readFile } from 'node:fs/promises'
 
-/** 工程目录必须在 cwd 内（store.PathOutsideCwd）；用仓内 .cache 下的临时目录。 */
+/** 工程目录必须在 cwd 内（store.PathOutsideCwd）；用仓内 .cache 下的临时目录，用例结束即删。 */
+const made: string[] = []
+afterEach(() => {
+  for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
 async function seed(dir: string, masters: unknown, layoutRefName?: string): Promise<void> {
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
+  made.push(dir)
   await createProject(process.cwd(), {
     dir,
     title: 'masters-test',
@@ -86,9 +92,15 @@ describe('deck.masters（spec §3.5）', () => {
       }
     )
     expect(built.native).toBeDefined()
-    // 版式部件存在：package 里应有 slideLayouts（OfficeKit addSlideLayout 产出）
-    const { getSlides } = await import('@office-kit/pptx')
-    expect(getSlides(built.native as never).length).toBe(1)
+    // 版式部件真实产出：两条声明的版式都在包里，且唯一一页挂在「标题页」上
+    const { getSlides, getSlideLayouts, getSlideLayoutName, getSlideLayout } = await import('@office-kit/pptx')
+    const pres = built.native as never
+    const names = getSlideLayouts(pres).map((l) => getSlideLayoutName(l))
+    expect(names).toEqual(expect.arrayContaining(['标题页', '内容页']))
+    const slides = getSlides(pres)
+    expect(slides.length).toBe(1)
+    const layout = getSlideLayout(slides[0])
+    expect(layout && getSlideLayoutName(layout)).toBe('标题页')
   })
 
   it('未知版式名：校验层 UnknownLayoutError（blocker）', () => {

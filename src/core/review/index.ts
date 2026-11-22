@@ -17,6 +17,7 @@
 import {
   findOverlappingShapePairs,
   findShapesOutsideCanvas,
+  getShapeFill,
   getShapeFillColorResolved,
   getShapeName,
   getShapeParagraphCount,
@@ -24,6 +25,10 @@ import {
   getShapeRunFormatEffective,
   getShapeRunText,
   getShapeText,
+  getSlideBackground,
+  getSlideLayout,
+  getSlideLayoutBackground,
+  getSlideMasterBackground,
   getSlideShapes,
   getSlides,
   resolveDeckBodyTextColor,
@@ -44,8 +49,6 @@ export interface ReviewIssue {
 export interface ReviewResult {
   pass: boolean
   issues: ReviewIssue[]
-  /** libreoffice-kit missing-font families, filled by the caller (render step). */
-  missingFonts: string[]
 }
 
 /** WCAG relative luminance of #RRGGBB. */
@@ -163,13 +166,14 @@ export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}):
       })
     }
 
-    // Contrast: per-run text color vs shape fill. The deck body color is the
-    // fallback when a run carries no explicit color; per-run colors override
-    // it. Only solid-filled shapes with text are meaningful targets; the check
-    // is deliberately conservative (no gradient/image fill analysis).
+    // Contrast: per-run text color vs what sits behind it. The deck body color
+    // is the fallback when a run carries no explicit color. A shape without a
+    // fill of its own shows the effective page background (slide → layout →
+    // master solid colour); gradient / pattern / image paints are not analysed.
     const bodyColor = bodyTextColorOf(slide)
+    const pageBackground = solidBackgroundOf(pres, slide)
     for (const shape of shapesWithText(slide)) {
-      const fill = getShapeFillColorResolved(pres, shape)
+      const fill = getShapeFillColorResolved(pres, shape) ?? (paintsNothing(shape) ? pageBackground : null)
       if (!fill) continue
       for (const run of runColorsOf(pres, shape, bodyColor)) {
         if (!run.color) continue
@@ -190,8 +194,36 @@ export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}):
 
   return {
     pass: !issues.some((i) => i.severity === 'blocker'),
-    issues,
-    missingFonts: []
+    issues
+  }
+}
+
+/** True when the shape has no paint of its own, so the page background shows through. */
+function paintsNothing(shape: SlideShapeData): boolean {
+  try {
+    const kind = getShapeFill(shape).kind
+    return kind === 'none' || kind === 'background' || (kind as string) === 'inherit'
+  } catch {
+    return false
+  }
+}
+
+/** First solid colour on the slide → layout → master background chain. */
+function solidBackgroundOf(pres: PresentationData, slide: SlideData): string | null {
+  const solid = (bg: { kind: string; color?: string } | null | undefined): string | null | undefined => {
+    if (!bg || bg.kind === 'inherit') return undefined
+    return bg.kind === 'solid' && typeof bg.color === 'string' ? bg.color : null
+  }
+  try {
+    const own = solid(getSlideBackground(slide))
+    if (own !== undefined) return own
+    const layout = getSlideLayout(slide)
+    if (!layout) return null
+    const fromLayout = solid(getSlideLayoutBackground(layout))
+    if (fromLayout !== undefined) return fromLayout
+    return solid(getSlideMasterBackground(pres, layout)) ?? null
+  } catch {
+    return null
   }
 }
 

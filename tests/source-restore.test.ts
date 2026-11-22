@@ -4,7 +4,7 @@
  * 三条主线：
  *  1. reverseImport 落 source/original.pptx，deck.source 记账 archive/originalSha1；
  *  2. 零编辑时 buildProjectDeck 整份从存档恢复（buildWarnings 带恢复说明），
- *     编辑后（update_page 触内容字段）sourceRef 失效、回退逐页重建；
+ *     任一页内容与导入时页指纹不符即回退逐页重建；
  *  3. planSourceRestore 的存档级门槛（sha1 不一致 / 存档缺失 / 页数不符 → 全回退）。
  */
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -47,7 +47,7 @@ describe('源存档与整页恢复', () => {
     expect(pipeline.buildWarnings.some((w) => w.includes('零编辑') && w.includes('源存档恢复'))).toBe(true)
   })
 
-  it('update_page 触内容字段 → sourceRef 失效，整份回退逐页重建', async () => {
+  it('update_page 触内容字段 → 页指纹不符，整份回退逐页重建', async () => {
     const bytes = await buildFixturePptx()
     await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
     const before = await loadProject(cwd, 'proj')
@@ -56,7 +56,7 @@ describe('源存档与整页恢复', () => {
     expect(decision.archiveReady).toBe(true)
     expect(decision.restorePage.every(Boolean)).toBe(true)
 
-    // 改一个元素的文字 → invalidatePageProvenance 清掉整页 sourceRef。
+    // 改页内容 → 页指纹不符；同时 invalidatePageProvenance 清掉整页 sourceRef。
     await editProject(cwd, {
       dir: 'proj',
       baseRevision: before.manifest.revision,
@@ -89,6 +89,35 @@ describe('源存档与整页恢复', () => {
     const missing = await planSourceRestore(loaded.deck, [...loaded.pages.values()], projAbs)
     expect(missing.archiveReady).toBe(false)
     expect(missing.notes.some((n) => n.includes('读不到'))).toBe(true)
+  })
+
+  it('按导入时页指纹对账：删空页、保留 sourceRef 改字都判为已改', async () => {
+    const bytes = await buildFixturePptx()
+    await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
+    const loaded = await loadProject(cwd, 'proj')
+    const projAbs = path.join(cwd, 'proj')
+    const pages = loaded.deck.pages.map((ref) => loaded.pages.get(String(ref))!)
+
+    const emptied = pages.map((page, i) => (i === 0 ? { ...page, elements: [] } : page))
+    const emptyDecision = await planSourceRestore(loaded.deck, emptied, projAbs)
+    expect(emptyDecision.restorePage[0]).toBe(false)
+
+    const retexted = pages.map((page, i) =>
+      i === 0
+        ? {
+            ...page,
+            elements: page.elements.map((el) =>
+              el.elementType === 'text' ? { ...el, content: { ...(el as { content?: object }).content, text: '偷偷改字' } } : el
+            )
+          }
+        : page
+    )
+    const retextDecision = await planSourceRestore(loaded.deck, retexted as typeof pages, projAbs)
+    expect(retextDecision.restorePage[0]).toBe(false)
+
+    await rm(path.join(projAbs, 'source', 'page-fingerprints.json'))
+    const noPrints = await planSourceRestore(loaded.deck, pages, projAbs)
+    expect(noPrints.archiveReady).toBe(false)
   })
 
   it('generate 方言工程不触发恢复轨', async () => {

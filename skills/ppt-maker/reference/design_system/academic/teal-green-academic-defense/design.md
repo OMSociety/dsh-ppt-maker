@@ -55,7 +55,7 @@ The source canvas is 483.874×272.126 pt, with a 1.778 (16:9) aspect ratio. On s
 
 【Typography】
 
-The source deck’s primary typeface is the sans serif NimbusSanL-Regu/Bold (render with Liter / Chinese: MiSans); use mathematical/monospaced faces for equations and code (render with JetBrains Mono, via customFonts). Measured body text is 8.52 pt=1x, slide titles 13.63 pt≈1.60x, chapter titles 23.55 pt≈2.76x, footnotes/footers 5.68 pt≈0.67x; subsection bold text is 9.46 pt, banner text 11.36 pt. At 960×540, the proportional equivalents are approximately 17/27/47/11 pt. Slide titles commonly follow “Primary Class - Subclass”; use sentence case for body copy, uppercase for proper names/acronyms, and keep numbers, Greek letters, superscripts, subscripts, and equations aligned on the same line. Use bold or a word-level background highlight for emphasis.
+The source deck’s primary typeface is the sans serif NimbusSanL-Regu/Bold (render with Liter / Chinese: MiSans); use mathematical/monospaced faces for equations and code (render with JetBrains Mono, font file in project assets/fonts/). Measured body text is 8.52 pt=1x, slide titles 13.63 pt≈1.60x, chapter titles 23.55 pt≈2.76x, footnotes/footers 5.68 pt≈0.67x; subsection bold text is 9.46 pt, banner text 11.36 pt. At 960×540, the proportional equivalents are approximately 17/27/47/11 pt. Slide titles commonly follow “Primary Class - Subclass”; use sentence case for body copy, uppercase for proper names/acronyms, and keep numbers, Greek letters, superscripts, subscripts, and equations aligned on the same line. Use bold or a word-level background highlight for emphasis.
 
 【Chart Language】
 

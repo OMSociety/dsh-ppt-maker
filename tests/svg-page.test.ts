@@ -1,26 +1,20 @@
 /**
  * SVG 页轨道端到端：media/svg/*.svg → vendored 编译器 → importSlide 混合合并。
  *
- * 依赖本机已备好的 vendor/.venv（scripts/prepare-vendor-env.mjs）。
- * 环境缺席时用例 skipped，不让 CI（无 venv）变红。
+ * 依赖 vendor/.venv（scripts/prepare-vendor-env.mjs；CI 在测试前执行）。
+ * 就绪判据统一见 tests/__fixtures__/venv.ts；未就绪时用例 skipped 并打印缺项。
  */
-import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { getShapePosition, getShapeSize, getShapeText, getShapeTextAutoFit, getShapeTextWrap, getSlideCount, getSlideShapes, getSlideSize, getSlideText, getSlides, loadPresentation, validatePresentation } from '@office-kit/pptx'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { PACKAGE_ROOT } from '../src/root.js'
 import { compileSvgPage, themeHashOf } from '../src/core/svg/compiler.js'
 import { createProject, editProject, loadProject } from '../src/core/project/store.js'
 import { buildProjectDeck, renderPptxImages, saveRawProjectPptx } from '../src/core/export-pipeline.js'
+import { probeVenv } from './__fixtures__/venv.js'
 
-const VENV_PYTHON = path.join(
-  PACKAGE_ROOT,
-  'skills', 'ppt-maker', 'vendor', '.venv',
-  process.platform === 'win32' ? path.join('Scripts', 'python.exe') : path.join('bin', 'python')
-)
-const hasVenv = existsSync(VENV_PYTHON)
+const hasVenv = probeVenv().ready
 
 const SPIKE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
   <rect x="0" y="0" width="960" height="540" fill="#123456"/>

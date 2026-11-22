@@ -17,7 +17,7 @@ model（JS 对象）与 AST（YAML 解析树）成对使用：model 负责引擎
 PPTD 的方言、profile 与错误码在生成、逆向和编辑路径中使用同一套定义；解析失败定位到具体字段，不静默降级为另一种方言。
 
 ### 5. 主线保持全 TypeScript
-引擎、工程、质检、导出与工作台共用 TypeScript 领域模型。SVG 页面轨使用 vendored 自 ppt-master 的 Python 转换器作为编译桥，经受圈子进程调用；其产物仍进入统一的 PPTX 工程与发布管线。
+引擎、工程、质检、导出与工作台共用 TypeScript 领域模型。SVG 页面轨使用 vendored 自 ppt-master 的 Python 转换器作为编译桥，经子进程受控调用；其产物仍进入统一的 PPTX 工程与发布管线。
 
 ### 6. 撤销 / 重做采用游标模型
 `history/` 采用 append-only 快照，manifest 保存当前游标。撤销与重做只移动游标，新编辑会截断被放弃的分支；`r0000` 是永久锚点。

@@ -7,16 +7,18 @@
  *   - 纯文字（默认）：显示人话，保存时按行包回 `<p>`；
  *   - 标记：直接编辑原始 markup，供精修行内格式。
  *
- * 这里只做「简单 markup（只含 `<p>`/`<br>`）」与纯文字之间的无损互转；
- * 含行内格式的文本由调用方按 `hasRichMarkup` 回退到标记模式，避免静默丢格式。
+ * 这里只做「简单 markup（只含不带属性的 `<p>`/`<br>`）」与纯文字之间的无损互转；
+ * 含行内格式或段落属性（如 `<p style="text-align:center">`）的文本由调用方按
+ * `hasRichMarkup` 回退到标记模式，避免静默丢格式。
  */
 
-/** 除 `<p>`/`<br>` 之外还有别的标签（即含行内格式）。 */
+/** 含 `<p>`/`<br>` 以外的标签，或任何标签带属性（段落样式也算格式）。 */
 export function hasRichMarkup(text: string): boolean {
-  const re = /<\/?([a-zA-Z][a-zA-Z0-9-]*)/g
+  const re = /<\/?([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>/g
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
     if (!/^(p|br)$/i.test(m[1])) return true
+    if (m[2].replace(/\//g, '').trim() !== '') return true
   }
   return false
 }

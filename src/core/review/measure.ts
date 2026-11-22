@@ -14,7 +14,7 @@ import { buildFontkitMeasurer, type RegisteredFont } from '@office-kit/pptx-prev
 import type { TextMeasurer } from '@office-kit/pptx-preview'
 import type { Presentation, Page } from '../pptd/schema.js'
 import { collectFontUsage } from '../fonts/usage.js'
-import { resolveTypeface } from '../fonts/resolver.js'
+import { resolveTypeface, type FontSlot } from '../fonts/resolver.js'
 import { extractTtcFace, isTtcContainer } from '../fonts/ttc-extract.js'
 
 export interface MeasurerBuildResult {
@@ -23,6 +23,15 @@ export interface MeasurerBuildResult {
   registered: string[]
   /** 解析不到、未注册的族名清单（这些族仍用启发式/内置 face 量测）。 */
   unresolved: string[]
+  /** 用到粗/斜体但本机只有其它字重的「族 字形」清单：按最近字形量测，宽度可能偏差。 */
+  approximated: string[]
+}
+
+const SLOT_FLAGS: Record<FontSlot, { bold: boolean; italic: boolean }> = {
+  regular: { bold: false, italic: false },
+  bold: { bold: true, italic: false },
+  italic: { bold: false, italic: true },
+  boldItalic: { bold: true, italic: true }
 }
 
 export async function buildDeckMeasurer(
@@ -32,25 +41,33 @@ export async function buildDeckMeasurer(
 ): Promise<MeasurerBuildResult | null> {
   try {
     const usage = collectFontUsage(deck, pages)
-    const typefaces = [...usage.typefaces.keys()]
     const fonts: RegisteredFont[] = []
     const registered: string[] = []
     const unresolved: string[] = []
-    for (const typeface of typefaces) {
-      try {
-        const face = await resolveTypeface(typeface, 'regular', { projectDir: options.projectDir })
-        if (!face) {
-          unresolved.push(typeface)
-          continue
+    const approximated: string[] = []
+    for (const [typeface, usedSlots] of usage.typefaces) {
+      // regular 始终注册：它是该族所有未注册字形的回落。
+      const slots = new Set<FontSlot>(['regular', ...usedSlots])
+      let any = false
+      const registeredSlots = new Set<FontSlot>()
+      for (const slot of slots) {
+        try {
+          const face = await resolveTypeface(typeface, slot, { projectDir: options.projectDir })
+          if (!face) continue
+          if (face.slot !== slot && slot !== 'regular') approximated.push(`${typeface} ${slot}`)
+          any = true
+          if (registeredSlots.has(face.slot)) continue
+          registeredSlots.add(face.slot)
+          const bytes = isTtcContainer(face.bytes) ? extractTtcFace(face.bytes, face.faceIndex) : face.bytes
+          fonts.push({ family: typeface, source: bytes, ...SLOT_FLAGS[face.slot] })
+        } catch {
+          /* 该字形不可用：由 regular 或内置 face 量测 */
         }
-        const bytes = isTtcContainer(face.bytes) ? extractTtcFace(face.bytes, face.faceIndex) : face.bytes
-        fonts.push({ family: typeface, source: bytes })
-        registered.push(typeface)
-      } catch {
-        unresolved.push(typeface)
       }
+      if (any) registered.push(typeface)
+      else unresolved.push(typeface)
     }
-    return { measureText: buildFontkitMeasurer({ fonts }), registered, unresolved }
+    return { measureText: buildFontkitMeasurer({ fonts }), registered, unresolved, approximated }
   } catch {
     return null
   }

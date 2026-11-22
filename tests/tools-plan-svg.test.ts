@@ -8,7 +8,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { apply } from '../src/index.js'
 import type { ToolDef } from '../src/tools/shared.js'
-import { existsSync } from 'node:fs'
+import { probeVenv } from './__fixtures__/venv.js'
 
 interface ToolResult {
   ok: boolean
@@ -76,12 +76,16 @@ describe('ppt_plan', () => {
   it('setBrief → get 往返；setPlan 写 plan.yml 且进乐观锁', async () => {
     await call('ppt_create', { dir: 'proj-plan', title: '规划' })
     const brief = { purpose: '汇报', audience: '导师', coreMessage: '结论先行', mode: 'deck', pageCount: 8 }
-    const r1 = await call('ppt_plan', { dir: 'proj-plan', action: 'setBrief', brief })
-    expect(r1.ok).toBe(true)
+    const noBase = await call('ppt_plan', { dir: 'proj-plan', action: 'setBrief', brief })
+    expect(noBase).toMatchObject({ ok: false, error: { code: 'InvalidArgument', status: 400 } })
+    const staleBrief = await call('ppt_plan', { dir: 'proj-plan', action: 'setBrief', brief, baseRevision: 3 })
+    expect(staleBrief).toMatchObject({ ok: false, error: { code: 'RevisionMismatch', status: 409 } })
+    const r1 = await call('ppt_plan', { dir: 'proj-plan', action: 'setBrief', brief, baseRevision: 0 })
+    expect(r1).toMatchObject({ ok: true, revision: 0 })
     const raw = await readFile(path.join(cwd, 'proj-plan', 'brief.md'), 'utf8')
     expect(raw).toContain('汇报')
 
-    const r2 = await call('ppt_plan', { dir: 'proj-plan', action: 'setPlan', plan: { status: 'draft', pages: [{ page: 'pages/01.page', title: '封面' }] } })
+    const r2 = await call('ppt_plan', { dir: 'proj-plan', action: 'setPlan', baseRevision: 0, plan: { status: 'draft', pages: [{ page: 'pages/01.page', title: '封面' }] } })
     expect(r2.ok).toBe(true)
     expect(typeof r2.revision).toBe('number')
     await access(path.join(cwd, 'proj-plan', 'plan.yml'))
@@ -94,43 +98,47 @@ describe('ppt_plan', () => {
 
   it('setPlan 缺 pages → OpError；plan 里 svg 页缺 svgRef → OpError', async () => {
     await call('ppt_create', { dir: 'proj-plan2', title: '规划2' })
-    const bad = await call('ppt_plan', { dir: 'proj-plan2', action: 'setPlan', plan: { status: 'draft' } })
+    const bad = await call('ppt_plan', { dir: 'proj-plan2', action: 'setPlan', baseRevision: 0, plan: { status: 'draft' } })
     expect(bad.ok).toBe(false)
     expect((bad.error as { name?: string; message?: string })?.name ?? (bad.error as { message?: string })?.message).toMatch(/OpError|pages/)
-    const bad2 = await call('ppt_plan', { dir: 'proj-plan2', action: 'setPlan', plan: { pages: [{ page: 'pages/01.page', type: 'svg' }] } })
+    const bad2 = await call('ppt_plan', { dir: 'proj-plan2', action: 'setPlan', baseRevision: 0, plan: { pages: [{ page: 'pages/01.page', type: 'svg' }] } })
     expect(bad2.ok).toBe(false)
   })
 })
 
-const venvReady = existsSync(
-  path.join(__dirname, '..', 'skills', 'ppt-maker', 'vendor', '.venv-ready.json')
-)
+const venvReady = probeVenv().ready
 
-describe.skipIf(!venvReady)('ppt_svg', () => {
+describe.skipIf(!venvReady)('ppt_svg（需要 SVG 编译器环境）', () => {
   it('put 写源 + 挂 svg 页；compile 早检通过', async () => {
     await call('ppt_create', { dir: 'proj-svg', title: 'SVG' })
     const add = await call('ppt_edit', {
       dir: 'proj-svg',
+      baseRevision: 0,
       ops: [{ op: 'add_page', page: 'pages/01.page', content: { pageType: 'svg', svgSource: { ref: 'media/svg/cover.svg' }, elements: [] } }]
     })
     expect(add.ok).toBe(true)
-    const put = await call('ppt_svg', { dir: 'proj-svg', action: 'put', name: 'cover.svg', svg: SVG_DOC, page: 'pages/01.page' })
+    const put = await call('ppt_svg', { dir: 'proj-svg', action: 'put', name: 'cover.svg', svg: SVG_DOC, page: 'pages/01.page', baseRevision: 1 })
     expect(put.ok).toBe(true)
     expect(put.ref).toBe('media/svg/cover.svg')
     await access(path.join(cwd, 'proj-svg', 'media', 'svg', 'cover.svg'))
 
     const compiled = await call('ppt_svg', { dir: 'proj-svg', action: 'compile', ref: 'media/svg/cover.svg' })
-    expect(compiled.ok).toBe(true)
+    // 失败时把工具返回的 error 带进断言信息，区分「环境偶发」与「功能坏了」
+    expect(compiled.ok, `compile 失败：${JSON.stringify(compiled.error)}`).toBe(true)
     expect(compiled.compiled).toBe(true)
   }, 180_000)
+})
 
+describe('ppt_svg（不依赖编译器环境）', () => {
   it('put 挂到非 svg 页 → 409', async () => {
     await call('ppt_create', { dir: 'proj-svg2', title: 'SVG2' })
     await call('ppt_edit', {
       dir: 'proj-svg2',
-      ops: [{ op: 'add_page', page: 'pages/01.page', content: 'elements: []\n' }]
+      baseRevision: 0,
+      ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }]
     })
-    const r = await call('ppt_svg', { dir: 'proj-svg2', action: 'put', name: 'cover.svg', svg: SVG_DOC, page: 'pages/01.page' })
+    expect(await call('ppt_plan', { dir: 'proj-svg2', action: 'get' })).toMatchObject({ ok: true, revision: 1 })
+    const r = await call('ppt_svg', { dir: 'proj-svg2', action: 'put', name: 'cover.svg', svg: SVG_DOC, page: 'pages/01.page', baseRevision: 1 })
     expect(r.ok).toBe(false)
     expect((r.error as { code?: string }).code).toBe('SvgSourceInvalid')
   })

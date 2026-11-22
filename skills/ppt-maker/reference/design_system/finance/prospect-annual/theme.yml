@@ -18,11 +18,11 @@ colors:
   seriesolive: '#998C00'  # 堆叠需要时追加
 textStyles:
   title:
-    fontFamily: { latin: Anton, ea: MiSans }   # 超浓缩粗黑标题（Anton 经 customFonts；中文 MiSans Bold）
+    fontFamily: { latin: Anton, ea: MiSans }   # 超浓缩粗黑标题（Anton 字体文件放工程 assets/fonts/；中文 MiSans Bold）
     color: $ink
     bold: true
   body:
-    fontFamily: { latin: Inter, ea: MiSans }   # Inter 正文/图表（经 customFonts；备选 Liter）
+    fontFamily: { latin: Inter, ea: MiSans }   # Inter 正文/图表（字体文件放工程 assets/fonts/；备选 Liter）
     color: $ink
   caption:
     fontFamily: { latin: Inter, ea: MiSans }

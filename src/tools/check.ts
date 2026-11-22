@@ -53,7 +53,8 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
             }
           }
         },
-        ai: { type: 'object', additionalProperties: true }
+        ai: { type: 'object', additionalProperties: true },
+        pages: { type: 'array', items: { type: 'integer' }, description: '本次只检查了这些页（1 起）；缺省表示全页' }
       }),
       render: renderSummary((r) => {
         const issues = (r.issues as Array<{ severity?: string }> | undefined) ?? []
@@ -61,7 +62,7 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
         const ai = r.ai as { performed?: boolean } | undefined
         const aiNote = ai === undefined ? '' : ai.performed === true ? '，AI 已审' : '，AI 降级'
         const pages = (r as { pages?: number[] | null }).pages
-        const coverage = Array.isArray(pages) ? `，仅检 ${pages.length} 页` : '，全页覆盖'
+        const coverage = Array.isArray(pages) ? `，仅检第 ${pages.join('、')} 页` : '，全页覆盖'
         return `质检：${r.pass === true ? '通过' : `${blockers} 个阻断`}（共 ${issues.length} 条${aiNote}${coverage}）`
       })
     },
@@ -109,7 +110,8 @@ export function registerCheckTool(ctx: PluginToolCtx): (() => void) | undefined 
           /* 落账是副产物：manifest 写不动时质检结果仍然有效 */
         }
 
-        return { ok: true, ...result }
+        const pages = args.pages as number[] | undefined
+        return { ok: true, ...result, ...(pages === undefined ? {} : { pages }) }
       } catch (err) {
         return toolError(err)
       }

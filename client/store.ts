@@ -202,10 +202,13 @@ export function createPptStore(sessionId: string) {
   /**
    * 打开 / 切到某个工程：GET /project 拉整棵 deck（面板据此画 ThumbStrip + Stage）。
    * 草稿 / 冲突 / 外部修改横幅一同清零（draft 本来就是 per 工程的状态）。
-   * 点同一条 = noop。失败 → 挂 status:error + toast，不改 activeKey。
+   * 点同一条 = noop；`force` 时同一工程也重拉（采用外部修改 / 采用服务端版本），并保留当前页位置。
+   * 失败 → 挂 status:error + toast，不改 activeKey。
    */
-  async function switchProject(key: string): Promise<boolean> {
-    if (!key || key === state.activeKey) return true
+  async function switchProject(key: string, options: { force?: boolean } = {}): Promise<boolean> {
+    if (!key) return true
+    const reload = key === state.activeKey
+    if (reload && !options.force) return true
     try {
       const res = await api.project(state.sessionId, key)
       patch({
@@ -219,7 +222,9 @@ export function createPptStore(sessionId: string) {
         currentPageData: null,
         currentPageRevision: -1,
         lastSeenRevision: res.revision,
-        currentPage: 0,
+        currentPage: reload
+          ? Math.max(0, Math.min(state.currentPage, (Array.isArray(res.deck?.pages) ? res.deck.pages.length : 1) - 1))
+          : 0,
         selection: null,
         draft: null,
         conflict: null,
@@ -260,6 +265,12 @@ export function createPptStore(sessionId: string) {
       // canUndo/canRedo 由宿主 /state 的 manifest 轮廓给出（activeKey 工程才有意义）。
       canUndo: Boolean(st.manifest?.canUndo),
       canRedo: Boolean(st.manifest?.canRedo),
+    }
+
+    if (nextKey !== null && st.manifestError) {
+      // 活动工程存在但读不出来（deck.pptd 解析失败、manifest 损坏等）：显示原因，而不是空工作台。
+      patch({ ...patchBase, status: 'error', error: `工程读取失败：${st.manifestError}` })
+      return
     }
 
     if (nextKey === null) {
@@ -393,6 +404,15 @@ export function createPptStore(sessionId: string) {
       toast(`保存失败：${(error as Error).message}`, 'error')
       return false
     }
+  }
+
+  /** 丢弃本地状态后按磁盘重载活动工程：deck、修订基线、当前页与全部缩略图一并刷新。 */
+  async function reloadActive(): Promise<void> {
+    const key = state.activeKey
+    if (!key) return
+    if (!(await switchProject(key, { force: true }))) return
+    void actions.ensurePageLoaded(true)
+    void actions.syncProjectPages()
   }
 
   const actions = {
@@ -644,7 +664,7 @@ export function createPptStore(sessionId: string) {
       if (!state.canUndo) return
       const key = state.activeKey
       try {
-        const res = await api.undo(state.sessionId, key)
+        const res = await api.undo(state.sessionId, key, state.lastSeenRevision)
         patch({
           lastSeenRevision: res.revision,
           conflict: null,
@@ -660,6 +680,10 @@ export function createPptStore(sessionId: string) {
         void actions.syncProjectPages()
         toast('已撤销', 'info')
       } catch (error) {
+        if (error instanceof ConflictError) {
+          patch({ conflict: { revision: error.revision } })
+          return
+        }
         toast(`撤销失败：${(error as Error).message}`, 'error')
       }
     },
@@ -670,7 +694,7 @@ export function createPptStore(sessionId: string) {
       if (!state.canRedo) return
       const key = state.activeKey
       try {
-        const res = await api.redo(state.sessionId, key)
+        const res = await api.redo(state.sessionId, key, state.lastSeenRevision)
         patch({
           lastSeenRevision: res.revision,
           conflict: null,
@@ -678,13 +702,19 @@ export function createPptStore(sessionId: string) {
           currentPageData: null,
           currentPageRevision: -1,
           pagesAst: {},
-          // redo 成功后游标必 > 0；canRedo 是否还有余量交给下轮轮询校准
+          // redo 成功后游标必 > 0；是否还能继续重做以宿主 /state 为准，立即拉一次校准按钮态
           canUndo: true,
+          canRedo: false,
         })
         void actions.ensurePageLoaded()
         void actions.syncProjectPages()
+        void api.state(state.sessionId).then(applyPoll).catch(() => {})
         toast('已重做', 'info')
       } catch (error) {
+        if (error instanceof ConflictError) {
+          patch({ conflict: { revision: error.revision } })
+          return
+        }
         toast(`重做失败：${(error as Error).message}`, 'error')
       }
     },
@@ -732,7 +762,6 @@ export function createPptStore(sessionId: string) {
       if (!state.activeKey) return null
       try {
         const saved = await api.exportPptxToProject(state.sessionId, state.activeKey)
-        if (saved.revision) patch({ lastSeenRevision: saved.revision })
         const kb = Math.max(1, Math.round(saved.bytes / 1024))
         toast(`已导出 ${saved.relativePath || saved.filename}（${kb} KB）`, 'info', {
           file: saved.absolutePath || undefined,
@@ -751,13 +780,13 @@ export function createPptStore(sessionId: string) {
      */
     async acceptExternal() {
       patch({ externalChange: null, draft: null, conflict: null })
-      if (state.activeKey) await switchProject(state.activeKey)
+      await reloadActive()
     },
 
     /** 「冲突」横幅上的「采用服务端版本」：清冲突 + 清草稿，重载磁盘上的样子。 */
     async resolveConflictTheirs() {
       patch({ conflict: null, draft: null })
-      if (state.activeKey) await switchProject(state.activeKey)
+      await reloadActive()
     },
 
     flush,

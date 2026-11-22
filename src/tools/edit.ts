@@ -10,7 +10,7 @@
  *  - returns `{ ok, revision, appliedOps, warnings }`.
  */
 import { editProject, OP_NAMES, type OpRecord } from '../core/project/store.js'
-import { renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
+import { requireBaseRevision, renderSummary, resultSchema, resolveSessionCwd, sessionIdOf, toolError, type PluginToolCtx } from './shared.js'
 
 export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
   const off = ctx.tools.register({
@@ -19,12 +19,12 @@ export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
       '对 PPTD 工程应用一组编辑 op（原子批量：任一 op 失败整批不落盘）。' +
       'op 词表：add_page / remove_page / move_page / update_page / page_duplicate / add_element / update_element / remove_element / update_plan / update_svg_source' +
       '（别名 page_add=add_page、page_delete=remove_page）。' +
-      '带 baseRevision 做乐观锁：与 manifest.revision 不一致返回 409 RevisionMismatch。' +
+      '必须带 baseRevision 做乐观锁：与 manifest.revision 不一致返回 409 RevisionMismatch。' +
       '返回 { ok, revision, appliedOps, warnings }。',
     parameters: {
       type: 'object',
       additionalProperties: false,
-      required: ['dir', 'ops'],
+      required: ['dir', 'ops', 'baseRevision'],
       properties: {
         dir: { type: 'string', minLength: 1 },
         ops: {
@@ -40,7 +40,7 @@ export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
         baseRevision: {
           type: 'integer',
           minimum: 0,
-          description: '乐观锁基线修订号；与当前 manifest.revision 不一致时整批拒绝（409）'
+          description: '必填乐观锁基线修订号；与当前 manifest.revision 不一致时整批拒绝（409）'
         }
       }
     },
@@ -62,7 +62,7 @@ export function registerEditTool(ctx: PluginToolCtx): (() => void) | undefined {
         const result = await editProject(cwd, {
           dir: args.dir as string,
           ops: args.ops as OpRecord[],
-          baseRevision: args.baseRevision as number | undefined,
+          baseRevision: requireBaseRevision(args, 'ppt_edit '),
           sessionId: sessionIdOf(exec)
         })
         return { ok: true, revision: result.revision, appliedOps: result.appliedOps, warnings: result.warnings, merged: result.merged }

@@ -8,6 +8,8 @@
  *
  * 判据：
  *   1. 入口 `main`、`icon`、`cordis.patch.yml`、`package.json` 必须在包里；
+ *      运行期要读的 `docs/pptd-spec.md`、`scripts/prepare-vendor-env.mjs` 与
+ *      vendor 的 requirements / 编译驱动也必须在包里；
  *   2. `exports` 里指向本仓文件的字面量路径必须在包里；
  *   3. `files` 白名单的每一项至少要有一项落地（目录至少一个文件，glob 至少命中一次，
  *      带 `!` 的负向条目跳过）；
@@ -37,6 +39,10 @@ need(pkg.main ?? 'index.js', '入口 main')
 if (pkg.icon) need(pkg.icon, '插件图标 icon')
 need('cordis.patch.yml', '挂载声明')
 need('package.json', '包清单本身')
+need('docs/pptd-spec.md', '技能正文要求模型读取的 PPTD 全量规格')
+need('scripts/prepare-vendor-env.mjs', 'SvgCompilerMissing 报错指引的建环境脚本')
+need('skills/ppt-maker/vendor/requirements.txt', '建环境脚本读取的 pin 依赖')
+need('skills/ppt-maker/vendor/compile_svg_page.py', 'SVG 页编译驱动')
 
 for (const target of Object.values(pkg.exports ?? {})) {
   const value = typeof target === 'string' ? target : target?.default

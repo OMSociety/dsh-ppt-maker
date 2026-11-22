@@ -7,7 +7,7 @@
  * **复制几何**进本包。右侧栏在标签页里读不到主题上下文，所以品牌标自带渐变——
  * 这是「界面图标颜色只走 `currentColor` / `--dsw-alias-*`」那条纪律的例外。
  *
- * 渐变 id 带插件前缀，免得与别的插件或宿主的图标在同一页撞 `url(#…)`。
+ * 渐变 id 带插件前缀与实例后缀，免得与别的插件、宿主图标或本图标的其它实例在同一页撞 `url(#…)`。
  *
  * **同一处几何只有一份**：改 `icon.svg` 就回来改 `PptMark`，别处不另画。
  */
@@ -27,21 +27,25 @@ export interface GlyphProps {
  * 同 `icon.svg` 一样在 36 画板上放大 1.3 倍取景，贴合侧边栏的视觉重量。
  */
 export function PptMark({ size = 16, className, style }: GlyphProps) {
+  // 每个实例用独立渐变 id：同屏多份图标时，卸载其中一份不会让其余引用落空。
+  const uid = React.useId().replace(/:/g, '')
+  const back = `ppt-mark-back-${uid}`
+  const front = `ppt-mark-front-${uid}`
   return (
     <svg width={size} height={size} viewBox="0 0 36 36" fill="none" aria-hidden="true" className={className} style={style}>
       <defs>
-        <linearGradient id="ppt-mark-back" x1="13" y1="8" x2="28" y2="20" gradientUnits="userSpaceOnUse">
+        <linearGradient id={back} x1="13" y1="8" x2="28" y2="20" gradientUnits="userSpaceOnUse">
           <stop stopColor="#FF9E66" />
           <stop offset="1" stopColor="#FA541C" />
         </linearGradient>
-        <linearGradient id="ppt-mark-front" x1="7" y1="13" x2="25" y2="27" gradientUnits="userSpaceOnUse">
+        <linearGradient id={front} x1="7" y1="13" x2="25" y2="27" gradientUnits="userSpaceOnUse">
           <stop stopColor="#69B9FF" />
           <stop offset="1" stopColor="#324DE2" />
         </linearGradient>
       </defs>
       <g transform="translate(18 18) scale(1.3) translate(-18 -18)">
-        <rect x="13.5" y="8" width="14" height="11" rx="2.5" fill="url(#ppt-mark-back)" />
-        <rect x="8" y="13.5" width="17" height="13" rx="2.5" fill="url(#ppt-mark-front)" />
+        <rect x="13.5" y="8" width="14" height="11" rx="2.5" fill={`url(#${back})`} />
+        <rect x="8" y="13.5" width="17" height="13" rx="2.5" fill={`url(#${front})`} />
         <rect x="11.5" y="17" width="10" height="2" rx="1" fill="#FFFFFF" />
         <rect x="11.5" y="21" width="6.5" height="2" rx="1" fill="#FFFFFF" fillOpacity="0.85" />
       </g>

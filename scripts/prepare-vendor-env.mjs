@@ -7,6 +7,10 @@
  * marker file matches the current requirements hash.
  *
  * Usage: node scripts/prepare-vendor-env.mjs
+ *
+ * Environment overrides:
+ *   PIP_INDEX  pip index URL (default: Tsinghua mirror https://pypi.tuna.tsinghua.edu.cn/simple)
+ *   PYTHON     interpreter used to create the venv (default: python on Windows, python3 elsewhere)
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -19,7 +23,8 @@ const VENDOR_DIR = path.join(PACKAGE_ROOT, 'skills', 'ppt-maker', 'vendor')
 const VENV_DIR = path.join(VENDOR_DIR, '.venv')
 const REQUIREMENTS = path.join(VENDOR_DIR, 'requirements.txt')
 const MARKER = path.join(VENDOR_DIR, '.venv-ready.json')
-const PIP_INDEX = 'https://pypi.tuna.tsinghua.edu.cn/simple'
+const PIP_INDEX = process.env.PIP_INDEX || 'https://pypi.tuna.tsinghua.edu.cn/simple'
+const BASE_PYTHON = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3')
 
 const venvPython = process.platform === 'win32'
   ? path.join(VENV_DIR, 'Scripts', 'python.exe')
@@ -52,7 +57,7 @@ if (existsSync(venvPython) && existsSync(MARKER)) {
 
 if (!existsSync(venvPython)) {
   console.log('[prepare-vendor-env] creating venv at', VENDOR_DIR)
-  run('python', ['-m', 'venv', VENV_DIR], 'python -m venv')
+  run(BASE_PYTHON, ['-m', 'venv', VENV_DIR], ` -m venv`)
 }
 
 console.log('[prepare-vendor-env] installing pinned requirements')

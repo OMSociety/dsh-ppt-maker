@@ -23,12 +23,14 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
   ProjectError,
+  checksumOf,
   createProject,
   editProject,
+  loadProject,
   resolveProjectDir,
   type OpRecord
 } from '../project/store.js'
-import { checksumOf } from '../project/store.js'
+import { PAGE_FINGERPRINTS_FILE, pageFingerprint } from './restore.js'
 import { stringifyDeck } from '../pptd/parse.js'
 import { SCHEMA_VERSION } from '../pptd/schema-v2.js'
 import { stringify as yamlStringify } from 'yaml'
@@ -136,13 +138,21 @@ export async function writeReverseProject(
   const reportPath = path.join(absDir, 'import.report.yml')
   await writeFile(reportPath, yamlStringify(mapped.report), 'utf8')
 
-  // 6. 源存档（spec §10）：原始 pptx 字节原样落 source/original.pptx。
-  //    导出管线的「未改页整页恢复」读这份存档；它不参与 manifest.checksum，
+  // 6. 源存档（spec §10.4）：原始 pptx 字节原样落 source/original.pptx，
+  //    同目录记下导入完成时每页内容的指纹（按落盘后重新读回的页计算）。
+  //    导出管线的「未改页整页恢复」读这两份文件；它们不参与 manifest.checksum，
   //    也不随编辑变化——originalSha1 是「整轮导入的原子单位」。
   if (mapped.sourceBytes && mapped.sourceBytes.length) {
     const sourceDir = path.join(absDir, 'source')
     await mkdir(sourceDir, { recursive: true })
     await writeFile(path.join(sourceDir, 'original.pptx'), Buffer.from(mapped.sourceBytes))
+    const loaded = await loadProject(options.cwd, options.dir)
+    const order = Array.isArray(loaded.deck.pages) ? loaded.deck.pages : []
+    const fingerprints = order.map((ref) => {
+      const page = loaded.pages.get(String(ref))
+      return page ? pageFingerprint(page) : ''
+    })
+    await writeFile(path.join(sourceDir, PAGE_FINGERPRINTS_FILE), `${JSON.stringify({ pages: fingerprints }, null, 2)}\n`, 'utf8')
   }
 
   return {

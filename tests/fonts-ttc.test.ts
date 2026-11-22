@@ -24,7 +24,11 @@ import { embedFontsForPptx } from '../src/core/fonts/embed-pipeline.js'
 import type { Presentation } from '../src/core/pptd/schema.js'
 
 /** 候选真件 TTC（多 face 容器，两个都是 glyf 轮廓） */
-const TTC_CANDIDATES = ['C:\\Windows\\Fonts\\msyh.ttc', 'C:\\Windows\\Fonts\\simsun.ttc']
+const TTC_CANDIDATES = [
+  'C:\\Windows\\Fonts\\msyh.ttc',
+  'C:\\Windows\\Fonts\\simsun.ttc',
+  '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'
+]
 
 function hasFile(p: string): boolean {
   try {

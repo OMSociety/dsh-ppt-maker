@@ -11,8 +11,8 @@ const PAGE_BASIC = `elements:
   - elementType: text
     elementId: t1
     bounds: [10, 10, 200, 50]
-    content: |
-      # Hello
+    content:
+      text: '# Hello'
 `
 
 function codes(issues: Issue[]): string[] {
@@ -37,6 +37,27 @@ describe('parseProject（PPTD）', () => {
   it('export.fontEmbed 越值 → ExportFieldValueError', () => {
     const r = parseProject('schema: 2\nexport: { fontEmbed: bogus }\npages: []\n', [])
     expect(codes(r.issues)).toContain('ExportFieldValueError')
+  })
+
+  it('错型字段报阻断而非静默取默认：fill 写成字符串、content 写成字符串', () => {
+    const page = `pageType: content
+elements:
+  - elementId: s1
+    elementType: shape
+    shapeName: rect
+    bounds: [0, 0, 100, 100]
+    fill: "#3366cc"
+  - elementId: t2
+    elementType: text
+    bounds: [0, 0, 100, 40]
+    content: 验收冒烟 A
+`
+    const r = parseProject(DECK_BASIC, [{ path: 'pages/01.page', text: page }])
+    const fill = r.issues.find((i) => i.path?.endsWith('#fill'))
+    expect(fill?.level).toBe('blocker')
+    expect(fill?.message).toContain('{type: "solid", color: "#3366cc"}')
+    const content = r.issues.find((i) => i.path?.endsWith('#content'))
+    expect(content?.level).toBe('blocker')
   })
 
   it('未知动画效果 → UnknownAnimationEffectError', () => {
@@ -106,9 +127,52 @@ pages:
     expect(codes(r.issues)).toContain('UnknownThemeKeyError')
   })
 
+  it('正文、备注、表格文字与图表数据里的 $ 开头字符串按字面处理', () => {
+    const deck = `schema: 2
+size: [960, 540]
+theme:
+  colors:
+    brand: '#112233'
+pages:
+  - pages/01.page
+`
+    const page = `notes: '$100 起'
+elements:
+  - elementType: text
+    elementId: t1
+    bounds: [0, 0, 200, 40]
+    content:
+      text: '$100 起'
+      color: $brand
+  - elementType: table
+    elementId: tb
+    bounds: [0, 60, 200, 80]
+    columnWidths: [1]
+    rowHeights: [1]
+    rows:
+      - - text: '$5'
+  - elementType: chart
+    elementId: c1
+    bounds: [0, 160, 200, 120]
+    data:
+      cols: ['$项目', '值']
+      rows: [['$A', 1]]
+    series:
+      - type: bar
+        name: '$营收'
+        encode: { x: '$项目', y: '值' }
+`
+    const r = parseProject(deck, [{ path: 'pages/01.page', text: page }])
+    expect(r.issues.filter((i) => i.code === 'UnknownThemeKeyError')).toEqual([])
+    // 颜色位上的 $key 仍按主题引用校验
+    const bad = parseProject(deck, [{ path: 'pages/01.page', text: page.replace('color: $brand', 'color: $nosuch') }])
+    expect(bad.issues.filter((i) => i.code === 'UnknownThemeKeyError')).toHaveLength(1)
+  })
+
   it('缺失的页文件 → SchemaError（pages 列表声明但读不到）', () => {
     const r = parseProject(DECK_BASIC, [])
-    expect(codes(r.issues).length).toBeGreaterThan(0)
+    expect(codes(r.issues)).toContain('SchemaError')
+    expect(r.issues.some((i) => i.code === 'SchemaError' && i.level === 'blocker')).toBe(true)
   })
 
   it('缺少 schema 字段 → UnsupportedSchemaError（v1 工程被拒）', () => {
@@ -143,5 +207,15 @@ pages:
       { path: 'pages/01.page', text: 'pageType: svg\nsvgSource: { ref: ../escape.svg }\nelements: []\n' }
     ])
     expect(codes(badRef.issues)).toContain('SchemaError')
+  })
+it('deck 写 customFonts 报 SchemaError，指向 assets/fonts/', () => {
+    const result = parseProject(
+      'schema: 2\nsize: [960, 540]\ncustomFonts:\n  - { family: Inter }\npages: [pages/01.page]\n',
+      [{ path: 'pages/01.page', text: 'elements: []\n' }]
+    )
+    const issue = result.issues.find((i: Issue) => i.path?.endsWith('#customFonts'))
+    expect(issue?.code).toBe('SchemaError')
+    expect(issue?.level).toBe('blocker')
+    expect(issue?.message).toContain('assets/fonts/')
   })
 })

@@ -4,18 +4,19 @@
  * 安全边界（浏览器与文件系统之间唯一的一道门）：
  *   1. **统一访问检查**：每个请求先交给 `ctx.connection.requestRejection`，由宿主完成
  *      Host/Origin 与浏览器登录态认证；401/403 立即结束，之后才解析路由、会话与请求体。
- *   2. **同源校验**：统一访问检查通过后，sameOrigin 再拒 `sec-fetch-site: cross-site`、
- *      非环路 Host、`Origin: null` 与 Origin/Host 不匹配。写方法要求 `content-type: application/json`（415）。
+ *   2. **同源校验**：统一访问检查通过后，sameOrigin 再拒缺失或无法解析的 Host、
+ *      `sec-fetch-site: cross-site`、`Origin: null` 与 Origin/Host 不匹配；绑定地址（环路或
+ *      局域网 IP）由宿主 webServer 配置决定。写方法要求 `content-type: application/json`（415）。
  *   3. **只认 key，不认路径**：客户端传 per-session store 登记过的工程 key，宿主自己
  *      查出工程目录，再交给 `src/core/project/store.ts` 的 `resolveProjectDir` 复检
  *      ——必须落在 `sessions.get(sessionId).header.cwd` 内，缺失报错、绝不回落 `process.cwd()`。
- *   4. **revision 守卫**：写必须带 `baseRevision`（数字），缺/非法 400、不匹配 409
- *      （`ProjectError.status` 的归一映射）；绝不静默覆盖人的手改。
+ *   4. **revision 守卫**：编辑、撤销、重做与恢复历史都必须带 `baseRevision`（数字），缺/非法 400；
+ *      比对在工程锁内完成，不匹配 409 并回带 `conflict.revision`；绝不静默覆盖人的手改。
  *   5. **MAX_BODY = 8MB 流式**：超限回 413（超限后继续把流读干，413 才回得出去）。
  *
  * 状态码：401 未认证 / 403 拒绝访问或跨站 / 413 请求体超限 / 404 找不到（工程、页、素材）/
  * 409 `ProjectError.status` 覆盖层（RevisionMismatch / SnapshotUnavailable / SchemaBlockers / …）/
- * 415 写方法没带 `application/json` / 400 其余参数与状态错误。
+ * 415 写方法没带 `application/json` / 400 其余参数错误 / 500 插件内部错误（固定文案，原文只进宿主日志）。
  * 二进制一律 `res.writeHead(200, {content-type}) + res.end(bytes)`。
  */
 import fsp from 'node:fs/promises'
@@ -42,12 +43,12 @@ export const MAX_ASSET_BYTES = 5 * 1024 * 1024
  * @typedef {object} CoreSurface
  * @property {(cwd: string, dir: string) => Promise<import('../../src/core/project/store.js').LoadedProject>} loadProject
  * @property {(cwd: string, options: object) => Promise<object>} editProject
- * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} undoProject
- * @property {(cwd: string, dir: string, steps?: number) => Promise<object>} redoProject
+ * @property {(cwd: string, dir: string, steps?: number, options?: { baseRevision?: number }) => Promise<object>} undoProject
+ * @property {(cwd: string, dir: string, steps?: number, options?: { baseRevision?: number }) => Promise<object>} redoProject
  * @property {(cwd: string, dir: string) => Promise<{ canUndo: boolean, canRedo: boolean }>} projectUndoState
  * @property {(cwd: string, dir: string) => Promise<object>} listProjectHistory
  * @property {(cwd: string, dir: string, revision: number) => Promise<object | null>} readHistorySnapshot
- * @property {(cwd: string, dir: string, targetRevision: number) => Promise<object>} restoreProject
+ * @property {(cwd: string, dir: string, targetRevision: number, options?: { baseRevision?: number }) => Promise<object>} restoreProject
  * @property {(cwd: string, dir: string, options?: object) => Promise<object>} releaseProject
  * @property {(cwd: string, dir: string, options?: object) => Promise<object>} checkProject
  * @property {(cwd: string, dir: string, report: unknown) => Promise<void>} writeQaReport
@@ -99,12 +100,34 @@ function json(res, code, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function fail(res, code, message) {
-  json(res, code, { ok: false, error: message })
+function fail(res, code, message, extra) {
+  json(res, code, { ok: false, error: message, ...(extra || {}) })
+}
+
+/**
+ * 写类请求的修订基线：缺失或非数字是调用方的编程错误（400）；
+ * 与当前修订的比对在 store 的工程锁内完成（不符 409 RevisionMismatch）。
+ * @param {Record<string, unknown>} body
+ * @param {string} action 用于报错文案的动作名
+ * @returns {number}
+ */
+function requireBaseRevision(body, action) {
+  const value = body.baseRevision
+  if (value === undefined || value === null) {
+    const err = new Error(`${action}必须带 baseRevision（面板版本过旧时刷新页面）`)
+    err.status = 400
+    throw err
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    const err = new Error('baseRevision 必须是数字')
+    err.status = 400
+    throw err
+  }
+  return value
 }
 
 /* ------------------------------------------------------------------ *
- * sameOrigin —— 环路 Host / Origin 的纵深防御
+ * sameOrigin —— Host / Origin 一致性的纵深防御
  * ------------------------------------------------------------------ */
 
 function parseAuthority(authority) {
@@ -115,19 +138,12 @@ function parseAuthority(authority) {
   }
 }
 
-function isLoopbackHostname(hostname) {
-  if (hostname === 'localhost' || hostname === '[::1]') return true
-  const parts = hostname.split('.')
-  return parts.length === 4 && parts[0] === '127' && parts.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255)
-}
-
 export function sameOrigin(req) {
   const host = req.headers && req.headers.host
   if (!host) return false
   if (String(req.headers['sec-fetch-site'] || '').toLowerCase() === 'cross-site') return false
   const hostUrl = parseAuthority(host)
   if (hostUrl === undefined) return false
-  if (!isLoopbackHostname(hostUrl.hostname)) return false
   const origin = req.headers.origin
   if (origin === undefined) return true
   if (origin === 'null') return false
@@ -299,6 +315,7 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         const projects = ss.listSessionProjects(sessionId)
         const activeKey = ss.activeKey(sessionId)
         let manifest = null
+        let manifestError = null
         if (activeKey) {
           const hit = ss.resolveProject(sessionId, cwd, activeKey)
           if (hit) {
@@ -317,8 +334,10 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
               const undoState = await projectUndoState(cwd, hit.dir)
               manifest.canUndo = undoState.canUndo
               manifest.canRedo = undoState.canRedo
-            } catch {
+            } catch (error) {
               manifest = null
+              manifestError = error && error.message ? error.message : String(error)
+              log(`[ppt-maker] /state 读取工程失败: ${manifestError}`)
             }
           }
         }
@@ -329,6 +348,7 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
           projects,
           openRequests: ss.pendingOpenRequests(sessionId),
           manifest,
+          manifestError,
         })
       }
 
@@ -413,7 +433,14 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
           return fail(res, 404, `素材不可读：${src}`)
         }
         const mime = sessionStore.mimeFor(norm) || 'application/octet-stream'
-        res.writeHead(200, { 'content-type': mime, 'cache-control': 'no-cache' })
+        // SVG 素材可携带脚本：CSP sandbox 让直接导航到该 URL 时不以 DSH Web 源执行任何内容，
+        // nosniff 阻止浏览器按内容猜测类型；面板以 <img>/Blob 渲染，二者均不受影响。
+        res.writeHead(200, {
+          'content-type': mime,
+          'cache-control': 'no-cache',
+          'x-content-type-options': 'nosniff',
+          'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        })
         return res.end(bytes)
       }
 
@@ -447,18 +474,11 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         const { sessionId, cwd } = sessionOf(body, url)
         const key = String(body.key || '')
         const { dir } = projectOf(ss, sessionId, cwd, key)
-        // 版本号在路由层先卡类型：缺失或不合理是调用方的编程错误，给 400 比进 409 更好读。
-        // 真正的不覆盖保证在 src/core/project/store.ts 的 editProject（baseRevision 不匹配就 409）。
-        if (body.baseRevision === undefined || body.baseRevision === null) {
-          return fail(res, 400, '写入必须带 baseRevision（面板版本过旧时刷新页面）')
-        }
-        if (typeof body.baseRevision !== 'number' || !Number.isFinite(body.baseRevision)) {
-          return fail(res, 400, 'baseRevision 必须是数字')
-        }
+        const baseRevision = requireBaseRevision(body, '写入')
         const result = await editProject(cwd, {
           dir,
           ops: Array.isArray(body.ops) ? body.ops : [],
-          baseRevision: body.baseRevision,
+          baseRevision,
           sessionId,
         })
         ss.markSeenRevision(sessionId, key, result.revision)
@@ -475,9 +495,10 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         const { sessionId, cwd } = sessionOf(body, url)
         const key = String(body.key || '')
         const { dir } = projectOf(ss, sessionId, cwd, key)
+        const baseRevision = requireBaseRevision(body, '撤销/重做')
         const steps = Number(body.steps ?? 1)
         const fn = route === 'POST /undo' ? undoProject : redoProject
-        const result = await fn(cwd, dir, steps)
+        const result = await fn(cwd, dir, steps, { baseRevision })
         ss.markSeenRevision(sessionId, key, result.revision)
         return json(res, 200, { ok: true, revision: result.revision, undoneOps: result.undoneOps, warnings: result.warnings })
       }
@@ -578,24 +599,10 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         const { sessionId, cwd } = sessionOf(body, url)
         const key = String(body.key || '')
         const { dir } = projectOf(ss, sessionId, cwd, key)
-        // 与 /edit 同口径：baseRevision 缺失是编程错误给 400；不匹配给 409 带最新 revision。
-        if (body.baseRevision === undefined || body.baseRevision === null) {
-          return fail(res, 400, '恢复必须带 baseRevision（面板版本过旧时刷新页面）')
-        }
-        if (typeof body.baseRevision !== 'number' || !Number.isFinite(body.baseRevision)) {
-          return fail(res, 400, 'baseRevision 必须是数字')
-        }
+        const baseRevision = requireBaseRevision(body, '恢复')
         const revision = Number(body.revision)
         if (!Number.isInteger(revision) || revision < 0) return fail(res, 400, 'revision 必须是 ≥0 的整数')
-        const loaded = await loadProject(cwd, dir)
-        if (loaded.manifest.revision !== body.baseRevision) {
-          return json(res, 409, {
-            ok: false,
-            error: 'revision 冲突：工程已被其它写入推进，刷新历史列表后重试',
-            conflict: { revision: loaded.manifest.revision },
-          })
-        }
-        const result = await restoreProject(cwd, dir, revision)
+        const result = await restoreProject(cwd, dir, revision, { baseRevision })
         ss.markSeenRevision(sessionId, key, result.revision)
         return json(res, 200, { ok: true, revision: result.revision, undoneOps: result.undoneOps, warnings: result.warnings })
       }
@@ -622,11 +629,15 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
       const message = error && error.message ? error.message : String(error)
       log(`[ppt-maker] ${route} 失败: ${message}`)
       if (error instanceof OversizeError) return fail(res, 413, message)
-      if (error instanceof ProjectError && typeof error.status === 'number') return fail(res, error.status, error.message)
+      if (error instanceof ProjectError && typeof error.status === 'number') {
+        const expected = error.detail && typeof error.detail.expected === 'number' ? error.detail.expected : undefined
+        return fail(res, error.status, error.message, expected === undefined ? undefined : { conflict: { revision: expected } })
+      }
       if (typeof error === 'object' && error !== null && typeof error.status === 'number' && error.status >= 400 && error.status < 600) {
         return fail(res, error.status, message)
       }
-      return fail(res, 400, message)
+      if (error && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) return fail(res, 404, '请求的工程文件不存在')
+      return fail(res, 500, '插件内部错误，详情见宿主日志')
     }
   }
 }

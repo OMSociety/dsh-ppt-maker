@@ -224,9 +224,13 @@ describe('客户端 bundle 形态', () => {
     }
     expect(specifiers.has('react'), '应当 require react，而不是把 React 打进来').toBe(true)
     expect(specifiers.has('react/jsx-runtime'), 'jsx automatic 产物应当 require react/jsx-runtime').toBe(true)
-    // rc2 官方禁止客户端 bundle 加载 Harness Client 包（practices.md:35）
+    // 种子表描述的是平台模块表能解析的全集；本项目再收紧一层：client/ 不 import 任何
+    // @deepseek-ai/* 包（AGENTS.md「禁止操作」），宿主能力一律经 ctx.inject 的服务拿。
     const hostPackages = [...specifiers].filter((s) => s.startsWith('@deepseek-ai/'))
-    expect(hostPackages, `不该 require Harness Client 包：${hostPackages.join(', ')}`).toEqual([])
+    expect(
+      hostPackages,
+      `client/ 约定不 import @deepseek-ai/* 包（即使它在平台种子表里），宿主能力请走 ctx.inject：${hostPackages.join(', ')}`
+    ).toEqual([])
     // 产物不得内联字体/图片路径等绝对路径——硬编码会咬用户（工作目录与包目录不同盘就崩）
     for (const absolute of ['D:\\', 'C:\\', '/Users/', 'dsh-fishpai', 'fishpai']) {
       expect(source.includes(absolute), `产物不得出现与别的插件/本机路径相关的字面量 ${absolute}`).toBe(false)

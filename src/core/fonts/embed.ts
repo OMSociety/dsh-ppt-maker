@@ -1,15 +1,15 @@
 /**
  * embed.ts — OOXML 字体嵌入后处理
  *
- * 每次调用都写一整套新部件：
+ * 对 fontPlan 里尚未嵌入的每个 (typeface, slot) 写一套新部件：
  *   1) [Content_Types].xml  加 per-part Override
  *   2) ppt/_rels/presentation.xml.rels  加 font Relationship（rId 从现有 max+1 起分配）
  *   3) ppt/fonts/fontN.fntdata  写 EOT 封装字节（N 取现有最大 +1，逐 face 递增）
  *   4) ppt/presentation.xml   根属性 embedTrueTypeFonts / saveSubsetFonts +
  *      p:embeddedFontLst 条目（插 notesSz 之后 / defaultTextStyle 之前）
  *
- * 非幂等：同一 face 再调一次会再写一套 fntdata 与 Relationship；调用方须保证一次导出
- * 只调一次（口径见下方主入口注释）。要重嵌就从「未嵌字体」的原始产物重跑。
+ * 幂等：输入里 p:embeddedFontLst 已登记的 (typeface, slot) 一律跳过，对已嵌产物再调一次
+ * 原样返回输入字节。要换一套字体字节，从「未嵌字体」的原始产物重跑。
  *
  * 重打包防御：[Content_Types].xml 必须第一个 zip 条目（OPC 惯例）；
  * fntdata DEFLATE 6，其余 stored 原样回写（不重编码 XML 之外的任何字节）。
@@ -50,6 +50,9 @@ export interface EmbedResult {
 
 const SLOT_ORDER: ReadonlyArray<FontSlot> = ['regular', 'bold', 'italic', 'boldItalic']
 
+/** ZIP 条目统一时间戳：1980-01-01 00:00（DOS 时间可表示的最早时刻）。 */
+const ZIP_EPOCH = new Date(1980, 0, 1, 0, 0, 0)
+
 const dec = new TextDecoder()
 
 /** fflate 的 Zippable 期待的键值形态（与库 0.8.x 类型签名对齐） */
@@ -83,15 +86,35 @@ function nextFontIndex(parts: Record<string, Uint8Array>): number {
   return max + 1
 }
 
+function slotKey(typeface: string, slot: FontSlot): string {
+  return `${typeface}\u0000${slot}`
+}
+
+/** presentation.xml 里 p:embeddedFontLst 已登记的 (typeface, slot) 集合。 */
+function embeddedSlotsOf(presentationXml: Uint8Array): Set<string> {
+  const out = new Set<string>()
+  const doc = xmlDocOf(presentationXml)
+  const entries = doc.getElementsByTagName('p:embeddedFont')
+  for (let i = 0; i < entries.length; i++) {
+    const el = entries.item(i)
+    const typeface = el?.getElementsByTagName('p:font').item(0)?.getAttribute('typeface')
+    if (!el || !typeface) continue
+    for (const slot of SLOT_ORDER) {
+      if (el.getElementsByTagName(`p:${slot}`).item(0)) out.add(slotKey(typeface, slot))
+    }
+  }
+  return out
+}
+
 /* ------------------------------------------------------------------ *
  * 主入口
  * ------------------------------------------------------------------ */
 
 /**
- * 对 savePresentation 产物做字体嵌入。
- * 非幂等（重复注入会产生重复部件）——导出口径「每次导出重嵌」。
+ * 对 savePresentation 产物做字体嵌入；已嵌入的槽位跳过（见文件头）。
  */
-export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanEntry[]): EmbedResult {
+export function embedFontsPostProcess(pptxBytes: Uint8Array, plan: FontPlanEntry[]): EmbedResult {
+  let fontPlan = plan
   const log: string[] = []
   if (fontPlan.length === 0) return { bytes: pptxBytes, writtenParts: [], facesEmbedded: [], log }
 
@@ -104,6 +127,16 @@ export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanE
   for (const p of ['ppt/presentation.xml', 'ppt/_rels/presentation.xml.rels', '[Content_Types].xml']) {
     if (!parts[p]) throw new Error(`missing part: ${p}`)
   }
+
+  // 已嵌入的 (typeface, slot) 跳过：输入若已含这些槽位（已嵌产物再送进来、导入的
+  // pptx 自带嵌入字体），不再写第二套 fntdata 与 Relationship。全部已在位时原样返回。
+  const present = embeddedSlotsOf(parts['ppt/presentation.xml'])
+  const pending = fontPlan.filter((f) => !present.has(slotKey(f.typeface, f.slot)))
+  for (const f of fontPlan) {
+    if (!pending.includes(f)) log.push(`${f.typeface}(${f.slot}) 已嵌入，跳过`)
+  }
+  if (pending.length === 0) return { bytes: pptxBytes, writtenParts: [], facesEmbedded: [], log }
+  fontPlan = pending
 
   // 为每条 fontPlan 分配 partName + rId
   interface Assignment {
@@ -267,11 +300,13 @@ export function embedFontsPostProcess(pptxBytes: Uint8Array, fontPlan: FontPlanE
   }
 
   // 5) 重打包：[Content_Types].xml 首条目；fntdata DEFLATE 6；其余 stored
-  const out: Record<string, Uint8Array | [Uint8Array, { level: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 }]> = {}
-  out['[Content_Types].xml'] = [parts['[Content_Types].xml'], { level: 0 }]
+  // 条目时间戳固定（ZIP DOS 时间的起点），同一输入的重打包字节确定。
+  const mtime = ZIP_EPOCH
+  const out: Record<string, Uint8Array | [Uint8Array, { level: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9; mtime: Date }]> = {}
+  out['[Content_Types].xml'] = [parts['[Content_Types].xml'], { level: 0, mtime }]
   for (const [name, data] of Object.entries(parts)) {
     if (name === '[Content_Types].xml') continue
-    out[name] = name.endsWith('.fntdata') ? [data, { level: 6 }] : [data, { level: 0 }]
+    out[name] = name.endsWith('.fntdata') ? [data, { level: 6, mtime }] : [data, { level: 0, mtime }]
   }
   return { bytes: zipSync(out), writtenParts, facesEmbedded, log }
 }

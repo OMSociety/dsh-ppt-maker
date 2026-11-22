@@ -67,6 +67,8 @@ export class ProjectError extends Error {
 export class OpError extends Error {
   readonly opIndex: number
   readonly op: string
+  /** 调用方给出的 op 不合法：HTTP 层映射为 400。 */
+  readonly status = 400
 
   constructor(opIndex: number, op: string, message: string) {
     super(`ops[${opIndex}] (${op})：${message}`)
@@ -458,14 +460,13 @@ function nextPagePath(model: ProjectModel): string {
 }
 
 /**
- * 逆向保真（spec §10.4）：编辑触碰内容字段时，清掉整页元素的 sourceRef。
+ * 逆向溯源（spec §6.8）：编辑触碰内容字段时，清掉整页元素的 sourceRef。
  *
- * 导出侧的「未改页整页恢复」以 sourceRef 完整性判定「这一页自导入后没动过」；
- * update_page / update_element 是顶层浅合并，patch 不改 sourceRef——若不主动
- * 失效，改了文字仍会被误判为「未改」而从存档整页恢复，把用户的编辑冲掉。
- * 因此内容字段（content/bounds/fill/…）一变，整页 sourceRef 全部抹掉：
- * 该页回退逐页重建，其余未动页不受影响。纯溯源字段（sourceRef/originalName）
- * 的 patch 不触发失效。
+ * sourceRef 表示「该元素与源 pptx 的某个形状逐字段对应」。update_page /
+ * update_element 是顶层浅合并，patch 不改 sourceRef；内容字段（content/bounds/
+ * fill/…）一变，这层对应关系就不再成立，整页 sourceRef 全部抹掉。纯溯源字段
+ * （sourceRef/originalName）的 patch 不触发失效。整页恢复另按页指纹判定
+ * （src/core/reverse/restore.ts）。
  */
 const PROVENANCE_KEYS = new Set(['sourceRef', 'originalName'])
 
@@ -654,7 +655,10 @@ export async function editProject(cwd: string, options: EditOptions): Promise<Ed
     // bad revision had already become the cursor.
     const blockers = issues.filter((issue) => issue.level === 'blocker')
     if (blockers.length > 0) {
-      throw new ProjectError('ValidationBlockers', `写入前校验发现 ${blockers.length} 个阻断问题，本次改动未落盘`, {
+      // 前几条直接进 message：工具摘要与面板横幅只显示 message，detail 里是完整清单。
+      const shown = blockers.slice(0, 5).map((issue) => `${issue.path ?? ''} ${issue.message}`.trim())
+      const more = blockers.length > shown.length ? `；另有 ${blockers.length - shown.length} 条见 detail` : ''
+      throw new ProjectError('ValidationBlockers', `写入前校验发现 ${blockers.length} 个阻断问题，本次改动未落盘：${shown.join('；')}${more}`, {
         status: 409,
         detail: blockers
       })
@@ -697,14 +701,44 @@ export interface UndoRedoResult {
   warnings: string[]
 }
 
-async function moveCursor(cwd: string, dir: string, target: number, label: 'undo' | 'redo'): Promise<UndoRedoResult> {
+export interface CursorMoveOptions {
+  /** 调用方看到的 manifest.revision；给出时在工程锁内比对，不符即 409 RevisionMismatch。 */
+  baseRevision?: number
+}
+
+type CursorPlan = (current: number, maxRevision: number) => { target: number; label: 'undo' | 'redo' } | { noop: string }
+
+function assertBaseRevision(base: number | undefined, current: number): void {
+  if (base === undefined) return
+  if (typeof base !== 'number' || !Number.isFinite(base)) {
+    throw new ProjectError('InvalidArgument', 'baseRevision 必须是数字', { status: 400 })
+  }
+  if (base !== current) {
+    throw new ProjectError('RevisionMismatch', `baseRevision 不匹配：期望 ${current}，收到 ${base}`, {
+      status: 409,
+      detail: { expected: current, actual: base }
+    })
+  }
+}
+
+/**
+ * 游标移动的唯一实现：读 manifest、比对 baseRevision、计算目标与物化快照
+ * 全部在同一把工程锁内完成，并发写入不会在「读到 revision」与「移动游标」之间落地。
+ */
+async function moveCursor(cwd: string, dir: string, plan: CursorPlan, options: CursorMoveOptions): Promise<UndoRedoResult> {
   const abs = resolveProjectDir(cwd, dir)
   return withProjectLock(abs, async () => {
     const loaded = await loadProject(cwd, dir)
     const current = loaded.manifest.revision
-    if (target === current) return { revision: current, undoneOps: [], warnings: [`没有可${label === 'undo' ? '撤销' : '重做'}的步骤`] }
+    assertBaseRevision(options.baseRevision, current)
 
     const snapshots = await listSnapshots(abs)
+    const maxRevision = snapshots.length > 0 ? snapshots[snapshots.length - 1].revision : 0
+    const decided = plan(current, maxRevision)
+    if ('noop' in decided) return { revision: current, undoneOps: [], warnings: [decided.noop] }
+    const { target, label } = decided
+    if (target === current) return { revision: current, undoneOps: [], warnings: [`没有可${label === 'undo' ? '撤销' : '重做'}的步骤`] }
+
     const between =
       label === 'undo'
         ? snapshots.filter((s) => s.revision > target && s.revision <= current)
@@ -741,27 +775,21 @@ async function moveCursor(cwd: string, dir: string, target: number, label: 'undo
   })
 }
 
-export async function undoProject(cwd: string, dir: string, steps = 1): Promise<UndoRedoResult> {
+function assertSteps(steps: number): void {
   if (!Number.isInteger(steps) || steps < 1 || steps > 20) {
     throw new ProjectError('InvalidSteps', 'steps 必须是 1–20 的整数', { status: 400 })
   }
-  const loaded = await loadProject(cwd, dir)
-  const target = Math.max(0, loaded.manifest.revision - steps)
-  return moveCursor(cwd, dir, target, 'undo')
 }
 
-export async function redoProject(cwd: string, dir: string, steps = 1): Promise<UndoRedoResult> {
-  if (!Number.isInteger(steps) || steps < 1 || steps > 20) {
-    throw new ProjectError('InvalidSteps', 'steps 必须是 1–20 的整数', { status: 400 })
-  }
-  const loaded = await loadProject(cwd, dir)
-  const abs = resolveProjectDir(cwd, dir)
-  const snapshots = await listSnapshots(abs)
-  const max = snapshots.length > 0 ? snapshots[snapshots.length - 1].revision : 0
-  const target = Math.min(max, loaded.manifest.revision + steps)
-  return moveCursor(cwd, dir, target, 'redo')
+export async function undoProject(cwd: string, dir: string, steps = 1, options: CursorMoveOptions = {}): Promise<UndoRedoResult> {
+  assertSteps(steps)
+  return moveCursor(cwd, dir, (current) => ({ target: Math.max(0, current - steps), label: 'undo' }), options)
 }
 
+export async function redoProject(cwd: string, dir: string, steps = 1, options: CursorMoveOptions = {}): Promise<UndoRedoResult> {
+  assertSteps(steps)
+  return moveCursor(cwd, dir, (current, max) => ({ target: Math.min(max, current + steps), label: 'redo' }), options)
+}
 /**
  * Undo/redo availability for UI surfaces (e.g. the workbench toolbar).
  * Cursor model: canUndo = cursor > 0; canRedo = cursor < max snapshot revision.
@@ -834,14 +862,52 @@ export async function readHistorySnapshot(
  * 显式目标。复用 moveCursor 的快照物化与素材 hash 校验（历史 rule 3）；
  * 目标就是当前版本时是安全的 no-op。
  */
-export async function restoreProject(cwd: string, dir: string, targetRevision: number): Promise<UndoRedoResult> {
+export async function restoreProject(
+  cwd: string,
+  dir: string,
+  targetRevision: number,
+  options: CursorMoveOptions = {}
+): Promise<UndoRedoResult> {
   if (!Number.isInteger(targetRevision) || targetRevision < 0) {
     throw new ProjectError('InvalidRevision', '目标 revision 必须是 ≥0 的整数', { status: 400 })
   }
-  const loaded = await loadProject(cwd, dir)
-  const current = loaded.manifest.revision
-  if (targetRevision === current) {
-    return { revision: current, undoneOps: [], warnings: ['目标版本就是当前版本，无需恢复'] }
-  }
-  return moveCursor(cwd, dir, targetRevision, targetRevision < current ? 'undo' : 'redo')
+  return moveCursor(
+    cwd,
+    dir,
+    (current) =>
+      targetRevision === current
+        ? { noop: '目标版本就是当前版本，无需恢复' }
+        : { target: targetRevision, label: targetRevision < current ? 'undo' : 'redo' },
+    options
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * brief.md（规划契约里给人读的需求简报）
+ * ------------------------------------------------------------------ */
+
+/**
+ * 在工程锁内写 brief.md：先比对 baseRevision，与当前 manifest.revision 不符即 409。
+ * brief 是散文、不参与构建，因此不推进 revision、不进快照、不入导出指纹；
+ * 锁与基线比对保证它不会覆盖并发写入方刚看到的工程状态。
+ */
+export async function writeProjectBrief(
+  cwd: string,
+  dir: string,
+  text: string,
+  options: { baseRevision: number }
+): Promise<{ revision: number }> {
+  const abs = resolveProjectDir(cwd, dir)
+  return withProjectLock(abs, async () => {
+    const loaded = await loadProject(cwd, dir)
+    const current = loaded.manifest.revision
+    if (options.baseRevision !== current) {
+      throw new ProjectError('RevisionMismatch', `baseRevision 不匹配：期望 ${current}，收到 ${options.baseRevision}`, {
+        status: 409,
+        detail: { expected: current, actual: options.baseRevision }
+      })
+    }
+    await writeAtomic(path.join(abs, 'brief.md'), text)
+    return { revision: current }
+  })
 }

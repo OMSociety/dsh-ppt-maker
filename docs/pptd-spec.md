@@ -136,45 +136,6 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 
 `brief.md` 与 `plan.yml` 是规划元数据，不是 deck 内容：**二者不参与 undo 快照与 manifest checksum**（见 §3.4）。
 
-### 3.5 母版与版式（deck.masters，仅生成方言）
-
-PPTD 的元素轨（§6）逐页画全部内容；母版/版式轨解决的是另一半诉求：**跨页共享的装饰图形与占位框只画一次**，各页挂版式后自动继承，且 PowerPoint 的「新建幻灯片」能沿用同一套骨架。
-
-deck 级可选字段：
-
-```ts
-interface Presentation {
-  // ……见 §3.1……
-  masters?: MasterSpec[];   // 仅生成方言；缺省 = 引擎默认空白母版（现状行为）
-}
-
-interface MasterSpec {
-  name: string;                    // 母版名（人读，唯一）
-  background?: Background;         // 母版背景（§4.1 同构）
-  shapes?: ElementBase[];          // 装饰图形：shape / image / line / text（静态内容）
-  layouts: LayoutSpec[];           // 该母版下的版式，至少 1 个
-}
-
-interface LayoutSpec {
-  name: string;                    // 版式名，页内以它引用（唯一）
-  shapes?: ElementBase[];          // 版式级装饰图形（盖在母版装饰之上）
-  placeholders?: LayoutPlaceholderSpec[];
-}
-
-interface LayoutPlaceholderSpec {
-  kind: "title" | "body" | "content" | "picture" | "chart" | "table";
-  bounds: [number, number, number, number];   // px，同 §1.2
-}
-```
-
-页侧挂接：`Page.layoutRef`（§6.8 之外两方言通用）在生成方言里写作 `{ name: "<layout 名>" }`；引擎按 `deck.masters[*].layouts[*].name` 解析，找不到 → blocker `UnknownLayoutError`。
-
-**语义边界**：
-
-- 母版/版式只承载**静态装饰**与**占位框**；页的实际内容仍由 `elements` 逐页给出（PPTD 不做「内容自动填进占位」的隐式匹配）；
-- 母版/版式的 `shapes` 不支持动画与转场（动画/转场是页级概念，见 §7 / §8）；
-- 逆向方言不写 `masters`：逆向工程用 §10.4 的源存档整页恢复保住原始母版，不重建。
-
 ---
 
 ## 2. 双方言（two profiles）
@@ -312,7 +273,6 @@ interface Presentation {
   profile?: Profile;           // 默认 "generate"；见 §2
   title?: string;              // 默认无标题
   size: [number, number];      // 必填，[宽, 高]；推荐值见 §1.2
-  customFonts?: CustomFont[];  // 默认不加载自定义字体；见 §3.3
   theme?: Theme;               // 生成方言推荐；逆向方言可省；见 §3.3
   export?: ExportConfig;       // 默认全取缺省值；见 §3.2
   pages: string[];             // 必填，页文件相对路径列表，如 "pages/01_cover.page"
@@ -328,7 +288,7 @@ interface DeckSource {
 }
 ```
 
-> **提示**：`CustomFont.src` 是 Google Fonts CSS URL，离线环境下不可达；导出字体嵌入（§9）只认工程内 `assets/fonts/` 与目标机实装字体，不从该 URL 拉取。
+> **提示**：自定义字体以字体文件放进工程 `assets/fonts/` 引入（渲染、测量与嵌入都先查该目录，再查系统字体），在 `fontFamily` 里写字体内部族名即可；deck 不设字体声明字段，写了 `customFonts` 报 blocker `SchemaError`。
 
 **生成方言示例**：
 
@@ -460,10 +420,6 @@ interface TableStyleConfig {
   rowOverColumn?: boolean;          // 默认 true；行类别与列类别冲突时行胜
 }
 
-interface CustomFont {
-  family: string;   // 字体名，必须与 Google Fonts 上的名字逐字一致
-  src: string;      // Google Fonts CSS URL；只带默认字重
-}
 ```
 
 ### 3.4 工程级文件：brief.md 与 plan.yml
@@ -542,6 +498,47 @@ pages:
 
 ---
 
+### 3.5 母版与版式（deck.masters，仅生成方言）
+
+PPTD 的元素轨（§6）逐页画全部内容；母版/版式轨解决的是另一半诉求：**跨页共享的装饰图形与占位框只画一次**，各页挂版式后自动继承，且 PowerPoint 的「新建幻灯片」能沿用同一套骨架。
+
+deck 级可选字段：
+
+```ts
+interface Presentation {
+  // ……见 §3.1……
+  masters?: MasterSpec[];   // 仅生成方言；缺省 = 引擎默认空白母版
+}
+
+interface MasterSpec {
+  name: string;                    // 母版名（人读，唯一）
+  background?: Background;         // 母版背景（§4.1 同构）
+  shapes?: ElementBase[];          // 装饰图形：shape / image / line / text（静态内容）
+  layouts: LayoutSpec[];           // 该母版下的版式，至少 1 个
+}
+
+interface LayoutSpec {
+  name: string;                    // 版式名，页内以它引用（唯一）
+  shapes?: ElementBase[];          // 版式级装饰图形（盖在母版装饰之上）
+  placeholders?: LayoutPlaceholderSpec[];
+}
+
+interface LayoutPlaceholderSpec {
+  kind: "title" | "body" | "content" | "picture" | "chart" | "table";
+  bounds: [number, number, number, number];   // px，同 §1.2
+}
+```
+
+页侧挂接：`Page.layoutRef`（两方言通用；逆向方言里记录源页所用版式，见 §4.1）在生成方言里写作 `{ name: "<layout 名>" }`；引擎按 `deck.masters[*].layouts[*].name` 解析，找不到 → blocker `UnknownLayoutError`。
+
+**语义边界**：
+
+- 母版/版式只承载**静态装饰**与**占位框**；页的实际内容仍由 `elements` 逐页给出（PPTD 不做「内容自动填进占位」的隐式匹配）；
+- 母版/版式的 `shapes` 不支持动画与转场（动画/转场是页级概念，见 §7 / §8）；
+- 逆向方言不写 `masters`：逆向工程用 §10.4 的源存档整页恢复保住原始母版，不重建。
+
+---
+
 ## 4. 页面文件（.page）
 
 ### 4.1 Page
@@ -558,7 +555,7 @@ interface Page {
   svgSource?: SvgSource;            // 仅生成方言 svg 页必填（§4.2）
   transition?: PageTransition;      // 仅逆向方言；源文件页级转场记录，见 §8.2
   hidden?: boolean;                 // 仅逆向方言，默认 false；源文件里的隐藏页
-  layoutRef?: LayoutRef;            // 仅逆向方言；源页所用版式（slide layout）溯源
+  layoutRef?: LayoutRef;            // 默认无；生成方言挂 deck.masters 的版式（§3.5），逆向方言记录源页版式
   sectionName?: string;             // 仅逆向方言；源文件里的节（section）名
 }
 
@@ -2237,7 +2234,7 @@ interface ImportReport {
 
 ### 10.4 源存档与未改页整页恢复
 
-逆向导入把原始 pptx 字节原样落到 `source/original.pptx`，`deck.source` 同时记账：
+逆向导入把原始 pptx 字节原样落到 `source/original.pptx`，导入完成时每页内容的指纹落到 `source/page-fingerprints.json`（`{ pages: string[] }`，按 `deck.pages` 顺序；指纹 = 按键排序、去掉 undefined 字段的页 JSON 的 sha1），`deck.source` 同时记账：
 
 ```ts
 interface DeckSource {
@@ -2252,12 +2249,12 @@ interface DeckSource {
 **导出行为**（fail-closed，永不部分恢复）：
 
 1. `deck.profile === "reverse"` 且 `archive` / `originalSha1` 齐全时才启用本轨；
-2. 存档文件必须存在、sha1 与 `originalSha1` 一致、页数与 `deck.pages` 一致；
-3. 「未改」判定：该页每个元素仍带 `sourceRef`（`{slideIndex, shapeId}`，见 §6.8）。编辑操作一旦触及内容字段（`content` / `bounds` / `fill` / `notes` 等），整页元素的 `sourceRef` 被清掉（纯溯源字段 `sourceRef` / `originalName` 的修改不触发）；
+2. 存档文件必须存在、sha1 与 `originalSha1` 一致、页数与 `deck.pages` 一致，页指纹文件存在且项数相同；
+3. 「未改」判定：该页当前内容的指纹与导入时记录的指纹一致。元素增删、任何字段改动（含删空整页）都会改变指纹；
 4. **全部页**均判定未改 → 整份 deck 从存档逐页 `importSlide` 恢复（chart/workbook/notes/media/未知部件原样保留），导出 warnings 记一条恢复说明；
 5. 任一条件不满足 → **整份**回退逐页按 PPTD 重建（占位仍是占位，报告已如实记账），warnings 说明回退原因。
 
-存档不参与 `manifest.checksum`，不随编辑变化；`originalSha1` 永远指向「整轮导入」那一刻的源文件。
+存档与页指纹不参与 `manifest.checksum`，不随编辑变化；`originalSha1` 永远指向「整轮导入」那一刻的源文件。
 
 ## 11. 错误码表
 
@@ -2275,13 +2272,13 @@ interface Issue {
 }
 ```
 
-校验顺序：`schema` 版本闸（§2.0）先于一切——无 `schema: 2` 即 `UnsupportedSchemaError` 并跳过后续校验。
+校验顺序：`schema` 版本闸（§2.0）先于一切——闸未通过（`UnsupportedSchemaError` 或非整数时的 `SchemaError`）即跳过后续校验。
 
 ### 11.1 协议与方言
 
 | 错误码 | 级别 | 触发条件 |
 |---|---|---|
-| `UnsupportedSchemaError` | blocker | 无 `schema: 2`（缺失、非数字或非 2） |
+| `UnsupportedSchemaError` | blocker | `schema` 缺失、为 `null`，或是整数但不在支持集 `{2}`；`schema` 不是整数时报 `SchemaError`（§2.0） |
 | `UnknownProfileError` | blocker | `profile` 取值不是 `generate` / `reverse` |
 | `ProfileViolationError` | blocker | 字段越方言：生成方言出现 `source` / 逆向专属页字段 / 逆向专属元素字段 / 逆向专属动画字段 / icon 与 chart 之外的逆向限制（逆向方言出现 `$key` 主题引用、`pageType`、icon、chart 等） |
 | `SourceRequiredError` | blocker | 逆向方言缺 `source` / `source.path` / `source.slideCount` / `source.size` |

@@ -17,8 +17,8 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 | `ppt_themes` | 列设计系统/主题 | `{ok, themes:[...]}` |
 | `ppt_plan` | 读写规划契约 brief.md / plan.yml（get / setBrief / setPlan） | `{ok, brief?, plan?, issues?, revision?}` |
 | `ppt_edit` | 原子编辑（ops 数组批量） | `{ok, revision, appliedOps, warnings}` |
-| `ppt_undo` / `ppt_redo` | 撤销/重做（游标移动，append-only 快照） | `{ok, revision}` |
-| `ppt_render` | 渲染每页 PNG 预览（libreoffice-kit 光栅化最终 pptx） | `{ok, images:[{page,path}]}` |
+| `ppt_undo` / `ppt_redo` | 撤销/重做（游标移动，append-only 快照；须带 baseRevision） | `{ok, revision}` |
+| `ppt_render` | 渲染每页 PNG 预览（libreoffice-kit 光栅化最终 pptx） | `{ok, images:[{page,path,absolutePath}]}` |
 | `ppt_check` | 质检（规则层默认跑；`ai:true` 追加 AI 视觉质检） | `{ok, pass, issues:[...]}` |
 | `ppt_export` | 导出 .pptx（需质检通过且指纹未过期；`skipCheck:true` 绕过门禁但 postflight 不跳） | `{ok, path, revision, sha256, postflight, check}` |
 | `ppt_svg` | SVG 页面轨：写 SVG 源（media/svg/）并挂页，或立即编译早检 | `{ok, ref, compiled?, fonts?}` |
@@ -46,7 +46,7 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 | 输入 | 仅主题 / 完整文档 / 逐页大纲 |
 | 页数 | 用户指定优先；只给文档时先给页数估算并确认 |
 
-- 先读完用户上传的全部文件与 URL。PPTD 的格式约束读全量规格 `docs/pptd-spec.md`（仓库内，自包含）。
+- 先读完用户上传的全部文件与 URL。PPTD 的格式约束读全量规格 `docs/pptd-spec.md`（插件包根目录；相对本技能目录为 `../../docs/pptd-spec.md`，自包含）。
 - 内容不足以撑满演示时，先用检索补充材料（除非用户明确说不扩展）。
 - 需求冲突或无法判定时**先问用户**：调用 `ask_user_question` 把冲突项摆成选项（推荐项放首位并加 `(Recommended)`），一次一问；不要自行脑补。
 
@@ -64,7 +64,7 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 1. `ppt_themes` 看有哪些设计系统（学术/咨询/金融/促销/工作，每项带 `executable` 标记——为 `true` 时 `ppt_create` 会把该主题的主题表（`theme.yml`：colors/textStyles/tableStyles）直接写进 `deck.theme`，页内用 `$key` 引用即可），用户指定了就用指定族，没指定就按场景挑一个；自定风格不要硬套预设。
 2. `ppt_create` 建工程（给 `dir`/`title`/`designSystem`/`theme`），拿回 `manifest.revision`（乐观锁的基准）。
 3. `ppt_edit` 批量加页加元素：一次调用发一串 ops（`add_page` / `add_element` / `update_element` / …），原子生效。**每次都要带上一次的 `baseRevision`**，返回 409 就是游标过期，重新读再改。
-4. 改错了用 `ppt_undo` / `ppt_redo`（合并窗内的连续编辑算一步）。
+4. 改错了用 `ppt_undo` / `ppt_redo`（合并窗内的连续编辑算一步），同样必须带当前 `baseRevision`；`ppt_plan` 的 `setBrief` / `setPlan` 与 `ppt_svg` 带 `page` 挂页也一样。修订号取上一次写入返回的 `revision`，或 `ppt_plan action:get` 返回的 `revision`。
 
 **P01–P05 早检（默认路径必做）**：页数 ≥ 5 的 deck，先按 plan 做完前 5 页就停下来——`ppt_render` 出这 5 页 PNG，自查后交给用户确认「方向对不对」。确认通过才继续后面页面；要返工也只浪费 5 页。页数 < 5 或 Quick 路径跳过此门。
 
@@ -74,7 +74,7 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 2. `ppt_svg` `action:'compile'` 立即编译早检（也顺手暖了缓存）；
 3. 引擎导出时整页编译为 DrawingML 原生形状并入成品 deck——成品里仍是可选中、可编辑的文本与形状。
 
-SVG 页是整页编译，不拆成 PPTD 元素；页内元素级编辑（`update_element` 等）对它不适用，改源重挂才是正道。编译失败（源缺失/语法不支持/编译器环境缺失）一律报错拒建，不会静默降级成占位页。首次使用若报 `SvgCompilerMissing`，先在仓库跑 `node scripts/prepare-vendor-env.mjs` 建 Python 环境（约 50MB，清华源）。
+SVG 页是整页编译，不拆成 PPTD 元素；页内元素级编辑（`update_element` 等）对它不适用，改源重挂才是正道。编译失败（源缺失/语法不支持/编译器环境缺失）一律报错拒建，不会静默降级成占位页。首次使用若报 `SvgCompilerMissing`，按报错给出的绝对路径跑 `node <插件包根目录>/scripts/prepare-vendor-env.mjs` 建 Python 环境（需 Python 3.10+，约 50MB，默认清华源，可用环境变量 `PIP_INDEX` 换源）。
 
 ### 四、生成内容的纪律
 
@@ -96,7 +96,7 @@ SVG 页是整页编译，不拆成 PPTD 元素；页内元素级编辑（`update
 ### 五、校验（导出前必做）
 
 1. **规则质检**：`ppt_check`（默认全页；文字溢出按工程实际字体的真实字形宽度量测，对比度逐 run 判定）。blocker（文字溢出/出界/结构坏）必须修；warning（重叠/对比度/缺字体）逐条过目。**不要只检部分页就导出**——落账带页面覆盖记录，未覆盖全页时 `ppt_export` 会以 `QaCoverageIncomplete` 拒导出。
-2. **视觉 QA**：`ppt_render` 出每页 PNG（最终 pptx 光栅化，所见即所得；宿主支持时图片内容块随结果直接返回，不用再 read_image），逐页核对：图片清晰不变形、文字未压住关键画面、元素未越界、文字与背景对比足够、对齐/间距/字号层级统一。可疑页 `read_image` 全分辨率确认后再改，改完重跑直到全部通过。
+2. **视觉 QA**：`ppt_render` 出每页 PNG（最终 pptx 光栅化，所见即所得；结果给出每页图片的 absolutePath，对它调 `read_image` 看图），逐页核对：图片清晰不变形、文字未压住关键画面、元素未越界、文字与背景对比足够、对齐/间距/字号层级统一。可疑页放大确认后再改，改完重跑直到全部通过。
 3. **AI 深检（按需）**：`ppt_check` 传 `ai: true`。路由不支持图像时会降级成 PNG 路径清单 + 版式摘要，由你自行 `read_image` 完成视觉复核。
 
 ### 六、导出与交付
@@ -121,4 +121,4 @@ SVG 页是整页编译，不拆成 PPTD 元素；页内元素级编辑（`update
 
 ## 动画与备注
 
-默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的速查见 `reference/animation-tokens.md`；完整规范与易混淆 token 辨析见 `docs/pptd-spec.md` 附录 A/B（仓库内）。
+默认**不加**（阅读/自学/打印/发送类 deck 不需要）。用户明确要求或确属现场演示时才加，每页 1~3 组，优先 fade/fly/zoom；`notes` 同理。动画词表 95 个、转场 42 个的速查见 `reference/animation-tokens.md`；完整规范与易混淆 token 辨析见 `docs/pptd-spec.md` 附录 A/B（插件包根目录）。

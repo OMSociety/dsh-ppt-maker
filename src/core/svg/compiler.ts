@@ -70,6 +70,8 @@ export async function compileSvgPage(opts: CompileSvgPageOptions): Promise<Compi
     .update(SVG_COMPILER_VERSION)
     .update('|')
     .update(themeHash)
+    .update('|')
+    .update(await referencedMediaDigest(svgBytes.toString('utf8'), projectDir))
     .digest('hex')
     .slice(0, 32)
   const cacheDir = path.join(projectDir, '.cache', 'svg')
@@ -85,7 +87,7 @@ export async function compileSvgPage(opts: CompileSvgPageOptions): Promise<Compi
   if (!existsSync(python)) {
     throw new ProjectError(
       'SvgCompilerMissing',
-      'SVG 编译器环境未安装：请先运行 node scripts/prepare-vendor-env.mjs',
+      `SVG 编译器环境未安装：请先运行 node "${path.join(PACKAGE_ROOT, 'scripts', 'prepare-vendor-env.mjs')}"（需 Python 3.10+）`,
       { status: 500 }
     )
   }
@@ -118,6 +120,29 @@ export async function compileSvgPage(opts: CompileSvgPageOptions): Promise<Compi
   const fonts = Array.isArray(receipt.fonts) ? receipt.fonts.filter((f) => typeof f === 'string') : []
   await writeFile(sidecarAbs, JSON.stringify({ fonts }, null, 2) + '\n')
   return { bytes: new Uint8Array(await readFile(outAbs)), cached: false, fonts }
+}
+
+/**
+ * 缓存键分量：SVG 里 href / xlink:href 引用的本地媒体（相对 projectDir 解析）的字节摘要。
+ * 换掉被引用的位图即触发重编译；data: 与远程 URL 不参与。
+ */
+export async function referencedMediaDigest(svgText: string, projectDir: string): Promise<string> {
+  const refs = new Set<string>()
+  for (const match of svgText.matchAll(/\b(?:xlink:)?href\s*=\s*(["'])(.*?)\1/gi)) {
+    const ref = match[2].trim()
+    if (ref === '' || ref.startsWith('#') || /^(data|https?):/i.test(ref)) continue
+    refs.add(ref.replace(/\\/g, '/'))
+  }
+  const hash = createHash('sha256')
+  for (const ref of [...refs].sort()) {
+    hash.update(ref).update('=')
+    const abs = path.resolve(projectDir, ref)
+    const inside = abs === projectDir || abs.startsWith(projectDir + path.sep)
+    if (inside && existsSync(abs)) hash.update(await readFile(abs))
+    else hash.update('missing')
+    hash.update(';')
+  }
+  return hash.digest('hex')
 }
 
 /** deck.theme 的缓存键分量：主题变化触发重编译。 */

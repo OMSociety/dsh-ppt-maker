@@ -2,12 +2,14 @@
  * e2e stub：假宿主 ctx（tools/sessions/skills/webServer/connection + logger + effect），
  * 跑全链 create → edit×3（合并窗内）→ undo → redo，外加 ppt_themes 与错误路径。
  */
-import { access, mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { getShapeXmlString, getSlideShapes, getSlides, loadPresentation } from '@office-kit/pptx'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apply, name as pluginName, inject } from '../src/index.js'
 import type { ToolDef } from '../src/tools/shared.js'
+import { neverReturnedFields, resultViolations } from './__fixtures__/schema-check.js'
 
 interface ToolResult {
   ok: boolean
@@ -68,10 +70,14 @@ function revealTools(fire: (event: string, ...args: never[]) => void): void {
 
 const exec = { agent: { session: { id: 's-e2e' } } }
 
+/** 本文件里每次真实调用的返回值都按该工具的 output.schema 做值级校验。 */
 async function call(tool: string, args: Record<string, unknown>): Promise<ToolResult> {
   const def = defs.get(tool)
   expect(def, `工具 ${tool} 已注册`).toBeDefined()
-  return (await def!.execute(args, exec)) as ToolResult
+  const result = (await def!.execute(args, exec)) as ToolResult
+  const schema = (def as { output?: { schema?: unknown } }).output?.schema
+  expect(resultViolations(result, schema), `${tool} 返回值与 output.schema 不符`).toEqual([])
+  return result
 }
 
 async function fileExists(rel: string): Promise<boolean> {
@@ -221,13 +227,13 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     const e2 = await call('ppt_edit', {
       dir: 'deck',
       baseRevision: 1,
-      ops: [{ op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 50], content: 'hi' } }]
+      ops: [{ op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 50], content: { text: 'hi' } } }]
     })
     expect(e2).toMatchObject({ ok: true, revision: 1, merged: true })
     const e3 = await call('ppt_edit', {
       dir: 'deck',
       baseRevision: 1,
-      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: 'hello e2e' } }]
+      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: { text: 'hello e2e' } } }]
     })
     expect(e3.ok).toBe(true)
     expect(await fileExists('deck/pages/01.page')).toBe(true)
@@ -237,13 +243,13 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     expect(stale).toMatchObject({ ok: false, error: { code: 'RevisionMismatch', status: 409 } })
 
     // undo：合并窗内的三次编辑视为一步 → 回锚点
-    const undone = await call('ppt_undo', { dir: 'deck', steps: 1 })
+    const undone = await call('ppt_undo', { dir: 'deck', baseRevision: 1, steps: 1 })
     expect(undone).toMatchObject({ ok: true, revision: 0 })
     expect((undone.undoneOps as string[]).length).toBe(3)
     expect(await fileExists('deck/pages/01.page')).toBe(false)
 
     // redo
-    const redone = await call('ppt_redo', { dir: 'deck', steps: 1 })
+    const redone = await call('ppt_redo', { dir: 'deck', baseRevision: 0, steps: 1 })
     expect(redone).toMatchObject({ ok: true, revision: 1 })
     expect((redone.redoneOps as string[]).length).toBe(3)
     expect(await fileExists('deck/pages/01.page')).toBe(true)
@@ -252,10 +258,26 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     const tooEarly = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
     expect(tooEarly).toMatchObject({ ok: false, error: { code: 'QaReportMissing', status: 409 } })
 
+    // 写入前校验的阻断项直接写进 message（模型只看得到摘要）
+    const badFill = await call('ppt_edit', {
+      dir: 'deck',
+      baseRevision: redone.revision as number,
+      ops: [{ op: 'add_element', page: 'pages/01.page', element: { elementType: 'shape', elementId: 'bad', shapeName: 'rect', bounds: [0, 0, 10, 10], fill: '#3366cc' } }]
+    })
+    expect(badFill).toMatchObject({ ok: false, error: { code: 'ValidationBlockers', status: 409 } })
+    expect((badFill.error as { message: string }).message).toContain('#fill')
+
+    // 只检部分页：摘要如实写出检了哪几页
+    const checkDef = defs.get('ppt_check') as unknown as { output: { render: (a: unknown, r: unknown) => Array<{ text: string }> } }
+    const partial = await call('ppt_check', { dir: 'deck', pages: [1] })
+    expect(partial.pages).toEqual([1])
+    expect(checkDef.output.render({}, partial)[0].text).toContain('仅检第 1 页')
+
     // check（规则质检：无 blocker → qaReport 落账 + 指纹绑定）
     const checked = await call('ppt_check', { dir: 'deck' })
     expect(checked.ok).toBe(true)
     expect(checked.pass).toBe(true)
+    expect(checkDef.output.render({}, checked)[0].text).toContain('全页覆盖')
 
     // export（质检指纹匹配 → 产物落盘 + exportReport 落账 + postflight 通过）
     const exported = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
@@ -264,12 +286,19 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     expect((exported.check as { pass: boolean }).pass).toBe(true)
     expect(typeof exported.sha256).toBe('string')
     expect((exported.postflight as { ok: boolean; slides: number })).toMatchObject({ ok: true, slides: 1 })
+    // 产物里真有编辑后的文字（不是只断言 ok）
+    const outPres = await loadPresentation(await readFile(path.join(cwd, 'deck/out.pptx')))
+    const outXml = getSlideShapes(getSlides(outPres)[0]).map((s) => getShapeXmlString(s)).join('\n')
+    expect(outXml).toContain('<a:t>hello e2e</a:t>')
+    // schema 声明的每个成功字段都真实返回（抓「schema 宣称有、实现不再返回」的漂移）
+    const exportSchema = (defs.get('ppt_export') as { output: { schema: unknown } }).output.schema
+    expect(neverReturnedFields(exportSchema, [exported]), 'ppt_export schema 声明但未返回的字段').toEqual([])
 
     // 质检后又有改动 → 指纹 stale，导出被拒
     const afterEdit = await call('ppt_edit', {
       dir: 'deck',
       baseRevision: redone.revision as number,
-      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: 'stale 测试' } }]
+      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: { text: 'stale 测试' } } }]
     })
     expect(afterEdit.ok).toBe(true)
     const staleExport = await call('ppt_export', { dir: 'deck', out: 'deck/out2.pptx' })
@@ -303,10 +332,10 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     const outside = await call('ppt_create', { dir: '../outside' })
     expect(outside).toMatchObject({ ok: false, error: { code: 'PathOutsideCwd', status: 400 } })
 
-    const missing = await call('ppt_undo', { dir: 'no-such-project' })
+    const missing = await call('ppt_undo', { dir: 'no-such-project', baseRevision: 0 })
     expect(missing).toMatchObject({ ok: false, error: { code: 'ProjectNotFound', status: 404 } })
 
-    const badSteps = await call('ppt_undo', { dir: 'deck', steps: 99 })
+    const badSteps = await call('ppt_undo', { dir: 'deck', baseRevision: 0, steps: 99 })
     expect(badSteps).toMatchObject({ ok: false, error: { code: 'InvalidSteps', status: 400 } })
   })
 })

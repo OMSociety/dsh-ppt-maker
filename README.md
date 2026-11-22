@@ -40,7 +40,7 @@
 | **转场与动画** | 页面级转场（fade 默认 / none / auto 策展轮换）与 95 种元素动画 preset，本地链路原生写出 |
 | **修订与快照** | manifest 单一写者 + append-only 快照（游标模型，undo/redo 天然成立）+ baseRevision 乐观锁（409） |
 | **设计系统** | 学术 / 咨询 / 金融 / 促销 / 工作五族 30 套预设主题，机器可读 `theme.yml`（颜色/字体）选题即写入 `deck.theme`，整套版式配色层级一致 |
-| **本地渲染预览** | 面板画布与缩略图把 PPTD 页直接渲染成 DOM（矢量、秒出、与选择框同源同坐标系）；导出与质检的 PNG 预览走 `@deepseek-ai/libreoffice-kit` 光栅化最终 pptx，每页按 (page, revision) 磁盘缓存；`ppt_render` 在宿主支持时随结果直接返回图片内容块 |
+| **本地渲染预览** | 面板画布与缩略图把 PPTD 页直接渲染成 DOM（矢量、秒出、与选择框同源同坐标系）；导出与质检的 PNG 预览走 `@deepseek-ai/libreoffice-kit` 光栅化最终 pptx，渲染结果写入工程 `.previews/page-NN.png`，每次渲染覆盖；`ppt_render` 结果列出每页图片的绝对路径，供 `read_image` 看图 |
 
 ## 效果
 
@@ -69,7 +69,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 
 > **提示**：装好后**刷新一下浏览器页面**，从右侧栏打开「PPT 工作台」——只重启宿主不够，客户端产物是页面加载时取的。
 
-> **依赖**：主链全 TS、无 Python；`ppt_render` 与质检用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。仅当用到 SVG 页面轨（`ppt_svg`）时需要 Python 3.10+：跑一次 `node scripts/prepare-vendor-env.mjs` 自动建虚拟环境并装好 pin 依赖（pip 走默认源，可按需加镜像）。`skills/ppt-maker/scripts/` 下的 Python 脚本仅作逃生舱，见 SKILL.md「Python 逃生舱」。
+> **依赖**：主链全 TS、无 Python；`ppt_render` 与质检用的 `@deepseek-ai/libreoffice-kit@0.1.2` 是硬依赖（约 183MB/平台，随包安装）。仅当用到 SVG 页面轨（`ppt_svg`）时需要 Python 3.10+：跑一次 `node scripts/prepare-vendor-env.mjs`（脚本随包分发，位于插件包根目录）自动建虚拟环境并装好 pin 依赖（pip 默认走清华源，可用环境变量 `PIP_INDEX` 换源、`PYTHON` 指定解释器）。`skills/ppt-maker/scripts/` 下的 Python 脚本仅作逃生舱，见 SKILL.md「Python 逃生舱」。
 
 > **平台**：引擎按平台分发——Windows（x64/arm64）与 macOS（x64/arm64）用原生包，Linux 没有原生包（npm 上不存在 `libreoffice-kit-linux-*`），渲染与质检改走 WASM。CI 在 `windows-latest` 与 `ubuntu-latest` 上跑同一套用例（字体嵌入断言除外），两个平台都通过；导出产物同源，未做跨平台逐字节对比。macOS 目前没有 CI 覆盖。
 
@@ -90,7 +90,7 @@ dsh plugin --profile <profile> add "dsh-ppt-maker"
 | `ppt_plan` | 读写规划契约：brief（用途/受众/核心信息）与 plan（页面规划） | `dir` · `action`（`get`/`setBrief`/`setPlan`） |
 | `ppt_edit` | 原子编辑：ops 数组批量增删改页面与元素（含 `update_plan`/`update_svg_source`），baseRevision 乐观锁 | `dir` · `ops` · `baseRevision` |
 | `ppt_undo` / `ppt_redo` | 撤销 / 重做（游标移动，合并窗内连续编辑算一步） | `dir` · `steps`（1–20，默认 1） |
-| `ppt_render` | 渲染每页 PNG 预览（最终 pptx 光栅化；宿主支持时随结果返回图片内容块） | `dir` · `pages` · `dpi`（默认 96） |
+| `ppt_render` | 渲染每页 PNG 预览（最终 pptx 光栅化；结果给出每页图片的绝对路径） | `dir` · `pages` · `dpi`（默认 96） |
 | `ppt_check` | 规则质检（默认）+ AI 视觉质检（只出建议不阻断） | `dir` · `pages` · `ai` |
 | `ppt_export` | 导出 .pptx（QA 指纹门禁 + postflight 回读，`skipCheck` 绕过） | `dir` · `out` · `skipCheck` |
 | `ppt_import` | .pptx → PPTD 全量逆向（dropped / degraded 两级报告 + 源文件存档） | `source` · `targetDir` · `mode`（`full` / `surgical`）· `open` |
@@ -125,6 +125,7 @@ npm run build        # 重出 lib/index.js 与 lib/client.js（改完 src/ 或 c
 npm run build:preview # 用正式工作台组件与 docs/preview/fixture.json 重建自包含预览 HTML
 npm run check:build  # 确认 lib/ 与 git 一致
 npm run check:mounts # 挂载声明核对
+npm run check:pack   # 发布物清单核对
 ```
 
 > **提示**：全量测试需大堆串行跑（默认堆会 OOM）：先 `$env:NODE_OPTIONS='--max-old-space-size=12288'`，再 `npx vitest run --no-file-parallelism`。完整验收口径与禁止事项见 [`AGENTS.md`](AGENTS.md)。
@@ -138,7 +139,7 @@ src/tools/         13 个工具的 raw JSON-Schema 契约
 client/            右侧栏工作台源码（TSX → esbuild 打成 lib/client.js）
 plugin/            装载壳 + host 路由（纯 JS，经 deps.core 注入 core）
 skills/ppt-maker/  ppt-maker 技能：设计系统参考与生成纪律（模型自己会读）；vendor/ 下是 SVG 转换器与 Python 环境
-tests/             宿主契约 / 工具 e2e / 逆向 / 字体 / bundle 守卫（语料 .pptx 不入库）
+tests/             宿主契约 / 工具 e2e / 逆向 / 字体 / bundle 守卫（20 份脱敏语料 .pptx 随仓库分发；sensitive-words.txt 不入库）
 docs/              PPTD 规格（全量自包含）/ 决策登记 / 兜底字体表
 lib/               构建产物（入库；dsh plugin add 只装不构建）
 ```

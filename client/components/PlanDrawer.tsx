@@ -13,9 +13,30 @@ export function PlanDrawer({ store, onClose }: { store: PptStore; onClose: () =>
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot)
   const plan = state.plan
   const brief = state.brief
+  const rootRef = React.useRef<HTMLDivElement | null>(null)
+
+  React.useEffect(() => {
+    // 打开即把焦点移进抽屉，关闭时还给触发它的按钮。
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    rootRef.current?.focus()
+    return () => opener?.focus()
+  }, [])
 
   return (
-    <div className="ppt-plan-drawer" role="dialog" aria-label="规划契约">
+    <div
+      ref={rootRef}
+      className="ppt-plan-drawer"
+      role="dialog"
+      aria-modal="true"
+      aria-label="规划契约"
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          onClose()
+        }
+      }}
+    >
       <div className="ppt-plan-head">
         <strong>规划契约</strong>
         <span className="ppt-plan-status" data-status={plan?.status ?? 'none'}>

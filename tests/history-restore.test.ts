@@ -54,14 +54,14 @@ describe('restoreProject', () => {
       baseRevision: 0,
       ops: [
         { op: 'add_page', page: 'pages/01.page', content: { elements: [] } },
-        { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 40], content: '第一版' } }
+        { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 40], content: { text: '第一版' } } }
       ],
       sessionId: 's1'
     })
     await editProject(cwd, {
       dir: 'deck',
       baseRevision: 1,
-      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: '第二版' } }],
+      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: { text: '第二版' } } }],
       sessionId: 's1'
     })
 
@@ -70,12 +70,12 @@ describe('restoreProject', () => {
     const r1 = await loadProject(cwd, 'deck')
     expect(r1.manifest.revision).toBe(1)
     const page1 = r1.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
-    expect(page1.elements[0].content).toBe('第一版')
+    expect(page1.elements[0].content).toEqual({ text: '第一版' })
 
     const fwd = await restoreProject(cwd, 'deck', 2)
     expect(fwd.revision).toBe(2)
     const r2 = await loadProject(cwd, 'deck')
     const page2 = r2.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
-    expect(page2.elements[0].content).toBe('第二版')
+    expect(page2.elements[0].content).toEqual({ text: '第二版' })
   })
 })

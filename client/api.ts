@@ -2,12 +2,12 @@
  * 客户端与宿主的接口层：全部走 `/ppt-maker/api/*`（同源 fetch）。
  *
  * 对齐 task-2 的宿主路由（plugin/host/routes.mjs）实回包形状：
- *   GET  /state       → {projects[{key,dir}], activeKey, openRequests[], manifest?, cwd, canUndo?, canRedo?}
+ *   GET  /state       → {projects[{key,dir}], activeKey, openRequests[], manifest?{…, canUndo, canRedo}, manifestError?, cwd}
  *   GET  /project     → {key, dir, revision, manifest, deck, pages[], issues, checksumMismatch}
  *   GET  /page        → {path, page, revision}
  *   GET  /media       → image bytes（?src=media/xx.png）
- *   POST /edit        → {ok, revision, appliedOps, warnings, merged}；409 → ConflictError
- *   POST /undo|redo   → {ok, revision, undoneOps}
+ *   POST /edit        → {ok, revision, appliedOps, warnings, merged}；409 → ConflictError（带 conflict.revision）
+ *   POST /undo|redo   → {ok, revision, undoneOps}；须带 baseRevision，过期 → ConflictError
  *   POST /media/upload → {ok, src, path, bytes}
  *   POST /export      → {relativePath, absolutePath, filename, revision, bytes}（save:true 落盘；
  *                       不走 call()——二进制/JSON 两种回包与 409 的判法不同，见 failExport）
@@ -61,8 +61,8 @@ export interface StatePayload {
   activeKey: string | null
   openRequests: Array<{ key: string; at: number }>
   manifest: ManifestOutline | null
-  canUndo?: boolean
-  canRedo?: boolean
+  /** 活动工程读取失败时的原因（工程文件损坏等）；manifest 此时为 null。 */
+  manifestError?: string | null
 }
 
 export interface ProjectPayload {
@@ -164,14 +164,33 @@ export interface OpenApplication {
 
 const PREFIX = '/ppt-maker/api'
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+/** 普通请求的等待上限：宿主卡住时让面板退出「正在保存」，草稿留在本地可重试。 */
+export const REQUEST_TIMEOUT_MS = 30_000
+/** 导出要构建、嵌字体与回读校验，单独给更长的上限。 */
+export const EXPORT_TIMEOUT_MS = 180_000
+
+/** 超时信号；运行环境缺 AbortSignal.timeout 时不设超时（请求照常发出）。 */
+function timeoutSignal(ms: number): AbortSignal | undefined {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined
+}
+
+function isTimeout(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name
+  return name === 'TimeoutError' || name === 'AbortError'
+}
+
+async function call<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   let res: Response
   try {
     res = await fetch(`${PREFIX}${path}`, {
+      signal: timeoutSignal(timeoutMs),
       ...init,
       headers: init?.body ? { 'content-type': 'application/json', ...(init?.headers || {}) } : init?.headers,
     })
   } catch (error) {
+    if (isTimeout(error)) {
+      throw new Error(`宿主 ${Math.round(timeoutMs / 1000)} 秒无响应，已停止等待；未保存的改动仍在本地，可重试或查看宿主日志`)
+    }
     // fetch 只在网络层失败时 reject（TypeError: Failed to fetch / Load failed）：宿主路由还没挂上、
     // 宿主进程断开、连接被重置都走这里。与「HTTP 4xx/5xx 带 JSON error」分开报——否则用户看到的
     // 是浏览器原文，分不清是网络不通还是宿主拒了请求。
@@ -243,16 +262,16 @@ export const api = {
       body: JSON.stringify({ sessionId, key, baseRevision, ops }),
     }),
 
-  undo: (sessionId: string, key: string, steps = 1) =>
+  undo: (sessionId: string, key: string, baseRevision: number, steps = 1) =>
     call<{ ok: true } & UndoRedoResult>(`/undo`, {
       method: 'POST',
-      body: JSON.stringify({ sessionId, key, steps }),
+      body: JSON.stringify({ sessionId, key, baseRevision, steps }),
     }),
 
-  redo: (sessionId: string, key: string, steps = 1) =>
+  redo: (sessionId: string, key: string, baseRevision: number, steps = 1) =>
     call<{ ok: true } & UndoRedoResult>(`/redo`, {
       method: 'POST',
-      body: JSON.stringify({ sessionId, key, steps }),
+      body: JSON.stringify({ sessionId, key, baseRevision, steps }),
     }),
 
   uploadMedia: (sessionId: string, key: string, payload: { name?: string; mime?: string; data: string }) =>
@@ -271,11 +290,18 @@ export const api = {
     sessionId: string,
     key: string,
   ): Promise<{ relativePath: string; absolutePath: string; filename: string; revision: number; bytes: number }> {
-    const res = await fetch(`${PREFIX}/export`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, key, save: true }),
-    })
+    let res: Response
+    try {
+      res = await fetch(`${PREFIX}/export`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId, key, save: true }),
+        signal: timeoutSignal(EXPORT_TIMEOUT_MS),
+      })
+    } catch (error) {
+      if (isTimeout(error)) throw new Error(`导出 ${EXPORT_TIMEOUT_MS / 1000} 秒未完成，已停止等待；可查看宿主日志后重试`)
+      throw new Error(`网络不通：连不上宿主路由（${(error as Error).message}）`)
+    }
     if (!res.ok) await failExport(res)
     const payload = (await res.json().catch(() => ({}))) as {
       relativePath?: string

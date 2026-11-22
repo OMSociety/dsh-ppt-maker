@@ -181,7 +181,15 @@ export function collectFontUsage(deck: Presentation, pages: Page[]): FontUsage {
     }
   }
 
-  // 2) pages 元素
+  // 2) 母版与版式装饰元素（引擎会把它们写进产物）
+  for (const master of deck.masters ?? []) {
+    for (const el of master.shapes ?? []) scanElement(el as Record<string, unknown>, typefaces, chars)
+    for (const layout of master.layouts ?? []) {
+      for (const el of layout.shapes ?? []) scanElement(el as Record<string, unknown>, typefaces, chars)
+    }
+  }
+
+  // 3) pages 元素
   for (const page of pages) {
     if (typeof page.notes === 'string') scanText(page.notes, chars)
     for (const el of page.elements ?? []) {

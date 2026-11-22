@@ -114,6 +114,8 @@ describe('reverse engine（PPTX → PPTD 逆向）', () => {
     expect(tableEl).toBeDefined()
     expect(tableEl.rows).toHaveLength(2)
     expect(tableEl.rows?.[0][0]?.colSpan).toBe(2)
+    // spec §6.6：被合并覆盖的格从 rows 省略
+    expect(tableEl.rows?.[0].map((cell) => cell.text)).toEqual(['A1', 'C1'])
 
     // connector
     const lineEl = page.elements.find((e) => e.elementType === 'line')

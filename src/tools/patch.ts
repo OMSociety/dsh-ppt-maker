@@ -17,7 +17,7 @@
  * shape 引用优先级：shapeId（源 <p:cNvPr id>）→ shapeName（cNvPr name）
  * → findShapesAtPoint 命中检测的 {x, y}（单位 EMU）。
  *
- * 输出：{ ok, out, bytes, appliedOps, unchangedParts }。
+ * 输出：{ ok, out, bytes, appliedOps, totalParts, keptParts, lostParts }。
  */
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -179,7 +179,8 @@ export function registerPatchTool(ctx: PluginToolCtx): (() => void) | undefined 
         bytes: { type: 'integer' },
         appliedOps: { type: 'integer' },
         appliedList: { type: 'array', items: { type: 'string' } },
-        unchangedParts: { type: 'integer' },
+        totalParts: { type: 'integer' },
+        keptParts: { type: 'integer' },
         lostParts: { type: 'array', items: { type: 'string' } },
         beforeSha1: { type: 'string' },
         afterSha1: { type: 'string' },
@@ -187,7 +188,9 @@ export function registerPatchTool(ctx: PluginToolCtx): (() => void) | undefined 
       }),
       render: renderSummary((r) => {
         const lost = Array.isArray(r.lostParts) ? r.lostParts.length : 0
-        return `已写入 ${String(r.out ?? '')}（${String(r.appliedOps)} 个 op；未建模部件 ${String(r.unchangedParts)} 件全数保留，丢件 ${lost}）`
+        return lost === 0
+          ? `已写入 ${String(r.out ?? '')}（${String(r.appliedOps)} 个 op；包内 ${String(r.totalParts)} 个部件全部保留）`
+          : `已写入 ${String(r.out ?? '')}（${String(r.appliedOps)} 个 op；包内 ${String(r.totalParts)} 个部件中 ${lost} 个丢失、${String(r.keptParts)} 个保留）`
       })
     },
     execute: async (args, exec) => {
@@ -274,7 +277,8 @@ export function registerPatchTool(ctx: PluginToolCtx): (() => void) | undefined 
           bytes: outBytes.byteLength,
           appliedOps: appliedOps.length,
           appliedList: appliedOps,
-          unchangedParts: lost.length === 0 ? beforeParts.size : beforeParts.size - lost.length,
+          totalParts: beforeParts.size,
+        keptParts: beforeParts.size - lost.length,
           lostParts: lost,
           beforeSha1,
           afterSha1: createHash('sha1').update(outBytes).digest('hex'),

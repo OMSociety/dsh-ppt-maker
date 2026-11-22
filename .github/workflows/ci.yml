@@ -44,6 +44,20 @@ jobs:
       - name: 发布物清单
         run: npm run check:pack
 
-      # fonts-embed 断言子集字体体积，依赖本机中文字体；云端 runner 取不到，单独在本机跑
-      - name: 全量测试（字体嵌入用例除外）
-        run: npx vitest run --no-file-parallelism --exclude "tests/fonts-embed.test.ts"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # SVG 页编译器的 Python 环境；svg-page 与 tools-plan-svg 依赖它
+      - name: 准备 SVG 编译器环境
+        run: node scripts/prepare-vendor-env.mjs
+        env:
+          PIP_INDEX: https://pypi.org/simple
+
+      # 字体真件用例：Noto CJK 供中文族名解析，文泉驿正黑（glyf 轮廓 TTC）与 DejaVu 供 EOT 封装与嵌入
+      - name: 安装测试字体（ubuntu）
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-wqy-zenhei fonts-dejavu-core
+
+      - name: 全量测试
+        run: npx vitest run --no-file-parallelism

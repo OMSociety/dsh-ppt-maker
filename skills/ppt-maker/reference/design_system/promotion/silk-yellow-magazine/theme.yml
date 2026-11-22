@@ -15,7 +15,7 @@ colors:
   chapteryellow: '#FFD200'
 textStyles:
   title:
-    fontFamily: { latin: Archivo Black, ea: MiSans }   # 标题/章节展示字（Archivo Black 经 customFonts；中文 MiSans Bold）
+    fontFamily: { latin: Archivo Black, ea: MiSans }   # 标题/章节展示字（Archivo Black 字体文件放工程 assets/fonts/；中文 MiSans Bold）
     color: $ink
     bold: true
   body:

@@ -192,11 +192,38 @@ describe('TableView · PPTD rows/style 契约', () => {
     expect(model.rows[1][0].text).toBe('ppt_plan')
   })
 
+  it('rows 省略被覆盖格时按网格列落位', () => {
+    const model = tableModelOf({
+      columnWidths: [0.34, 0.33, 0.33],
+      rowHeights: [0.5, 0.5],
+      rows: [
+        [{ text: 'A', rowSpan: 2 }, { text: 'B', colSpan: 2 }],
+        [{ text: 'C' }, { text: 'D' }],
+      ],
+    })
+    expect(model.columns).toBe(3)
+    expect(model.cells.map(({ r, c, cell }) => `${r}${c}${cell.text}`)).toEqual(['00A', '01B', '11C', '12D'])
+  })
+
   it('单元格保留 fill、字号、颜色与边框', () => {
     const cell = tableCellViewModel(element.rows[0][0] as Record<string, unknown>, {}, null)
     expect(cell.background).toBe('#1a1a1a')
     expect(cell.color).toBe('#fff')
     expect(cell.fontSize).toBe(16)
     expect(cell.html).toBe('工具')
+  })
+
+  it('BorderSpec 数组逐边落位：null 边不画，只留指定横线', () => {
+    const rule = { color: '#d8d2c4', style: 'solid', width: 1 }
+    const four = tableCellViewModel({ text: 'x' }, { border: [null, null, rule, null] }, null)
+    expect(four.borderTop).toBe('none')
+    expect(four.borderRight).toBe('none')
+    expect(four.borderLeft).toBe('none')
+    expect(four.borderBottom).toContain('#d8d2c4')
+    const two = tableCellViewModel({ text: 'x' }, { border: [rule, null] }, null)
+    expect(two.borderTop).toContain('#d8d2c4')
+    expect(two.borderBottom).toContain('#d8d2c4')
+    expect(two.borderLeft).toBe('none')
+    expect(tableCellViewModel({ text: 'x', border: null }, {}, null).borderTop).toBe('none')
   })
 })

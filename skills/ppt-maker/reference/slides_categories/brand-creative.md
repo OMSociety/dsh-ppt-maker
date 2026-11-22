@@ -84,10 +84,10 @@ Visual references are only "references": they show you something good so you kno
 - No transparent gradients; colors appear only as flats, overprints, and halftones.
 
 **Type**:
-- Cover title: ultra-heavy condensed poster type, 88–120 pt (for Latin, bring in ultra-heavy display faces like Anton via customFonts — see fonts.md), allowed to rotate -3 degrees and cross the canvas edge.
+- Cover title: ultra-heavy condensed poster type, 88–120 pt (for Latin, place an ultra-heavy display face such as Anton in the project assets/fonts/ — see fonts.md), allowed to rotate -3 degrees and cross the canvas edge.
 - Page titles: 42–58 pt, may be reversed white on a black ground.
 - Body text: 14–17 pt, in a clear sans-serif or serif face.
-- Annotations: 10–12 pt monospaced (bring in JetBrains Mono etc. via customFonts — see fonts.md), mimicking typewriter labels.
+- Annotations: 10–12 pt monospaced (place a JetBrains Mono file in the project assets/fonts/ — see fonts.md), mimicking typewriter labels.
 
 **Grid and geometry**:
 - Use unequal-width two and three columns and cut-and-paste modules.
@@ -127,10 +127,10 @@ Visual references are only "references": they show you something good so you kno
 - No blue-purple gradients and no colored status blocks.
 
 **Type**:
-- Masthead: ultra-heavy sans-serif, 72–100 pt (for Latin, bring in Archivo Black etc. via customFonts — see fonts.md), all caps where supported or otherwise set as ultra-bold short text.
+- Masthead: ultra-heavy sans-serif, 72–100 pt (for Latin, place Archivo Black etc. in the project assets/fonts/ — see fonts.md), all caps where supported or otherwise set as ultra-bold short text.
 - Headlines: 44–72 pt, tight leading.
 - Body text: 11–14 pt serif, line spacing 1.25–1.4.
-- Data and labels: monospaced (bring in JetBrains Mono etc. via customFonts — see fonts.md), 10–14 pt.
+- Data and labels: monospaced (place a JetBrains Mono file in the project assets/fonts/ — see fonts.md), 10–14 pt.
 - Pull quotes: 28–40 pt serif italic or bold.
 
 **Grid and geometry**:

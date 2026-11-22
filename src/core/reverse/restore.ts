@@ -1,33 +1,27 @@
 /**
  * 未改页整页恢复（spec §10.4）——逆向工程的导出保真轨。
  *
- * 逆向导入将 PPTD 未建模部件记录为 dropped + 占位，并把原始 pptx
- * 存档至 source/original.pptx（deck.source.archive / originalSha1）。
- * 全部页未改时，导出从存档整份逐页恢复；任一页有编辑痕迹时，
- * 整份按 PPTD 元素重建，占位与报告保留。
+ * 逆向导入将 PPTD 未建模部件记录为 dropped + 占位，把原始 pptx 存档至
+ * source/original.pptx（deck.source.archive / originalSha1），并把导入完成时
+ * 每页内容的指纹写进 source/page-fingerprints.json。全部页未改时，导出从
+ * 存档整份逐页恢复；任一页有改动时，整份按 PPTD 元素重建，占位与报告保留。
  *
- * 「未改」的判定（保守，fail-closed）：
+ * 「未改」的判定（fail-closed）：
  *   1. deck.profile === 'reverse' 且 deck.source.archive/originalSha1 齐全；
  *   2. 存档文件存在、sha1 与 originalSha1 一致（存档本身没被换过）；
- *   3. 页数与 deck.pages 顺序和导入时一致（页未增删重排）；
- *   4. 该页每个元素仍带 sourceRef（{slideIndex, shapeId}），且 slideIndex
- *      全部指向这一页——导入时每个元素都带 sourceRef，编辑操作（update_element
- *      等）不保证保留它，缺一个就视为「改过」。
- * 任何一条不满足即回退逐页重建，并在 warnings 里说明原因（永不静默）。
- *
- * 当前实现的边界：判定依据是 sourceRef 完整性，不是内容 diff——「改了一个
- * 元素的 text 但 sourceRef 还在」不会被识别为已改。因此本轨默认只在
- * 「整份 deck 自导入后零编辑」时启用整页恢复（restorePage 全 true 才生效），
- * 部分页编辑的场景整份回退逐页重建。
- *
- * 上面这段是能力边界的如实说明；真正的保守口径是：
- * 本模块只在「全部页 sourceRef 完整」时返回 archiveReady=true 且
- * restorePage 全 true，否则 archiveReady=false。调用方按整份 deck 二选一。
+ *   3. 页数与导入时一致；
+ *   4. 每页当前内容的指纹（pageFingerprint：按键排序的规范 JSON 的 sha1）
+ *      与导入时记录的指纹一致——元素增删、字段改动、删空整页都会改变指纹。
+ * 任何一条不满足即回退逐页重建，并在 notes 里说明原因（永不静默）。
+ * 调用方按整份 deck 二选一：archiveReady 且 restorePage 全 true 才整页恢复。
  */
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page, Presentation } from '../pptd/schema.js'
+
+/** 页指纹文件：与存档同目录，不参与 manifest.checksum。 */
+export const PAGE_FINGERPRINTS_FILE = 'page-fingerprints.json'
 
 export interface RestoreDecision {
   /** 整页恢复是否可用（存档级门槛）。 */
@@ -40,16 +34,35 @@ export interface RestoreDecision {
   bytes: Uint8Array | null
 }
 
-function sha1Of(bytes: Uint8Array): string {
+function sha1Of(bytes: Uint8Array | string): string {
   return createHash('sha1').update(bytes).digest('hex')
 }
 
-/** 元素是否仍带「指向本页」的导入溯源标记。 */
-function elementUntouched(el: unknown, slideIndex: number): boolean {
-  if (!el || typeof el !== 'object') return false
-  const ref = (el as { sourceRef?: { slideIndex?: unknown; shapeId?: unknown } }).sourceRef
-  if (!ref || typeof ref !== 'object') return false
-  return ref.slideIndex === slideIndex && typeof ref.shapeId === 'number'
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical)
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const key of Object.keys(value).sort()) {
+      const v = (value as Record<string, unknown>)[key]
+      if (v !== undefined) out[key] = canonical(v)
+    }
+    return out
+  }
+  return value
+}
+
+/** 页内容指纹：键序无关、忽略 undefined 字段。 */
+export function pageFingerprint(page: Page): string {
+  return sha1Of(JSON.stringify(canonical(page)))
+}
+
+async function readFingerprints(archiveAbs: string): Promise<string[] | null> {
+  try {
+    const raw = JSON.parse(await readFile(path.join(path.dirname(archiveAbs), PAGE_FINGERPRINTS_FILE), 'utf8')) as { pages?: unknown }
+    return Array.isArray(raw.pages) && raw.pages.every((p) => typeof p === 'string') ? (raw.pages as string[]) : null
+  } catch {
+    return null
+  }
 }
 
 export async function planSourceRestore(
@@ -84,13 +97,15 @@ export async function planSourceRestore(
   if (source.slideCount !== pages.length) {
     return none([`页数与源文件不一致（源 ${source.slideCount} 页 / 现 ${pages.length} 页），全部页按 PPTD 重建`])
   }
+  const fingerprints = await readFingerprints(archiveAbs)
+  if (!fingerprints || fingerprints.length !== pages.length) {
+    return none([`页指纹 source/${PAGE_FINGERPRINTS_FILE} 缺失或页数不符，全部页按 PPTD 重建`])
+  }
 
   const notes: string[] = []
   const restorePage = pages.map((page, i) => {
-    const slideIndex = i + 1
-    const els = Array.isArray(page.elements) ? page.elements : []
-    const untouched = els.every((el) => elementUntouched(el, slideIndex))
-    if (!untouched) notes.push(`第 ${slideIndex} 页有编辑痕迹，按 PPTD 重建`)
+    const untouched = pageFingerprint(page) === fingerprints[i]
+    if (!untouched) notes.push(`第 ${i + 1} 页内容与导入时不同，按 PPTD 重建`)
     return untouched
   })
 

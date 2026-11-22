@@ -10,8 +10,9 @@
  *     ppt_svg / ppt_import / ppt_open / ppt_patch；raw JSON-Schema via
  *     ctx.tools.register）——经 src/lazy-tools.ts 懒展开：技能被 invoke 前工具不进会话工具表。
  *
- * `inject = ['tools', 'sessions', 'skills', 'webServer']`——只声明插件装载
- * 上下文里**保证存在**的服务（与 dsh-fishpai / 官方工具包同一口径）。
+ * `inject = ['tools', 'sessions', 'skills', 'webServer', 'connection']`——只声明插件装载
+ * 上下文里**保证存在**的服务。`connection` 必须保留：每个 `/ppt-maker/api/*` 请求先经
+ * `ctx.connection.requestRejection` 做宿主统一访问检查，删掉它会让全部路由失去认证。
  * `llm` / `attachments`（ppt_check 的 opt-in AI 视觉质检用）**不得进 inject**：
  * Cordis 对注入但缺席的服务会把 apply() 无限期挂起且全程静默——实测症状是
  * 技能注册成功（目录里看得见）而全部 ppt_* 工具与 webServer 路由凭空消失。
@@ -308,17 +309,12 @@ export function apply(ctx: ApplyCtx): void {
             get attachments() {
               return ctx.get?.('attachments') as ApplyCtx['attachments']
             },
-            pptMaker: undefined,
-            // Lazy getter: the bridge is filled in once the host-store module
-            // finishes loading (microtask after apply). Tool calls always come
-            // after apply, so by the time execute runs the bridge is present.
-            ...(register === registerImportTool || register === registerOpenTool
-              ? {
-                  get pptMaker() {
-                    return resolveBridge()
-                  }
-                }
-              : {})
+            // Live getter: the bridge is filled in once the host-store module
+            // finishes loading, which may be after the tools are revealed.
+            // (An object spread would read the getter once and freeze undefined.)
+            get pptMaker() {
+              return register === registerImportTool || register === registerOpenTool ? resolveBridge() : undefined
+            }
           })
           if (typeof off === 'function') suiteOffs.push(off)
         } catch (err) {

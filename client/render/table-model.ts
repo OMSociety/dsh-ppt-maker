@@ -32,10 +32,9 @@ export function tableCategoryStyleOf(
   style: TableStyleMap,
   r: number,
   c: number,
-  rows: TableCell[][],
+  lastRow: number,
+  lastCol: number,
 ): TableStyleMap {
-  const lastRow = rows.length - 1
-  const lastCol = rows[r]?.length ? rows[r].length - 1 : 0
   const bodyStyles = Array.isArray(style.bodyStyles) ? style.bodyStyles : []
   const rowStyle = r === 0
     ? style.firstRowStyle
@@ -50,12 +49,28 @@ export function tableCategoryStyleOf(
   return style.rowOverColumn === false ? { ...row, ...col } : { ...col, ...row }
 }
 
-function cellBorderStyle(border: unknown, theme?: ThemeLike | null): Pick<CSSProperties, 'border'> {
-  if (border === null) return { border: 'none' }
-  if (border && typeof border === 'object' && !Array.isArray(border)) {
-    return { border: borderToCss(border, theme) ?? '1px solid rgba(0,0,0,0.15)' }
-  }
-  return { border: '1px solid rgba(0,0,0,0.15)' }
+const DEFAULT_CELL_BORDER = '1px solid rgba(0,0,0,0.15)'
+
+type CellBorderCss = Pick<CSSProperties, 'borderTop' | 'borderRight' | 'borderBottom' | 'borderLeft'>
+
+/** 单条边：null 不画，Border 对象画，未写（undefined）用默认细线。 */
+function sideCss(side: unknown, theme?: ThemeLike | null): string {
+  if (side === null) return 'none'
+  if (side && typeof side === 'object') return borderToCss(side, theme) ?? DEFAULT_CELL_BORDER
+  return DEFAULT_CELL_BORDER
+}
+
+/**
+ * BorderSpec（规格 §6.7）= null | Border | [上下, 左右] | [上, 右, 下, 左]；
+ * 数组内的 null 表示该边不画。
+ */
+function cellBorderStyle(border: unknown, theme?: ThemeLike | null): CellBorderCss {
+  let sides: [unknown, unknown, unknown, unknown]
+  if (Array.isArray(border) && border.length === 2) sides = [border[0], border[1], border[0], border[1]]
+  else if (Array.isArray(border) && border.length === 4) sides = [border[0], border[1], border[2], border[3]]
+  else sides = [border, border, border, border]
+  const [top, right, bottom, left] = sides.map((side) => sideCss(side, theme))
+  return { borderTop: top, borderRight: right, borderBottom: bottom, borderLeft: left }
 }
 
 export function tableCellViewModel(
@@ -84,11 +99,41 @@ export function tableCellViewModel(
   }
 }
 
+export interface PlacedTableCell {
+  r: number
+  /** Grid column: `rows` omits cells covered by a merge (spec §6.6). */
+  c: number
+  rowSpan: number
+  colSpan: number
+  cell: TableCell
+}
+
 export function tableModelOf(content: Record<string, unknown>) {
   const rows = normTableRows(content.rows)
-  const columns = Math.max(0, ...rows.map((row) => row.length))
+  const widestRow = Math.max(
+    0,
+    ...rows.map((row) => row.reduce((sum, cell) => sum + Math.max(1, Number(cell.colSpan) || 1), 0)),
+  )
+  const columns = Array.isArray(content.columnWidths) && content.columnWidths.length > 0
+    ? content.columnWidths.length
+    : widestRow
+  const occupied = rows.map(() => new Array<boolean>(columns).fill(false))
+  const cells: PlacedTableCell[] = []
+  rows.forEach((row, r) => {
+    let c = 0
+    for (const cell of row) {
+      while (c < columns && occupied[r][c]) c += 1
+      if (c >= columns) break
+      const rowSpan = Math.max(1, Math.min(Number(cell.rowSpan) || 1, rows.length - r))
+      const colSpan = Math.max(1, Math.min(Number(cell.colSpan) || 1, columns - c))
+      for (let dr = 0; dr < rowSpan; dr++) for (let dc = 0; dc < colSpan; dc++) occupied[r + dr][c + dc] = true
+      cells.push({ r, c, rowSpan, colSpan, cell })
+      c += colSpan
+    }
+  })
   return {
     rows,
+    cells,
     columns,
     columnWidths: ratioList(content.columnWidths, columns),
     rowHeights: ratioList(content.rowHeights, rows.length),

@@ -7,8 +7,8 @@
  *
  * Frozen contract:
  *  - input: source（相对 cwd 的 .pptx 路径）、targetDir、title、open；
- *  - mode: 'full'（默认，走逆向）| 'surgical'（早退，返回 guidance，由调用
- *    方走 ppt_patch；本工具只建空 projectDir 不动它）；
+ *  - mode: 'full'（默认，走逆向）| 'surgical'（不建目录、不写任何文件，只返回
+ *    指向 ppt_patch 的 guidance）；
  *  - output: { ok, projectDir, pageCount, mediaCount, revision, dropped,
  *    degraded } — RevisionMismatch 等错误走 toolError 统一通道。
  */
@@ -52,7 +52,7 @@ export function registerImportTool(ctx: PluginToolCtxWithOpen): (() => void) | u
         mode: {
           type: 'string',
           enum: ['full', 'surgical'],
-          description: 'full（默认）= 全量逆向；surgical = 早退（仅给提示，不建工程）'
+          description: 'full（默认）= 全量逆向；surgical = 不建工程、不写文件，只返回改用 ppt_patch 的指引'
         }
       }
     },

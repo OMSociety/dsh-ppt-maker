@@ -10,7 +10,7 @@ colors:
 textStyles:
   title:
     fontSize: 69
-    fontFamily: { latin: Inter, ea: MiSans }   # Inter SemiBold 标题/标签（Inter 经 customFonts）
+    fontFamily: { latin: Inter, ea: MiSans }   # Inter SemiBold 标题/标签（Inter 字体文件放工程 assets/fonts/）
     color: $ink
     bold: true
   display:

@@ -14,8 +14,8 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
     name: 'ppt_render',
     description:
       '把工程渲染成每页 PNG 预览：经引擎构建最终 pptx 字节后由 libreoffice-kit 光栅化（96dpi）。' +
-      '返回 { ok, images:[{page,path}] }，图片落在工程目录 .previews/ 下；' +
-      '宿主支持附件时同时回传图片内容块（无需再 read_image 即可直接看图复核版面）。',
+      '返回 { ok, images:[{page,path,absolutePath}] }，图片落在工程目录 .previews/page-NN.png（每次渲染覆盖）；' +
+      '结果只给路径不带图片本身，看图复核请对 absolutePath 调 read_image。',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -41,6 +41,7 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
             properties: {
               page: { type: 'integer' },
               path: { type: 'string' },
+              absolutePath: { type: 'string' },
               width: { type: 'integer' },
               height: { type: 'integer' }
             }
@@ -50,8 +51,9 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
         warnings: { type: 'array', items: { type: 'string' } }
       }),
       render: renderSummary((r) => {
-        const images = (r.images as Array<{ page: number }> | undefined) ?? []
-        return `已渲染 ${images.length} 页预览`
+        const images = (r.images as Array<{ page: number; absolutePath?: string }> | undefined) ?? []
+        const list = images.map((img) => `第 ${img.page} 页：${img.absolutePath ?? ''}`).join('\n')
+        return `已渲染 ${images.length} 页预览（看图请对以下路径调 read_image）${list ? `\n${list}` : ''}`
       })
     },
     execute: async (args, exec) => {
@@ -70,8 +72,7 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
         try {
           const previewDir = path.join(pipeline.dir, '.previews')
           await mkdir(previewDir, { recursive: true })
-          const images: Array<{ page: number; path: string; width: number; height: number }> = []
-          const pngBytes: Array<{ page: number; bytes: Uint8Array; name: string }> = []
+          const images: Array<{ page: number; path: string; absolutePath: string; width: number; height: number }> = []
           for (const image of rendered.result.images) {
             const page = image.page ?? image.index + 1
             const target = path.join(previewDir, `page-${String(page).padStart(2, '0')}.png`)
@@ -80,36 +81,17 @@ export function registerRenderTool(ctx: PluginToolCtx): (() => void) | undefined
             images.push({
               page,
               path: path.relative(cwd, target).replace(/\\/g, '/'),
+              absolutePath: target,
               width: image.width,
               height: image.height
             })
-            pngBytes.push({ page, bytes: new Uint8Array(bytesIn), name: path.basename(target) })
-          }
-          // 图片内容块：经 attachments 入库后作为工具结果的 content 返回，
-          // 主模型不用再 read_image 就能直接看到每页渲染图（视觉复核闭环）。
-          // 宿主没注入 attachments 时降级为纯路径清单（原行为）。
-          const content: Array<Record<string, unknown>> = []
-          const saveImages = (ctx.attachments as { saveImages?: unknown } | undefined)?.saveImages
-          if (typeof saveImages === 'function') {
-            try {
-              const refs = await (saveImages as (items: Array<{ data: Uint8Array; mediaType: 'image/png'; name: string }>) => Promise<unknown[]>)(
-                pngBytes.map((p) => ({ data: p.bytes, mediaType: 'image/png', name: p.name }))
-              )
-              pngBytes.forEach((p, i) => {
-                content.push({ type: 'text', text: `第 ${p.page} 页渲染图：` })
-                content.push({ type: 'image', attachment: refs[i] })
-              })
-            } catch {
-              /* 入库失败不反噬渲染结果：路径清单仍然有效 */
-            }
           }
           return {
             ok: true,
             revision: pipeline.revision,
             images,
             missingFonts: rendered.result.missingFonts,
-            warnings: pipeline.buildWarnings,
-            ...(content.length > 0 ? { content } : {})
+            warnings: pipeline.buildWarnings
           }
         } finally {
           await rendered.cleanup()

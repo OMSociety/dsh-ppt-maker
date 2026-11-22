@@ -12,7 +12,7 @@ colors:
   green: '#D9F04A'        # 荧光黄绿：仅封面几何装饰与收尾页行动按钮，不外溢
 textStyles:
   title:
-    fontFamily: { latin: Archivo Black, ea: MiSans }   # 重标题（英文 Archivo Black 经 customFonts）
+    fontFamily: { latin: Archivo Black, ea: MiSans }   # 重标题（英文 Archivo Black 字体文件放工程 assets/fonts/）
     color: $ink
     bold: true
   body:

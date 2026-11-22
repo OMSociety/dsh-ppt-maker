@@ -121,3 +121,17 @@ export function renderSummary(line: (result: Record<string, unknown>) => string)
     return [{ type: 'text', text: line(result) }]
   }) as (args: unknown, result: never) => unknown
 }
+
+/**
+ * 写类工具的修订基线：必须是 ≥0 的整数（先读 manifest.revision 或上一次写入返回的 revision）。
+ * 比对本身在 store 的工程锁内完成，不符返回 409 RevisionMismatch。
+ */
+export function requireBaseRevision(args: Record<string, unknown>, action: string): number {
+  const value = args.baseRevision
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new ProjectError('InvalidArgument', `${action}必须带 baseRevision（≥0 的整数，取当前 manifest.revision 或上一次写入返回的 revision）`, {
+      status: 400
+    })
+  }
+  return value
+}

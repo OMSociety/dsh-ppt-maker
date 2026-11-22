@@ -1,6 +1,6 @@
 # DSH bundle layer: mount the host plugin that registers the bundled ppt-maker skill
-# and the full tool surface: create / themes / edit / undo / redo / render / check /
-# export, plus ppt_import / ppt_open / ppt_patch (reverse-engineering & surgical patch).
+# and its thirteen ppt_* tools (create / themes / plan / edit / undo / redo / svg /
+# render / check / export / import / open / patch; registry in src/index.ts).
 
 - insert:
     - id: ppt-maker

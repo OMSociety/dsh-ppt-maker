@@ -1,12 +1,12 @@
 # AGENTS.md — dsh-ppt-maker Agent 宪法
 
 适用范围：本仓库全部目录。这是接手开发的第一入口；对外说明见 [README.md](README.md)。
-最后更新：2026-11-22
+最后更新：2026-11-23
 
 ## 项目概览
 
 DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、逆向与本地导出。
-宿主半侧注册 13 个 `ppt_*` 工具与 webServer 路由；浏览器半侧是右侧栏「PPT 创客」工作台；`skills/ppt-maker/` 是技能本体。
+宿主半侧注册 13 个 `ppt_*` 工具与 webServer 路由；浏览器半侧是右侧栏「PPT 工作台」标签页；`skills/ppt-maker/` 是技能本体。
 
 | 项 | 事实 |
 |---|---|
@@ -15,7 +15,7 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 | 测试 | vitest 5.0，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
 | 包管理 | npm，锁文件 `package-lock.json`；根目录的 `pnpm-lock.yaml` / `pnpm-workspace.yaml` 未入库，勿提交 |
 | 引擎（pin 死） | `@office-kit/pptx@0.24.0`、`@deepseek-ai/libreoffice-kit@0.1.2`（约 183MB，随包安装） |
-| 宿主契约 | 面板与工具依赖的宿主包由 DSH 运行时提供：peer 只列运行期 import 的宿主包名（`@deepseek-ai/dsh-native-command`，区间 `*`，标 `optional`） |
+| 宿主契约 | 面板与工具依赖的宿主包由 DSH 运行时提供：peer 只列运行期 import 的宿主包名（`@deepseek-ai/dsh-native-command`，区间 `*`，标 `optional`）；`engines.dsh` 写 `"*"`，即接受任意宿主版本，宿主能力差异由运行期探测与降级处理，不设版本闸 |
 
 文档索引（按读序）：
 
@@ -35,6 +35,7 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 | 类型检查（两个 tsconfig） | `npm run typecheck` |
 | 挂载面静态核对 | `npm run check:mounts` |
 | 构建产物漂移核对 | `npm run check:build`（须在 build 之后） |
+| 发布物清单核对 | `npm run check:pack` |
 
 测试要大堆并串行跑：堆不足时会在跑到一半报 `FATAL ERROR: invalid table size`；并行跑则可能用例全过后仍以 exit 1 收尾，报 `[vitest-worker]: Timeout calling "onTaskUpdate"`。旗标要直接交给 vitest——`npm test -- <旗标>` 会被 npm 12 当成自己的配置，报 `Unknown cli flag: --file-parallelism`：
 
@@ -102,17 +103,18 @@ Windows PowerShell 里先设环境变量，再跑第二句：`$env:NODE_OPTIONS=
 
 ## 验收标准
 
-`.github/workflows/ci.yml` 在 windows-latest 上跑下面五步；本地验收同样是这五步，改动完成 = 全部通过：
+`.github/workflows/ci.yml` 在 windows-latest 与 ubuntu-latest 上跑下面六步；本地验收同样是这六步，改动完成 = 全部通过：
 
 ```bash
 npm run typecheck
 npm run build
 npm run check:mounts
 npm run check:build
+npm run check:pack
 NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ```
 
-全量 34 个测试文件 / 297 个用例，约 1 分钟（高负载下 fonts-embed 单文件可到 85s）。CI 跳过 `tests/fonts-embed.test.ts`（断言子集字体体积，依赖本机中文字体，云端 runner 上没有这些字体），其余 33 文件 / 281 用例在云端跑。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
+全量 45 个测试文件 / 347 个用例，约 1 分钟。CI 在 windows-latest 与 ubuntu-latest 上跑全量：ubuntu 先装 `fonts-noto-cjk fonts-wqy-zenhei fonts-dejavu-core`，两端都先执行 `node scripts/prepare-vendor-env.mjs` 备好 SVG 转换器环境；依赖真实字体或 Python 环境的用例在缺件时按 `tests/__fixtures__/venv.ts` 与字体候选表跳过并打印缺项。`npm run check:build` 按内容比对 `lib/index.js`、`lib/client.js` 与 HEAD 的哈希（构建是确定性的）。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
 
 面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 13 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
@@ -120,7 +122,7 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 
 - 分支：`main` 是发布线，工作分支用 `feat/<主题>` 或 `fix/<主题>`（近例：`feat/history-qa-transitions`、`fix/right-rail-collapse-invisible`）。
 - Commit：Conventional Commits + 中文描述，scope 用改动所在的面：`engine` / `tools` / `host` / `workbench` / `fonts` / `reverse` / `docs` / `chore`，如 `feat(engine): …`、`fix(workbench): …`、`docs(readme): …`。
-- PR：以 `.github/workflows/ci.yml` 的结果为准，合并前本地再跑一遍「验收标准」那五步。
+- PR：以 `.github/workflows/ci.yml` 的结果为准，合并前本地再跑一遍「验收标准」那六步。
 
 ## 已知风险区
 
@@ -133,7 +135,7 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 | `src/lazy-tools.ts` | 工具懒展开只在技能被成功 invoke 后发生，改触发条件会让工具静默不出场 | 跑 `tests/lazy-tools.test.ts`，并在新会话里验证「invoke 技能后工具进场」 |
 | `src/core/fonts/` | TTC 表目录 offset 是文件绝对偏移（勿加 faceOffset）；fontkit 的 fsType 是位域对象（勿 `Number()` 直接比） | 跑 `tests/fonts-embed.test.ts` 与 `tests/fonts-e2e.test.ts` |
 | `src/core/reverse/map.ts` | 逆向保真覆盖富文本、graphicFrame 分类与背景继承，自动化只有合成 fixture | 跑 `tests/reverse-import.test.ts`；真实语料没有逆向回归落点，改动后人工 `ppt_import` 一份 `tests/corpus/` 文件复核 |
-| `tests/fonts-embed.test.ts` | 幂等用例并行下会抖动（单跑不现），当前配置 `{timeout:90000, retry:2}`，根因未除 | 它红了先单跑一次再判断 |
+| `src/core/fonts/embed.ts` | 重打包字节的确定性靠固定 ZIP 条目时间戳（`ZIP_EPOCH`）；已嵌槽位跳过保证幂等 | 改重打包或嵌入登记逻辑后跑 `tests/fonts-embed.test.ts`（含「同输入字节确定」「已嵌产物原样返回」两条断言） |
 | `src/core/export-pipeline.ts` | 预览/质检必须渲染**未嵌字体**的裸字节：LibreOffice 会误用嵌入的子集 EOT，出现字形张冠李戴（「0」渲染成「A」） | 别把渲染源换成嵌字体后的字节；字体嵌入的真实效果只能靠 PowerPoint/WPS 人工核对 |
 
 ## 出错怎么办

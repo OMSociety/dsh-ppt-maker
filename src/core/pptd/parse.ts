@@ -38,8 +38,6 @@ import {
   REVERSE_ONLY_ANIMATION_FIELDS,
   REVERSE_ONLY_ELEMENT_FIELDS,
   REVERSE_ONLY_PAGE_FIELDS,
-  SCHEME_COLOR_TOKENS,
-  SCHEME_REF_PREFIX,
   THEME_REF_PREFIX,
   TRANSITION_DIRECTION_DOMAIN,
   TRANSITION_EFFECT_SET,
@@ -53,6 +51,7 @@ import {
   type Theme
 } from './schema.js'
 import { validateDeckSchemaVersion } from './plan.js'
+import { validateElementFields } from './element-fields.js'
 
 export { validateDeckSchemaVersion } from './plan.js'
 
@@ -209,6 +208,16 @@ export function validateDeckShape(deck: Record<string, unknown>, path: string): 
     issues.push(blocker(ERROR_CODES.SchemaError, 'title 必须是字符串', `${path}#title`))
   }
 
+  if (deck.customFonts !== undefined) {
+    issues.push(
+      blocker(
+        ERROR_CODES.SchemaError,
+        'deck 不支持 customFonts：自定义字体请把字体文件放进工程 assets/fonts/，并在 fontFamily 写字体内部族名',
+        `${path}#customFonts`
+      )
+    )
+  }
+
   if (!Array.isArray(deck.pages)) {
     issues.push(blocker(ERROR_CODES.SchemaError, 'pages 必填，且为页文件相对路径数组', `${path}#pages`))
   } else {
@@ -323,7 +332,26 @@ export function validateExportConfig(raw: unknown, path: string): Issue[] {
  * Theme `$key` resolution (generate dialect, spec §2.5)
  * ------------------------------------------------------------------ */
 
-/** Every `$key` reference found anywhere in a document, with its dotted path. */
+/**
+ * Fields whose string values are user-facing copy or identifiers. `$key`
+ * applies to colour and style slots only (spec §2.5), so `"$100 起"` in body
+ * text or notes stays literal.
+ */
+const LITERAL_STRING_KEYS = new Set([
+  'text',
+  'notes',
+  'title',
+  'label',
+  'caption',
+  'name',
+  'originalName',
+  'elementId',
+  'src',
+  'path',
+  'points'
+])
+
+/** Every `$key` reference in colour/style positions of a document, with its dotted path. */
 export function collectThemeRefs(value: unknown, path: string, out: Array<{ key: string; path: string }> = []): Array<{ key: string; path: string }> {
   if (typeof value === 'string') {
     if (value.startsWith(THEME_REF_PREFIX) && value.length > 1) out.push({ key: value.slice(1), path })
@@ -334,7 +362,12 @@ export function collectThemeRefs(value: unknown, path: string, out: Array<{ key:
     return out
   }
   if (isRecord(value)) {
-    for (const [k, v] of Object.entries(value)) collectThemeRefs(v, `${path}.${k}`, out)
+    for (const [k, v] of Object.entries(value)) {
+      if (typeof v === 'string' && LITERAL_STRING_KEYS.has(k)) continue
+      // Chart `data` holds column names and cell values; `encode` names columns.
+      if (k === 'data' || k === 'encode') continue
+      collectThemeRefs(v, `${path}.${k}`, out)
+    }
   }
   return out
 }
@@ -619,6 +652,10 @@ function validateElement(element: unknown, ctx: { profile: Profile; path: string
         )
       }
     }
+  }
+
+  if (typeof elementType === 'string' && allowed.includes(elementType)) {
+    issues.push(...validateElementFields(element, path))
   }
 
   if (isPlaceholder) {
@@ -1030,9 +1067,4 @@ export function parseProject(deckText: string, pageEntries: PageEntry[]): Parsed
   }
 
   return { deck, pages, issues, profile }
-}
-
-/** Everything the checker needs to know about the `scheme:` literal domain (spec §2.3 R2). */
-export function isSchemeRef(value: unknown): boolean {
-  return typeof value === 'string' && value.startsWith(SCHEME_REF_PREFIX) && (SCHEME_COLOR_TOKENS as readonly string[]).includes(value.slice(SCHEME_REF_PREFIX.length))
 }

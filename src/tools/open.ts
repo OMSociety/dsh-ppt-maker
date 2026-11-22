@@ -66,7 +66,11 @@ export function registerOpenTool(ctx: PluginToolCtxWithOpen): (() => void) | und
         dir: { type: 'string' },
         requested: { type: 'boolean' }
       }),
-      render: renderSummary((r) => `已请求打开 ${String(r.dir ?? '')}`)
+      render: renderSummary((r) =>
+        r.requested === true
+          ? `已请求面板打开 ${String(r.dir ?? '')}`
+          : `已解析工程目录 ${String(r.dir ?? '')}，但宿主未提供面板桥接，未发出打开请求`
+      )
     },
     execute: async (args, exec) => {
       try {

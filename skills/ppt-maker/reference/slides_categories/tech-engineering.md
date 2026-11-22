@@ -155,7 +155,7 @@ When no better structure fits, start from "decision summary → goals and constr
 - When the brand has existing visual assets, inherit them first; without brand constraints, build the palette along the lines of "background color, structural color, critical-path color, status colors, neutrals."
 - Each color carries a stable meaning throughout the deck; critical states are additionally distinguished by text, line style, or shape.
 - Titles and body text prefer highly legible sans-serif faces; when a document feel is needed, titles may use a restrained serif.
-- Code uses monospaced fonts (the built-in list has no monospace; bring in JetBrains Mono etc. via customFonts — see fonts.md); one deck usually uses no more than two body-type families.
+- Code uses monospaced fonts (the built-in list has no monospace; place a JetBrains Mono file in the project assets/fonts/ — see fonts.md); one deck usually uses no more than two body-type families.
 - When content grows, first condense the text, split pages, or adjust the text-to-graphic ratio — only then shrink font size slightly.
 
 ### 8.3 Lines, icons, and effects

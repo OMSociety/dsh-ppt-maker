@@ -30,8 +30,13 @@ import {
   createPresentation,
   emu,
   getPresentationFonts,
+  getShapeFill,
+  getShapeFillOpacity,
+  getShapeGradientFill,
+  getShapeStroke,
   getSlides,
   getTableCell,
+  hasShapeImage,
   importSlide,
   loadPresentation,
   mergeTableCells,
@@ -456,11 +461,82 @@ function applyCommonGeometry(
     setShapeFlip(shape, { horizontal: element.flip[0] === true, vertical: element.flip[1] === true })
   }
   if (typeof element.opacity === 'number' && element.opacity < 1) {
-    // No setShapeOpacity in the library: route through fill/stroke opacity.
-    setShapeFill(shape, { opacity: Math.max(0, Math.min(1, element.opacity)) })
-    ctx.warnings.push(`${where}：元素 opacity 经填充透明度近似实现（文字/描边不透明度未级联）`)
+    applyElementOpacity(shape, Math.max(0, element.opacity), ctx, where)
   }
   renameShape(shape, element.elementId)
+}
+
+/**
+ * OOXML has no element-level opacity: alpha lives on each paint (picture,
+ * solid fill, gradient stops, outline, run colour). Text runs are handled in
+ * buildText; this writes the shape-level paints and reports what it skipped.
+ */
+function applyElementOpacity(shape: SlideShapeData, opacity: number, ctx: BuildContext, where: string): void {
+  const skipped: string[] = []
+  let picture = false
+  try {
+    picture = hasShapeImage(shape)
+  } catch {
+    picture = false
+  }
+  if (picture) {
+    try {
+      setShapeImageOpacity(shape, opacity)
+    } catch {
+      skipped.push('图片')
+    }
+  }
+  try {
+    const fill = getShapeFill(shape)
+    if (fill.kind === 'solid') {
+      setShapeFill(shape, { opacity: (getShapeFillOpacity(shape) ?? 1) * opacity })
+    } else if (fill.kind === 'gradient') {
+      const gradient = getShapeGradientFill(shape)
+      if (gradient) {
+        setShapeGradientFill(shape, {
+          ...gradient,
+          stops: gradient.stops.map(({ resolvedColor: _resolved, ...stop }) => ({
+            ...stop,
+            color: stop.color as Color,
+            opacity: (stop.opacity ?? 1) * opacity
+          }))
+        })
+      } else {
+        skipped.push('渐变填充')
+      }
+    } else if (fill.kind === 'pattern' || (fill.kind === 'image' && !picture)) {
+      skipped.push(fill.kind === 'pattern' ? '图案填充' : '图片填充')
+    }
+  } catch {
+    skipped.push('填充')
+  }
+  try {
+    const stroke = getShapeStroke(shape)
+    if (stroke.kind === 'solid') setShapeStroke(shape, { opacity })
+    else if (stroke.kind === 'gradient') skipped.push('渐变描边')
+  } catch {
+    skipped.push('描边')
+  }
+  if (skipped.length > 0) {
+    ctx.warnings.push(`${where}：opacity 无法写入${skipped.join('、')}，这些部分保持不透明`)
+  }
+}
+
+/** Adds an alpha transform to every run that carries an explicit colour. */
+function applyRunOpacity(specs: ParagraphSpec[], opacity: number): number {
+  let uncoloured = 0
+  for (const spec of specs) {
+    for (const run of spec.runs) {
+      const format = run.format as TextFormat | undefined
+      if (!format || format.color === undefined || format.color === null) {
+        uncoloured += 1
+        continue
+      }
+      const transforms = (format.colorTransforms ?? []).filter((t) => t.kind !== 'alpha')
+      ;(run as { format?: TextFormat }).format = { ...format, colorTransforms: [...transforms, { kind: 'alpha', value: opacity }] }
+    }
+  }
+  return uncoloured
 }
 
 /* ------------------------------------------------------------------ *
@@ -498,6 +574,12 @@ function buildText(
 
   const shape = addSlideTextBox(slide, { x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h), text: '' })
   const specs = richRunsToSpecs(parsed.paragraphs, base, resolver, fonts)
+  if (typeof element.opacity === 'number' && element.opacity < 1) {
+    const uncoloured = applyRunOpacity(specs, Math.max(0, element.opacity))
+    if (uncoloured > 0) {
+      ctx.warnings.push(`${where}：${uncoloured} 段文字未指定颜色，opacity 无法写入，按不透明导出`)
+    }
+  }
   setShapeParagraphs(shape, specs)
   applyParagraphMetrics(shape, parsed.paragraphs, base)
   applyParagraphBullets(shape, parsed.paragraphs)
@@ -593,7 +675,6 @@ function buildPlaceholder(
       runs: [{ text: label, format: { size: fontSize, color } }]
     }
   ])
-  fonts.add('default')
   applyCommonGeometry(shape, element as ElementBase, ctx, where)
   return shape
 }
@@ -743,22 +824,25 @@ function buildTable(
   const [x, y, w, h] = (element.bounds as number[]) ?? [0, 0, 400, 200]
 
   const tableStyle = resolveTableStyle(element.style, theme)
+  const placed = placeTableCells(rowsRaw, cols, ctx, where)
 
   const shape = addSlideTable(slide, {
     x: toEmu(x),
     y: toEmu(y),
     w: toEmu(w),
     h: toEmu(h),
-    rows: rowsRaw.map((row) => row.map((cell) => cellTextOf(cell))),
+    rows: placed.grid.map((row) => row.map((cell) => cellTextOf(cell))),
     colWidths: (columnWidths ?? new Array(cols).fill(1 / cols)).map((f) => toEmu(w * f)),
     rowHeights: (rowHeights ?? new Array(rowsRaw.length).fill(1 / rowsRaw.length)).map((f) => toEmu(h * f)),
     firstRow: tableStyle?.firstRowStyle !== undefined,
     bandRow: tableStyle?.bandRow === true
   })
 
-  applyTableCells(shape, rowsRaw, tableStyle, resolver, theme, ctx, fonts, where)
-  applyCommonGeometry(shape, element as ElementBase, ctx, where)
-  if (typeof element.rotation === 'number' && element.rotation !== 0) {
+  applyTableCells(shape, placed, tableStyle, resolver, theme, ctx, fonts, where)
+  // Native tables cannot rotate (spec §6.6): geometry is applied without rotation.
+  const { rotation, ...unrotated } = element as ElementBase
+  applyCommonGeometry(shape, unrotated as ElementBase, ctx, where)
+  if (typeof rotation === 'number' && rotation !== 0) {
     ctx.warnings.push(`${where}：PPT 原生表格不支持旋转，已忽略 rotation`)
   }
   return shape
@@ -789,9 +873,49 @@ function resolveTableStyle(style: unknown, theme: Theme | undefined): ResolvedTa
   return null
 }
 
+interface PlacedTable {
+  /** Full rows × cols grid; covered positions are null. */
+  grid: Array<Array<CellData | null>>
+  /** Authored cells with their grid position, in reading order. */
+  cells: Array<{ r: number; c: number; cell: CellData }>
+  cols: number
+}
+
+/**
+ * `rows` omits cells covered by a merge (spec §6.6), so a cell's grid column
+ * is the next column its row has not yet filled or had covered from above.
+ */
+function placeTableCells(rows: CellData[][], cols: number, ctx: BuildContext, where: string): PlacedTable {
+  const grid: Array<Array<CellData | null>> = rows.map(() => new Array<CellData | null>(cols).fill(null))
+  const occupied = rows.map(() => new Array<boolean>(cols).fill(false))
+  const cells: PlacedTable['cells'] = []
+  let overflow = 0
+  rows.forEach((row, r) => {
+    let c = 0
+    for (const cell of row) {
+      while (c < cols && occupied[r][c]) c += 1
+      if (c >= cols) {
+        overflow += 1
+        continue
+      }
+      const rowSpan = Math.max(1, Math.min(cell?.rowSpan ?? 1, rows.length - r))
+      const colSpan = Math.max(1, Math.min(cell?.colSpan ?? 1, cols - c))
+      for (let dr = 0; dr < rowSpan; dr++) for (let dc = 0; dc < colSpan; dc++) occupied[r + dr][c + dc] = true
+      const normalized = cell ? { ...cell, rowSpan, colSpan } : ({ text: '' } as CellData)
+      grid[r][c] = normalized
+      cells.push({ r, c, cell: normalized })
+      c += colSpan
+    }
+  })
+  if (overflow > 0) {
+    ctx.warnings.push(`${where}：${overflow} 个单元格超出列数（被合并覆盖的格须从 rows 省略），已忽略`)
+  }
+  return { grid, cells, cols }
+}
+
 function applyTableCells(
   table: SlideShapeData,
-  rows: CellData[][],
+  placed: PlacedTable,
   style: ResolvedTableStyle | null,
   resolver: ThemeResolver,
   theme: Theme | undefined,
@@ -799,61 +923,50 @@ function applyTableCells(
   fonts: Set<string>,
   where: string
 ): void {
-  const merges: Array<{ row: number; col: number; rowSpan: number; colSpan: number }> = []
-  for (let r = 0; r < rows.length; r++) {
-    for (let c = 0; c < rows[r].length; c++) {
-      const cell = rows[r][c]
-      if (!cell) continue
-      if ((cell.rowSpan ?? 1) > 1 || (cell.colSpan ?? 1) > 1) {
-        merges.push({ row: r, col: c, rowSpan: cell.rowSpan ?? 1, colSpan: cell.colSpan ?? 1 })
+  for (const { r, c, cell } of placed.cells) {
+    if ((cell.rowSpan ?? 1) > 1 || (cell.colSpan ?? 1) > 1) {
+      const merge = { row: r, col: c, rowSpan: cell.rowSpan ?? 1, colSpan: cell.colSpan ?? 1 }
+      try {
+        mergeTableCells(table, merge, { coveredText: 'keep' })
+      } catch (err) {
+        ctx.warnings.push(`${where}：合并单元格 (${r},${c}) 失败：${(err as Error).message}`)
       }
     }
   }
-  for (const merge of merges) {
-    try {
-      mergeTableCells(table, merge, { coveredText: 'keep' })
-    } catch (err) {
-      ctx.warnings.push(`${where}：合并单元格 (${merge.row},${merge.col}) 失败：${(err as Error).message}`)
+
+  const lastRow = placed.grid.length - 1
+  const lastCol = placed.cols - 1
+  for (const { r, c, cell } of placed.cells) {
+    const handle = getTableCell(table, r, c)
+
+    // Style chain (9 levels): category styles → cellStyle → bodyStyles → inline
+    const category = categoryStyleOf(style, r, c, lastRow, lastCol)
+    const baseStyle = { ...(style?.cellStyle ?? {}), ...(category ?? {}) }
+    const textStyleRef =
+      typeof cell.textStyle === 'string' && cell.textStyle.startsWith('$')
+        ? (theme?.textStyles?.[cell.textStyle.slice(1)] as Record<string, unknown> | undefined)
+        : undefined
+
+    // fill
+    const fill = (cell.fill ?? baseStyle.fill) as Record<string, unknown> | undefined
+    if (fill && fill.type === 'solid') {
+      const color = resolver.color(fill.color)
+      if (color) setTableCellFill(handle, color)
     }
-  }
 
-  const lastRow = rows.length - 1
-  for (let r = 0; r < rows.length; r++) {
-    const lastCol = rows[r].length - 1
-    for (let c = 0; c < rows[r].length; c++) {
-      const cell = rows[r][c]
-      if (!cell) continue
-      const handle = getTableCell(table, r, c)
+    // text paragraphs
+    const text = typeof cell.text === 'string' ? cell.text : ''
+    const merged: Record<string, unknown> = { ...baseStyle, ...(textStyleRef ?? {}), ...cell }
+    const content = resolveContent(merged, theme, resolver, fonts, ctx.warnings, `${where} 单元格(${r},${c})`)
+    const parsed = parseRichText(text)
+    const specs = richRunsToSpecs(parsed.paragraphs, content, resolver, fonts)
+    setTableCellParagraphs(handle, specs)
+    applyParagraphBullets(handle, parsed.paragraphs)
+    const anchor = (content.align[1] ?? 'middle') as string
+    setTableCellAnchor(handle, anchor === 'top' ? 'top' : anchor === 'bottom' ? 'bottom' : 'center')
 
-      // Style chain (9 levels): category styles → cellStyle → bodyStyles → inline
-      const category = categoryStyleOf(style, r, c, lastRow, lastCol)
-      const baseStyle = { ...(style?.cellStyle ?? {}), ...(category ?? {}) }
-      const textStyleRef =
-        typeof cell.textStyle === 'string' && cell.textStyle.startsWith('$')
-          ? (theme?.textStyles?.[cell.textStyle.slice(1)] as Record<string, unknown> | undefined)
-          : undefined
-
-      // fill
-      const fill = (cell.fill ?? baseStyle.fill) as Record<string, unknown> | undefined
-      if (fill && fill.type === 'solid') {
-        const color = resolver.color(fill.color)
-        if (color) setTableCellFill(handle, color)
-      }
-
-      // text paragraphs
-      const text = typeof cell.text === 'string' ? cell.text : ''
-      const merged: Record<string, unknown> = { ...baseStyle, ...(textStyleRef ?? {}), ...cell }
-      const content = resolveContent(merged, theme, resolver, fonts, ctx.warnings, `${where} 单元格(${r},${c})`)
-      const parsed = parseRichText(text)
-      const specs = richRunsToSpecs(parsed.paragraphs, content, resolver, fonts)
-      setTableCellParagraphs(handle, specs)
-      applyParagraphBullets(handle, parsed.paragraphs)
-      const anchor = (content.align[1] ?? 'middle') as string
-      setTableCellAnchor(handle, anchor === 'top' ? 'top' : anchor === 'bottom' ? 'bottom' : 'center')
-
-      // borders
-      applyCellBorders(handle, cell.border ?? baseStyle.border, resolver, ctx, `${where} 单元格(${r},${c})`)
-    }
+    // borders
+    applyCellBorders(handle, cell.border ?? baseStyle.border, resolver, ctx, `${where} 单元格(${r},${c})`)
   }
 }
 
@@ -1549,8 +1662,8 @@ export function createOfficeKitEngine(): DeckEngine {
       // 逆向保真（spec §10.4）：逆向工程自导入后零编辑时，整份 deck 从
       // source/original.pptx 逐页 importSlide 恢复——chart / custGeom /
       // connector / SmartArt 等 PPTD 承载不了的部件原样回来。
-      // 任何一页有编辑痕迹（sourceRef 被 invalidatePageProvenance 清掉）或
-      // 存档校验不过，整份回退逐页重建，永不部分恢复（避免页序/依赖错位）。
+      // 任何一页内容与导入时页指纹不符或存档校验不过，整份回退逐页重建，
+      // 永不部分恢复（避免页序/依赖错位）。
       const restore = await planSourceRestore(deck, pages, ctx.projectDir)
       for (const note of restore.notes) warnings.push(note)
       const restoreAll = restore.archiveReady && restore.restorePage.every(Boolean)
@@ -1584,7 +1697,7 @@ export function createOfficeKitEngine(): DeckEngine {
             slides,
             shapes: shapesPerPage,
             warnings,
-            fontsUsed: [...fonts].filter((f) => f !== 'default')
+            fontsUsed: [...fonts]
           }
         }
       }
@@ -1754,7 +1867,7 @@ export function createOfficeKitEngine(): DeckEngine {
         slides,
         shapes: shapesPerPage,
         warnings,
-        fontsUsed: [...fonts].filter((f) => f !== 'default')
+        fontsUsed: [...fonts]
       }
     },
 

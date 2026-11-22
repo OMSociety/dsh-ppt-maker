@@ -46,6 +46,6 @@
 | LXGW Bright | Serif (fangsong/kaiti) | LXGW WenKai family; combines fangsong and kaiti characteristics; gentle and clear letterforms | Literature, education, humanities | No |
 | ZCOOL KuaiLe | Handwriting (rounded) | ZCOOL KuaiLe; lively, cute, playful and cartoonish; youthful energy | Anime, children, entertainment | Yes |
 
-## Custom fonts (Google Fonts)
+## Custom fonts (project font files)
 
-Use custom fonts to strengthen expressiveness or to fill font categories the built-in list does not cover (e.g. JetBrains Mono for monospace, Archivo Black for ultra-heavy sans-serif, EB Garamond for classical serif). Bring them in from Google Fonts via `customFonts`: declare `customFonts` in the `.pptd` entry file (see CustomFont in [pptd.md](./pptd.md)), then reference it in `fontFamily`. The `family` name must match Google Fonts exactly.
+Use custom fonts to strengthen expressiveness or to fill font categories the built-in list does not cover (e.g. JetBrains Mono for monospace, Archivo Black for ultra-heavy sans-serif, EB Garamond for classical serif). Put the font file (`.ttf` / `.otf` / `.ttc`, with an embeddable fsType) in the project `assets/fonts/` directory, then reference its internal family name in `fontFamily`. Rendering, measurement and font embedding all resolve `assets/fonts/` before system fonts; a family found in neither place is reported as missing.

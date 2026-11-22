@@ -34,9 +34,8 @@ export function TableView({ content, theme }: { content: Record<string, unknown>
         borderCollapse: 'collapse',
       }}
     >
-      {model.rows.map((row, r) =>
-        row.map((cell, c) => {
-          const category = tableCategoryStyleOf(tableStyle, r, c, model.rows)
+      {model.cells.map(({ r, c, rowSpan, colSpan, cell }) => {
+          const category = tableCategoryStyleOf(tableStyle, r, c, model.rows.length - 1, model.columns - 1)
           const { html, ...style } = tableCellViewModel(cell, { ...baseStyle, ...category }, theme)
           return (
             <div
@@ -44,8 +43,8 @@ export function TableView({ content, theme }: { content: Record<string, unknown>
               className="pptd-table-cell"
               style={{
                 ...style,
-                gridRow: `${r + 1} / span ${Math.max(1, Number(cell.rowSpan) || 1)}`,
-                gridColumn: `${c + 1} / span ${Math.max(1, Number(cell.colSpan) || 1)}`,
+                gridRow: `${r + 1} / span ${rowSpan}`,
+                gridColumn: `${c + 1} / span ${colSpan}`,
                 boxSizing: 'border-box',
                 minWidth: 0,
                 minHeight: 0,
@@ -56,8 +55,7 @@ export function TableView({ content, theme }: { content: Record<string, unknown>
               dangerouslySetInnerHTML={{ __html: html }}
             />
           )
-        }),
-      )}
+        })}
     </div>
   )
 }

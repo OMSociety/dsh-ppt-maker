@@ -59,7 +59,7 @@ describe('project store（工程层）', () => {
       baseRevision: 0,
       ops: [
         { op: 'add_page', page: 'pages/01.page', content: { elements: [] } },
-        { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 50], content: 'hi' } }
+        { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 50], content: { text: 'hi' } } }
       ]
     })
     expect(result.revision).toBe(1)

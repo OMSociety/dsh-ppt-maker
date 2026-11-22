@@ -25,7 +25,8 @@ function projectArgument() {
 
 function sanitizePreviewPaths(value) {
   if (typeof value === 'string') {
-    return value.replace(/[A-Za-z]:[\\/][^\s"'，），\]】]+/g, '本机路径')
+    // 盘符前不能紧跟字母/数字/协议字符：否则 `http://` 的 `p://` 会被当成 P 盘路径。
+    return value.replace(/(?<![A-Za-z0-9+.\-])[A-Za-z]:[\\/](?![\\/])[^\s"'<>，），\]】]+/g, '本机路径')
   }
   if (Array.isArray(value)) return value.map(sanitizePreviewPaths)
   if (value && typeof value === 'object') {

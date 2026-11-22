@@ -23,6 +23,7 @@ import {
   getShapeFill,
   getShapeImageBytes,
   getShapeImageCrop,
+  getShapeImagePartName,
   getShapeImageFillBytes,
   getShapeImageOpacity,
   getShapeMedia,
@@ -31,8 +32,10 @@ import {
   getShapePreset,
   getShapeRunFormatEffective,
   getShapeStroke,
+  getShapeStrokeArrow,
   getShapeStrokeDash,
   getShapeTextAnchor,
+  getShapeTextAutoFitParams,
   getShapeTextDirection,
   getShapeTextWrap,
   getShapeXmlString,
@@ -269,9 +272,31 @@ interface RichParagraph {
   runsRead: boolean
 }
 
+/** `<a:normAutofit>` 记录的缩放：字号乘 fontScale，行距减 lnSpcReduction。 */
+interface TextFit {
+  fontScale: number
+  lnSpcReduction: number
+}
+
+const NO_FIT: TextFit = { fontScale: 1, lnSpcReduction: 0 }
+
+function readTextFit(shape: SlideShapeData): TextFit {
+  try {
+    const params = getShapeTextAutoFitParams(shape)
+    if (!params) return NO_FIT
+    const fontScale = Number.isFinite(params.fontScale) && params.fontScale > 0 && params.fontScale <= 1 ? params.fontScale : 1
+    const lnSpcReduction =
+      Number.isFinite(params.lnSpcReduction) && params.lnSpcReduction > 0 && params.lnSpcReduction < 1 ? params.lnSpcReduction : 0
+    return { fontScale, lnSpcReduction }
+  } catch {
+    return NO_FIT
+  }
+}
+
 function readRichParagraphs(
   pres: PresentationData,
-  shape: SlideShapeData
+  shape: SlideShapeData,
+  fit: TextFit = NO_FIT
 ): RichParagraph[] | null {
   let paraCount = 0
   try {
@@ -314,7 +339,7 @@ function readRichParagraphs(
         runToHtml(text, {
           font: typeof fmt.font === 'string' ? fmt.font : undefined,
           fontEastAsian: typeof fmt.fontEastAsian === 'string' ? fmt.fontEastAsian : undefined,
-          size: typeof fmt.size === 'number' ? fmt.size : undefined,
+          size: typeof fmt.size === 'number' ? fmt.size * fit.fontScale : undefined,
           color: typeof fmt.color === 'string' ? fmt.color : null,
           bold: fmt.bold === true,
           italic: fmt.italic === true,
@@ -338,6 +363,10 @@ function readRichParagraphs(
       else if (ls?.kind === 'pts') lineSpacingPts = ls.value
     } catch {
       /* inherit */
+    }
+    if (fit.lnSpcReduction > 0) {
+      if (lineSpacingPts !== null) lineSpacingPts = lineSpacingPts * (1 - fit.lnSpcReduction)
+      else lineSpacingPct = Math.round(((lineSpacingPct ?? 1) - fit.lnSpcReduction) * 1000) / 1000
     }
     let spaceBeforePts: number | null = null
     try {
@@ -397,10 +426,21 @@ function mapText(
   rec: ReverseShapeRecord,
   pres: PresentationData,
   fonts: ReverseReadResult['fonts'],
-  report: ImportReport
+  report: ImportReport,
+  elementId: string = elementIdOf(rec)
 ): Record<string, unknown> {
   const shape = rec.raw as SlideShapeData
-  const rich = readRichParagraphs(pres, shape)
+  const fit = readTextFit(shape)
+  const rich = readRichParagraphs(pres, shape, fit)
+  if (rich !== null && (fit.fontScale < 1 || fit.lnSpcReduction > 0)) {
+    report.degraded.push({
+      page: rec.slideIndex,
+      elementId,
+      feature: 'text.autoFit',
+      detail: '源文本框为缩字适配（normAutofit），字号与行距按显示效果写入，适配开关本身不保留',
+      originalValue: `fontScale=${fit.fontScale};lnSpcReduction=${fit.lnSpcReduction}`
+    })
+  }
   const hasRich =
     rich !== null && rich.some((p) => p.html !== '' || p.align !== null || p.lineSpacingPct !== null || p.lineSpacingPts !== null)
 
@@ -437,7 +477,7 @@ function mapText(
     // run 级读不到（非文本形状或库不支持）→ 回落纯文本并记账
     report.degraded.push({
       page: rec.slideIndex,
-      elementId: elementIdOf(rec),
+      elementId,
       feature: 'unknown',
       detail: 'run 级格式读取失败，文本按纯文本落盘（字体/字号/加粗/对齐继承主题默认）'
     })
@@ -456,6 +496,7 @@ function mapText(
   }
   return {
     ...baseElement(rec),
+    elementId,
     elementType: 'text',
     content
   }
@@ -467,11 +508,12 @@ function mapShape(rec: ReverseShapeRecord): Record<string, unknown> {
     ...baseElement(rec),
     elementType: 'shape'
   }
+  element.shapeName = 'rect'
   try {
     const preset = getShapePreset(shape)
-    if (preset && preset !== 'rect') element.shapeName = preset
+    if (preset) element.shapeName = preset
   } catch {
-    /* default rect */
+    /* rect */
   }
   try {
     const adjustments = getShapeAdjustValues(shape)
@@ -488,32 +530,70 @@ function mapShape(rec: ReverseShapeRecord): Record<string, unknown> {
   } catch {
     /* degrade into no-fill */
   }
+  const border = readBorder(shape)
+  if (border) element.border = border
+  return element
+}
+
+function readBorder(shape: SlideShapeData): Record<string, unknown> | null {
   try {
     const stroke = getShapeStroke(shape)
-    if (stroke.kind === 'solid') {
-      const border: Record<string, unknown> = {
-        style: 'solid',
-        width: typeof stroke.widthEmu === 'number' ? emuToPx(stroke.widthEmu) : 1,
-        color: asLiteralColor(stroke.color)
-      }
-      try {
-        const dash = getShapeStrokeDash(shape)
-        if (dash === 'dash' || dash === 'sysDot') border.style = dash === 'dash' ? 'dash' : 'dot'
-      } catch {
-        /* leave solid */
-      }
-      element.border = border
+    if (stroke.kind !== 'solid') return null
+    const border: Record<string, unknown> = {
+      style: 'solid',
+      width: typeof stroke.widthEmu === 'number' ? emuToPx(stroke.widthEmu) : 1,
+      color: asLiteralColor(stroke.color)
     }
+    try {
+      const dash = getShapeStrokeDash(shape)
+      if (dash === 'dash' || dash === 'sysDot') border.style = dash === 'dash' ? 'dash' : 'dot'
+    } catch {
+      /* leave solid */
+    }
+    return border
   } catch {
-    /* no stroke */
+    return null
   }
-  return element
+}
+
+/** True when the shape paints a fill or an outline of its own. */
+function hasVisibleSurface(shape: SlideShapeData): boolean {
+  try {
+    if (getShapeFill(shape).kind !== 'none') return true
+  } catch {
+    return true
+  }
+  try {
+    return getShapeStroke(shape).kind !== 'none'
+  } catch {
+    return true
+  }
 }
 
 /** Reverse dialect colours are literals only: `#RRGGBB` / `#RRGGBBAA` or `scheme:<token>`. */
 function asLiteralColor(raw: string): string {
   if (raw.startsWith('#') || raw.startsWith('scheme:')) return raw
   return `#${raw.replace(/^#/, '')}`.toUpperCase()
+}
+
+/** File extension from the image's magic bytes; the source part name is the fallback. */
+export function imageExtOf(bytes: Uint8Array, partName: string | null = null): string {
+  const at = (i: number): number => bytes[i] ?? -1
+  const ascii = (start: number, text: string): boolean => [...text].every((ch, i) => at(start + i) === ch.charCodeAt(0))
+  if (at(0) === 0x89 && ascii(1, 'PNG')) return '.png'
+  if (at(0) === 0xff && at(1) === 0xd8 && at(2) === 0xff) return '.jpg'
+  if (ascii(0, 'GIF8')) return '.gif'
+  if (ascii(0, 'BM')) return '.bmp'
+  if ((ascii(0, 'II') && at(2) === 0x2a && at(3) === 0) || (ascii(0, 'MM') && at(2) === 0 && at(3) === 0x2a)) return '.tiff'
+  if (ascii(0, 'RIFF') && ascii(8, 'WEBP')) return '.webp'
+  if (at(0) === 0x01 && at(1) === 0 && at(2) === 0 && at(3) === 0 && ascii(40, ' EMF')) return '.emf'
+  if ((at(0) === 0xd7 && at(1) === 0xcd && at(2) === 0xc6 && at(3) === 0x9a) || (at(0) === 0x01 && at(1) === 0 && at(2) === 0x09 && at(3) === 0)) {
+    return '.wmf'
+  }
+  const head = new TextDecoder().decode(bytes.subarray(0, 256)).trimStart()
+  if (head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg'))) return '.svg'
+  const fromPart = partName ? /\.[A-Za-z0-9]{2,5}$/.exec(partName)?.[0]?.toLowerCase() : undefined
+  return fromPart ?? '.bin'
 }
 
 function mapImage(
@@ -532,7 +612,13 @@ function mapImage(
   if (!bytes) {
     return placeholderFor(rec, 'unknown', `图片缺失：${rec.originalName || '未命名'}`)
   }
-  const ext = '.png'
+  const ext = imageExtOf(bytes, (() => {
+    try {
+      return getShapeImagePartName(shape)
+    } catch {
+      return null
+    }
+  })())
   const partName = `ppt/media/image-${rec.slideIndex}-${rec.shapeId}${ext}`
   media.push({ bytes, ext, partName })
   const element: Record<string, unknown> = {
@@ -582,15 +668,25 @@ function mapTable(
     element.columnWidths = colWidths.map((w) => (totalW > 0 ? w / totalW : 1 / colWidths.length))
     element.rowHeights = rowHeights.map((h) => (totalH > 0 ? h / totalH : 1 / rowHeights.length))
     const rows: Record<string, unknown>[][] = []
+    // Cells covered by a merge anchor are omitted from `rows` (spec §6.6).
+    const covered = new Set<string>()
     for (let r = 0; r < dims.rows; r++) {
       const row: Record<string, unknown>[] = []
       for (let c = 0; c < dims.cols; c++) {
+        if (covered.has(`${r},${c}`)) continue
         const cell = getTableCell(shape, r, c)
         const cellObj: Record<string, unknown> = { text: '' }
         try {
           const span = getTableCellSpan(cell)
-          if (span.rowSpan && span.rowSpan > 1) cellObj.rowSpan = span.rowSpan
-          if (span.gridSpan && span.gridSpan > 1) cellObj.colSpan = span.gridSpan
+          const rowSpan = span.rowSpan && span.rowSpan > 1 ? span.rowSpan : 1
+          const colSpan = span.gridSpan && span.gridSpan > 1 ? span.gridSpan : 1
+          if (rowSpan > 1) cellObj.rowSpan = rowSpan
+          if (colSpan > 1) cellObj.colSpan = colSpan
+          for (let dr = 0; dr < rowSpan; dr++) {
+            for (let dc = 0; dc < colSpan; dc++) {
+              if (dr !== 0 || dc !== 0) covered.add(`${r + dr},${c + dc}`)
+            }
+          }
         } catch {
           /* ignore */
         }
@@ -667,12 +763,62 @@ function mapTable(
   return element
 }
 
-function mapLine(rec: ReverseShapeRecord): Record<string, unknown> {
-  return {
-    ...baseElement(rec),
+const ARROW_MAP: Record<string, string> = { triangle: 'arrow', arrow: 'arrow', stealth: 'stealth', diamond: 'diamond', oval: 'oval' }
+
+/**
+ * Connector → straight PPTD line. The endpoints follow the bounds diagonal
+ * selected by the flip flags; flip is folded into `points` so the engine
+ * does not apply it twice.
+ */
+function mapLine(rec: ReverseShapeRecord, report: ImportReport): Record<string, unknown> {
+  const shape = rec.raw as SlideShapeData
+  const base = baseElement(rec)
+  const [, , w, h] = base.bounds as [number, number, number, number]
+  const vw = Math.max(w, 1)
+  const vh = Math.max(h, 1)
+  const fx = rec.flip.horizontal
+  const fy = rec.flip.vertical
+  const start = [fx ? w : 0, fy ? h : 0]
+  const end = [fx ? 0 : w, fy ? 0 : h]
+  const element: Record<string, unknown> = {
+    ...base,
+    flip: [false, false],
     elementType: 'line',
-    points: '0,0 100,100'
+    viewBox: [fmtNum(vw), fmtNum(vh)],
+    points: `${fmtNum(start[0])},${fmtNum(start[1])} ${fmtNum(end[0])},${fmtNum(end[1])}`
   }
+  const border = readBorder(shape)
+  if (border) element.border = border
+  const arrows: Array<string | null> = []
+  for (const end of ['head', 'tail'] as const) {
+    try {
+      const arrow = getShapeStrokeArrow(shape, end)
+      arrows.push(arrow && ARROW_MAP[arrow.type] ? ARROW_MAP[arrow.type] : null)
+    } catch {
+      arrows.push(null)
+    }
+  }
+  if (arrows.some((a) => a !== null)) element.arrow = arrows
+  let preset: string | null = null
+  try {
+    preset = getShapePreset(shape)
+  } catch {
+    preset = null
+  }
+  if (preset && preset !== 'line' && preset !== 'straightConnector1') {
+    report.degraded.push({
+      page: rec.slideIndex,
+      elementId: elementIdOf(rec),
+      feature: 'unknown',
+      detail: '折线/曲线连接线按首尾直线落盘',
+      originalValue: preset
+    })
+  }
+  return element
+}
+
+function fmtNum(v: number): number {
+  return Math.round(v * 100) / 100
 }
 
 /* ------------------------------------------------------------------ *
@@ -820,8 +966,9 @@ function applyBackgroundChain(
       stops: src.gradient.stops.map((s) => ({ position: s.offset, color: asLiteralColor(s.color) }))
     }
   } else if (src.imageBytes) {
-    const partName = `ppt/media/bg-${slideIndex}-${src.level}.png`
-    media.push({ bytes: src.imageBytes, ext: '.png', partName })
+    const ext = imageExtOf(src.imageBytes)
+    const partName = `ppt/media/bg-${slideIndex}-${src.level}${ext}`
+    media.push({ bytes: src.imageBytes, ext, partName })
     page.background = { type: 'image', src: `media/${partName.split('/').pop()}`, partName }
   }
   if (src.level !== 'slide') {
@@ -922,7 +1069,6 @@ function mapPage(
     }
   }
   if (slide.notes !== null && slide.notes !== '') page.notes = slide.notes
-  if (slide.title !== null && slide.title !== '') page.title = slide.title
 
   // background — slide → layout → master 链，取最终生效的背景
   const rawSlide = slide.raw as SlideData
@@ -986,11 +1132,27 @@ function mapPage(
               detail: '自定义几何形状（custGeom）按 rect 落盘，路径数据未保留'
             })
           }
+          // PPTD shape carries no text (spec §6.2): a preset shape with text
+          // becomes Shape + an overlaid Text sharing the same bounds.
+          if (rec.text.trim() !== '') {
+            const textId = `${elementIdOf(rec)}-text`
+            if (hasVisibleSurface(rawShape)) {
+              page.elements.push(mapShape(rec) as Page['elements'][number])
+              report.degraded.push({
+                page: rec.slideIndex,
+                elementId: textId,
+                feature: 'unknown',
+                detail: '形状内嵌文字拆为 Shape + 叠放 Text（同一 bounds），二者在 PPTD 中各自独立编辑'
+              })
+            }
+            page.elements.push(mapText(rec, pres, fonts, report, textId) as Page['elements'][number])
+            break
+          }
           page.elements.push(mapShape(rec) as Page['elements'][number])
           break
         }
         case 'connector':
-          page.elements.push(mapLine(rec) as Page['elements'][number])
+          page.elements.push(mapLine(rec, report) as Page['elements'][number])
           break
         case 'graphicFrame': {
           // 表/图已在上面分流；其余 graphicFrame（SmartArt/ole/未知）走 dropped + 占位

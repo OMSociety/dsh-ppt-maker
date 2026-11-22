@@ -280,6 +280,10 @@ export const CSS = `
   /* 排版基线 reset：规格默认 18pt/MiSans/单倍行距。不 reset 会继承工作台 UI 的
      12px/1.6/UI 字体族，未显式设字号的元素整体渲小。 */
   font-size:18px;line-height:1.2;font-family:MiSans,sans-serif;color:#1A1A1A;
+  /* 其余可继承的排版属性也归位到规格默认（左对齐、常规字重）：缩略图把画布放在 <button>
+     里，按钮的 UA 样式默认居中，不归位时缩略图里未显式对齐的文字会整体居中。 */
+  text-align:left;font-weight:normal;font-style:normal;letter-spacing:normal;
+  text-transform:none;text-indent:0;white-space:normal;word-spacing:normal;
 }
 /* Stage 里的 PptdView 占满并居中 */
 .ppt-stage-pptd{width:100%;height:100%}
@@ -427,6 +431,11 @@ export const CSS = `
   display:flex;align-items:center;justify-content:center;gap:8px;
   font-size:11px;color:var(--dsw-alias-label-secondary);
 }
+.pptd-text a{color:#0563C1;text-decoration:underline}
+.ppt-history-preview-label{
+  font-size:12px;color:var(--dsw-alias-label-secondary);margin:0 0 6px;
+}
+.ppt-history:focus,.ppt-plan-drawer:focus{outline:none}
 .ppt-history-warn,.ppt-history-loading{
   font-size:10.5px;color:var(--dsw-alias-label-secondary);
 }

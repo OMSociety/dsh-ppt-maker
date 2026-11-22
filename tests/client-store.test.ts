@@ -267,7 +267,19 @@ describe('PptStore 状态纪律', () => {
     store.dispose()
   })
 
-  it('undo 前必须先把草稿 flush：canUndo=false 时不调 /undo，游标要靠 /state 上来', async () => {
+  it('草稿未过防抖窗就点 undo：先把草稿 flush 成 /edit，不静默丢弃', async () => {
+    const store = seedStore()
+    await store.actions.init()
+    await store.actions.stage({ kind: 'move_page', from: 0, to: 1 })
+    // 不推进定时器：草稿仍在 pending
+    expect(store.getSnapshot().draft).not.toBeNull()
+    await store.actions.undo()
+    expect(mockApi.edit).toHaveBeenCalledTimes(1)
+    expect(store.getSnapshot().draft).toBeNull()
+    expect(store.getSnapshot().lastSeenRevision).toBe(2)
+  })
+
+  it('canUndo=false 时不调 /undo，游标要靠 /state 上来', async () => {
     const store = seedStore()
     await store.actions.init()
     // stage（攒批）→ 过防抖窗 flush 成功 → 推 canUndo=true 的 state 进来 → undo 才通过
@@ -280,7 +292,7 @@ describe('PptStore 状态纪律', () => {
     // 推 host 说可撤销
     await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 2, canUndo: true } })
     await store.actions.undo()
-    expect(mockApi.undo).toHaveBeenCalledWith('s1', 'k1')
+    expect(mockApi.undo).toHaveBeenCalledWith('s1', 'k1', 2)
     expect(store.getSnapshot().lastSeenRevision).toBe(1)
     store.dispose()
   })
@@ -442,6 +454,39 @@ describe('PptStore 状态纪律', () => {
     expect(res.src).toBe('media/x.png')
     // 上传本身不写元素 src——那是 Inspector 去调用 updateElement('id', {src}) 的活
     expect(mockApi.edit).not.toHaveBeenCalled()
+    store.dispose()
+  })
+})
+
+describe('PptStore 横幅动作与导出基线', () => {
+  it('acceptExternal：同一工程强制重拉，修订基线推进到磁盘版本', async () => {
+    const store = seedStore()
+    await store.actions.init()
+    mockApi.project.mockClear()
+    await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 3 } })
+    // 无草稿：静默推进；人为制造一份草稿后再让外部推进，触发「外部已修改」
+    await store.actions.stage({ kind: 'move_page', from: 0, to: 1 })
+    mockApi.edit.mockRejectedValueOnce(new ConflictError(5, 'revision 冲突'))
+    await vi.runAllTimersAsync()
+    expect(store.getSnapshot().conflict).toEqual({ revision: 5 })
+    mockApi.project.mockResolvedValueOnce({ ...PROJECT_R1, revision: 5, manifest: { revision: 5, title: 'T' } })
+    await store.actions.resolveConflictTheirs()
+    const snap = store.getSnapshot()
+    expect(mockApi.project).toHaveBeenCalledWith('s1', 'k1')
+    expect(snap.lastSeenRevision).toBe(5)
+    expect(snap.conflict).toBeNull()
+    expect(snap.draft).toBeNull()
+    store.dispose()
+  })
+
+  it('exportDeck 是只读操作：不改写本地修订基线', async () => {
+    const store = seedStore()
+    await store.actions.init()
+    await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 4 } })
+    expect(store.getSnapshot().lastSeenRevision).toBe(4)
+    mockApi.exportPptxToProject.mockResolvedValueOnce({ relativePath: 'export/T.pptx', absolutePath: 'C:/ws/export/T.pptx', filename: 'T.pptx', revision: 3, bytes: 2048 })
+    await store.actions.exportDeck()
+    expect(store.getSnapshot().lastSeenRevision).toBe(4)
     store.dispose()
   })
 })

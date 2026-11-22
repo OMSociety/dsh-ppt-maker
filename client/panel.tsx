@@ -191,10 +191,10 @@ function ExportOpenMenu({
         type="button"
         className="ppt-openwith-btn"
         disabled={busy}
-        onClick={() => setOpen((v) => !v)}
-        title={fallback ? '显示文件位置' : '打开导出的 .pptx'}
+        onClick={() => (fallback ? void fire({ action: 'reveal' }) : setOpen((v) => !v))}
+        title={fallback ? '没有关联应用，点击在文件夹中显示' : '选择用哪个应用打开导出的 .pptx'}
       >
-        打开 {open ? '▴' : '▾'}
+        {fallback ? '显示文件位置' : <>打开 {open ? '▴' : '▾'}</>}
       </button>
       {open ? (
         <div className="ppt-openwith-menu" role="menu">
@@ -225,7 +225,6 @@ function ExportOpenMenu({
                 </button>
               ))
             : null}
-          {/* 一个关联应用都没有时主按钮退化为「显示文件位置」（DSH 同口径）。 */}
           <div className="ppt-openwith-sep" />
           <button
             type="button"

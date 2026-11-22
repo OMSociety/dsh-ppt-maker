@@ -272,6 +272,15 @@ describe('textEditorModel · 画布就地编辑的显示/提交', () => {
     expect(m.commit('甲\n\n乙')).toBe('<p>甲</p><p></p><p>乙</p>')
   })
 
+  it('段落带样式属性（<p style>）按 rich 处理：往返逐字不变，段落对齐不被抹掉', () => {
+    const raw = '<p style="text-align:center">居中</p><p>普通</p>'
+    const m = textEditorModel(raw)
+    expect(m.rich).toBe(true)
+    expect(m.display).toBe(raw)
+    expect(m.commit(m.display)).toBe(raw)
+    expect(textEditorModel('<p>甲<br/>乙</p>').rich).toBe(false)
+  })
+
   it('纯文本简写：显示原样，提交包成 <p>', () => {
     const m = textEditorModel('abc')
     expect(m.rich).toBe(false)
@@ -298,5 +307,16 @@ describe('table-rows · 表格结构归一与比例', () => {
     expect(equalRatios(4)).toEqual([0.25, 0.25, 0.25, 0.25])
     expect(equalRatios(4).reduce((a, b) => a + b, 0)).toBeCloseTo(1)
     expect(equalRatios(0)).toEqual([])
+  })
+})
+
+describe('sanitize.ts · 超链接', () => {
+  it('<a href> 只放行 https/http/mailto，并补 target 与 rel', () => {
+    expect(sanitizeHtmlString('<a href="https://example.com/x?a=1&amp;b=2">链接</a>')).toBe(
+      '<a href="https://example.com/x?a=1&amp;b=2" target="_blank" rel="noopener noreferrer">链接</a>',
+    )
+    expect(sanitizeHtmlString('<a href="mailto:a@b.c">信</a>')).toContain('href="mailto:a@b.c"')
+    expect(sanitizeHtmlString('<a href="data:text/html,x">坏</a>')).toBe('<a>坏</a>')
+    expect(sanitizeHtmlString('<a href="javascript:alert(1)">坏</a>')).not.toContain('javascript')
   })
 })

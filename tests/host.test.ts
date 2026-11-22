@@ -80,6 +80,8 @@ interface Capture {
 type ApiDeps = NonNullable<Parameters<typeof createApiHandler>[0]>
 
 async function startServer(deps: Partial<ApiDeps> = {}) {
+  // 同一用例里换桩重启时，先关掉上一个监听器，避免句柄泄漏。
+  await stopServer()
   const handler = createApiHandler({
     resolveCwd: deps.resolveCwd ?? (() => cwd),
     requestRejection: deps.requestRejection ?? (() => undefined),
@@ -156,16 +158,17 @@ afterEach(async () => {
 // ── sameOrigin 栅栏 ─────────────────────────────────────────────────
 
 describe('sameOrigin', () => {
-  it('Host 必须是环路字面量', () => {
-    // 127.0.0.1 / localhost / [::1] PASS；其它都拒（含 127.1 非字面、0.0.0.0、evil 域）
+  it('Host 必须存在且可解析；绑定地址（环路或局域网 IP）由宿主 webServer 决定', () => {
     expect(sameOrigin({ headers: { host: '127.0.0.1:3080' } } as never)).toBe(true)
     expect(sameOrigin({ headers: { host: 'LOCALHOST:3080' } } as never)).toBe(true)
     expect(sameOrigin({ headers: { host: '[::1]:3080' } } as never)).toBe(true)
     expect(sameOrigin({ headers: { host: '127.0.0.1.' } } as never)).toBe(true)   // 尾随点归一
     expect(sameOrigin({ headers: { host: '2130706433' } } as never)).toBe(true)   // 十进制 IPv4
     expect(sameOrigin({ headers: { host: '127.0.0.2:3080' } } as never)).toBe(true) // 整段 127/8
-    expect(sameOrigin({ headers: { host: 'evil.example:3080' } } as never)).toBe(false)
-    expect(sameOrigin({ headers: { host: '0.0.0.0:3080' } } as never)).toBe(false)
+    expect(sameOrigin({ headers: { host: '192.168.1.5:16750' } } as never)).toBe(true)
+    expect(sameOrigin({ headers: { host: '192.168.1.5:16750', origin: 'http://192.168.1.5:16750' } } as never)).toBe(true)
+    expect(sameOrigin({ headers: { host: '192.168.1.5:16750', origin: 'http://evil.example:16750' } } as never)).toBe(false)
+    expect(sameOrigin({ headers: { host: 'bad host' } } as never)).toBe(false)
     expect(sameOrigin({ headers: {} } as never)).toBe(false)
   })
   it('sec-fetch-site: cross-site 必须拒', () => {
@@ -268,7 +271,7 @@ describe('host 路由', () => {
     expect(manifest.canRedo).toBe(false)
 
     // undo 后游标回到 0：不可撤销、可重做
-    await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key } })
+    await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 1 } })
     r = await apiJson(`${API_PREFIX}/state?sessionId=${SESSION}`)
     manifest = r.json!.manifest as Record<string, unknown>
     expect(manifest.canUndo).toBe(false)
@@ -330,7 +333,53 @@ describe('host 路由', () => {
     expect(r.status).toBe(409)
   })
 
-  it('/edit 应用 add_page / add_element / update_element / move_page / remove_element / remove_page，revision 推进；update_page 顶层浅合并', async () => {
+  it('/edit 应用 update_page（顶层浅合并）/ move_page / remove_element / remove_page', async () => {
+    await startServer()
+    const { key } = await seedProject()
+    const edit = (baseRevision: number, ops: unknown[]) =>
+      apiJson(`${API_PREFIX}/edit`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision, ops } })
+    const pageOf = async (page: string) =>
+      (await apiJson(`${API_PREFIX}/page?sessionId=${SESSION}&key=${key}&page=${page}`)).json!.page as Record<string, unknown>
+
+    const r1 = await edit(0, [
+      { op: 'add_page', page: 'pages/01.page', content: { notes: '旧备注', elements: [] } },
+      { op: 'add_page', page: 'pages/02.page', content: { elements: [] } },
+      { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 'a', bounds: [0, 0, 100, 50], content: { text: '甲' } } },
+      { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 'b', bounds: [0, 60, 100, 50], content: { text: '乙' } } },
+    ])
+    expect(r1.json!.revision).toBe(1)
+
+    // update_page：只覆盖顶层给出的键，elements 等未给出的键原样保留
+    const r2 = await edit(1, [{ op: 'update_page', page: 'pages/01.page', patch: { notes: '新备注' } }])
+    expect(r2.status).toBe(200)
+    const p1 = await pageOf('pages/01.page')
+    expect(p1.notes).toBe('新备注')
+    expect((p1.elements as unknown[]).length).toBe(2)
+
+    // move_page：把第 2 页移到最前
+    const r3 = await edit(2, [{ op: 'move_page', page: 'pages/02.page', toIndex: 0 }])
+    expect(r3.status).toBe(200)
+    const state = await apiJson(`${API_PREFIX}/project?sessionId=${SESSION}&key=${key}`)
+    expect((state.json!.deck as { pages: string[] }).pages).toEqual(['pages/02.page', 'pages/01.page'])
+
+    // remove_element：只删指定元素
+    const r4 = await edit(3, [{ op: 'remove_element', page: 'pages/01.page', elementId: 'a' }])
+    expect(r4.status).toBe(200)
+    expect(((await pageOf('pages/01.page')).elements as Array<{ elementId: string }>).map((e) => e.elementId)).toEqual(['b'])
+
+    // remove_page：页从 deck.pages 消失，revision 继续推进
+    const r5 = await edit(4, [{ op: 'remove_page', page: 'pages/02.page' }])
+    expect(r5.status).toBe(200)
+    expect(r5.json!.revision).toBe(5)
+    const after = await apiJson(`${API_PREFIX}/project?sessionId=${SESSION}&key=${key}`)
+    expect((after.json!.deck as { pages: string[] }).pages).toEqual(['pages/01.page'])
+
+    // 删不存在的元素 → 400，不推进 revision
+    const bad = await edit(5, [{ op: 'remove_element', page: 'pages/01.page', elementId: 'nope' }])
+    expect(bad.status).toBe(400)
+  })
+
+  it('/edit 应用 add_page / add_element / update_element，revision 推进', async () => {
     await startServer()
     const { key } = await seedProject()
 
@@ -342,7 +391,7 @@ describe('host 路由', () => {
         baseRevision: 0,
         ops: [
           { op: 'add_page', page: 'pages/01.page', content: { elements: [] } },
-          { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 50], content: '第一页标题' } },
+          { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 50], content: { text: '第一页标题' } } },
         ],
       },
     })
@@ -355,7 +404,7 @@ describe('host 路由', () => {
       method: 'POST',
       body: {
         sessionId: SESSION, key, baseRevision: 1,
-        ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: '改过的标题' } }],
+        ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: { text: '改过的标题' } } }],
       },
     })
     expect(r2.status).toBe(200)
@@ -365,7 +414,7 @@ describe('host 路由', () => {
     expect(r3.status).toBe(200)
     const page = r3.json!.page as { elements: Array<{ elementId: string; content?: string }> }
     expect(page.elements[0].elementId).toBe('t1')
-    expect(page.elements[0].content).toBe('改过的标题')
+    expect(page.elements[0].content).toEqual({ text: '改过的标题' })
   })
 
   it('op 词表外面的 op 一律 400（冻结词表口径，不接受未知 op）', async () => {
@@ -386,15 +435,21 @@ describe('host 路由', () => {
     await apiJson(`${API_PREFIX}/edit`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page', content: { elements: [] } }] } })
     await apiJson(`${API_PREFIX}/edit`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 1, ops: [{ op: 'add_page', page: 'pages/02.page', content: { elements: [] } }] } })
 
-    const u = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, steps: 1 } })
+    const u = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 2, steps: 1 } })
     expect(u.status).toBe(200)
     expect(u.json!.revision).toBe(1)
 
-    const r = await apiJson(`${API_PREFIX}/redo`, { method: 'POST', body: { sessionId: SESSION, key, steps: 1 } })
+    const r = await apiJson(`${API_PREFIX}/redo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 1, steps: 1 } })
     expect(r.status).toBe(200)
     expect(r.json!.revision).toBe(2)
 
-    const uu = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, steps: 2 } })
+    const missingBase = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, steps: 2 } })
+    expect(missingBase.status).toBe(400)
+    const stale = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 1, steps: 2 } })
+    expect(stale.status).toBe(409)
+    expect(stale.json!.conflict).toEqual({ revision: 2 })
+
+    const uu = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 2, steps: 2 } })
     expect(uu.status).toBe(200)
     expect(uu.json!.revision).toBe(0)
   })
@@ -619,6 +674,25 @@ describe('host 路由', () => {
     // 未知素材
     const missing = await api(`${API_PREFIX}/media?sessionId=${SESSION}&key=${key}&src=media/notthere.png`)
     expect(missing.status).toBe(404)
+
+    // SVG 素材：沙箱化 CSP + nosniff，直接导航到该 URL 时不以 DSH Web 源执行脚本
+    await mkdir(path.join(cwd, dir, 'media'), { recursive: true })
+    await writeFile(path.join(cwd, dir, 'media', 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+    const svg = await api(`${API_PREFIX}/media?sessionId=${SESSION}&key=${key}&src=media/logo.svg`)
+    expect(svg.status).toBe(200)
+    expect(svg.headers['content-type']).toContain('image/svg+xml')
+    expect(svg.headers['x-content-type-options']).toBe('nosniff')
+    expect(svg.headers['content-security-policy']).toContain('sandbox')
+  })
+
+  it('/state 读取活动工程失败时回带 manifestError，而不是伪装成空工程', async () => {
+    await startServer()
+    const { dir } = await seedProject()
+    await writeFile(path.join(cwd, dir, 'manifest.json'), '{ broken')
+    const r = await apiJson(`${API_PREFIX}/state?sessionId=${SESSION}`)
+    expect(r.status).toBe(200)
+    expect(r.json!.manifest).toBeNull()
+    expect(String(r.json!.manifestError)).toContain('工程账本损坏')
   })
 
   it('openRequest TTL：60s 内可见，60s 后不可见，tab-opened 会消费', async () => {
@@ -668,7 +742,7 @@ describe('版本历史路由', () => {
       baseRevision: 0,
       ops: [
         { op: 'add_page', page: 'pages/01.page', content: { elements: [] } },
-        { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [10, 10, 200, 40], content: 'v1' } },
+        { op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [10, 10, 200, 40], content: { text: 'v1' } } },
       ],
       sessionId: SESSION,
     })
@@ -676,7 +750,7 @@ describe('版本历史路由', () => {
     const e2 = await editProject(cwd, {
       dir,
       baseRevision: 1,
-      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: 'v2' } }],
+      ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: { text: 'v2' } } }],
       sessionId: SESSION,
     })
     expect(e2.revision).toBe(2)
@@ -701,7 +775,7 @@ describe('版本历史路由', () => {
     expect(deck.size).toEqual([960, 540])
     const pages = snap.json!.pages as Array<{ path: string; page: { elements: Array<{ content?: string }> } | null }>
     expect(pages).toHaveLength(1)
-    expect(pages[0].page?.elements[0]?.content).toBe('v1')
+    expect(pages[0].page?.elements[0]?.content).toEqual({ text: 'v1' })
 
     const missing = await apiJson(`${API_PREFIX}/history/pages?sessionId=${SESSION}&key=${key}&revision=99`)
     expect(missing.status).toBe(404)
@@ -729,7 +803,7 @@ describe('版本历史路由', () => {
     const loaded = await loadProject(cwd, dir)
     expect(loaded.manifest.revision).toBe(1)
     const page = loaded.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
-    expect(page.elements[0].content).toBe('v1')
+    expect(page.elements[0].content).toEqual({ text: 'v1' })
 
     // 前向恢复（undo 之后再 redo 到 r2）同样可用
     const forward = await apiJson(`${API_PREFIX}/history/restore`, {
@@ -740,7 +814,7 @@ describe('版本历史路由', () => {
     const loaded2 = await loadProject(cwd, dir)
     expect(loaded2.manifest.revision).toBe(2)
     const page2 = loaded2.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
-    expect(page2.elements[0].content).toBe('v2')
+    expect(page2.elements[0].content).toEqual({ text: 'v2' })
 
     const noBase = await apiJson(`${API_PREFIX}/history/restore`, {
       method: 'POST',

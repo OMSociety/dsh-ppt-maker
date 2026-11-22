@@ -18,6 +18,7 @@
  */
 import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -37,13 +38,10 @@ import {
 } from '@office-kit/pptx'
 
 const CORPUS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'corpus')
-/** 脱敏词表：只在本机存在（.gitignore 挡住），仓库里不留任何真实专名。 */
+/** 脱敏词表明文：只在本机存在（.gitignore 挡住），仓库里不留任何真实专名。 */
 const SENSITIVE_WORDS = path.join(CORPUS_DIR, 'sensitive-words.txt')
-/** 词表在位才跑红线；不在位时 skipIf 会把用例标成 skipped，并在文件加载时打一行原因。 */
-const HAS_SENSITIVE_WORDS = existsSync(SENSITIVE_WORDS)
-if (!HAS_SENSITIVE_WORDS) {
-  console.warn(`[corpus] 脱敏红线用例跳过：本机词表不在位（${SENSITIVE_WORDS}；该文件不入库）`)
-}
+/** 入库的加盐哈希表（scripts/hash-sensitive-words.mjs 生成）：CI 上红线照跑。 */
+const SENSITIVE_HASHES = path.join(CORPUS_DIR, 'sensitive-words.sha256.json')
 
 /** 页数台账（覆盖矩阵的机器可读版本）。 */
 const EXPECTED_PAGE_COUNTS: Record<string, number> = {
@@ -170,18 +168,34 @@ describe('语料对拍：20 份脱敏 pptx → loadPresentation', () => {
     expect(withNotes.length).toBeGreaterThan(0)
   })
 
-  it.skipIf(!HAS_SENSITIVE_WORDS)('脱敏红线：全 20 份文本不含本机词表里的任一串', async () => {
-    // 词表刻意不入库（内含来源专名）；权威口径在语料生成管线里（45 串双通道零命中）。
-    const words = (await readFile(SENSITIVE_WORDS, 'utf8'))
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith('#'))
-    expect(words.length).toBeGreaterThan(0)
+  it('脱敏红线：全 20 份文本的任一子串都不命中词表哈希', async () => {
+    // 词表明文不入库（内含来源专名）；入库的是加盐 SHA-256。按词表出现过的每个词长
+    // 滑窗取子串算同样的哈希比对，命中只报语料名与位置，不还原词。
+    const table = JSON.parse(await readFile(SENSITIVE_HASHES, 'utf8')) as { salt: string; lengths: number[]; hashes: string[] }
+    expect(table.hashes.length).toBeGreaterThan(0)
+    const wanted = new Set(table.hashes)
     for (const name of Object.keys(EXPECTED_PAGE_COUNTS)) {
-      const text = deckText(await loadCorpus(name))
-      for (const word of words) {
-        expect(text, `${name} 命中词表串`).not.toContain(word)
+      const chars = [...deckText(await loadCorpus(name))]
+      for (const len of table.lengths) {
+        for (let i = 0; i + len <= chars.length; i++) {
+          const digest = createHash('sha256').update(table.salt + chars.slice(i, i + len).join(''), 'utf8').digest('hex')
+          if (wanted.has(digest)) expect.fail(`${name} 在第 ${i} 个字符处命中词表（词长 ${len}）`)
+        }
       }
     }
+  })
+
+  it.skipIf(!existsSync(SENSITIVE_WORDS))('本机明文词表与入库哈希表一致（改词表后要重跑 hash-sensitive-words）', async () => {
+    const table = JSON.parse(await readFile(SENSITIVE_HASHES, 'utf8')) as { salt: string; hashes: string[] }
+    const words = [
+      ...new Set(
+        (await readFile(SENSITIVE_WORDS, 'utf8'))
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && !s.startsWith('#'))
+      )
+    ]
+    const hashes = words.map((w) => createHash('sha256').update(table.salt + w, 'utf8').digest('hex')).sort()
+    expect(hashes).toEqual(table.hashes)
   })
 })

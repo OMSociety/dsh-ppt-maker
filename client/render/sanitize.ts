@@ -7,8 +7,10 @@
  *
  * 白名单口径对齐富文本编译器（engine/richtext.ts 与 reverse/map.ts 的实际产物）：
  *   块级: p, ul, ol, li, br
- *   行内: span, strong, em, u, s, sup, sub, b, i
- *   允许属性: 仅 style；且 style 里只放行白名单 CSS 属性，值里禁 url()/expression/括号注入。
+ *   行内: span, strong, em, u, s, sup, sub, b, i, a
+ *   允许属性: style（只放行白名单 CSS 属性，值里禁 url()/expression/括号注入）；
+ *   <a> 另保留 href，且只接受 https://、http://、mailto:（与 docs/pptd-spec.md §6.1.1 一致），
+ *   并固定补 target="_blank" rel="noopener noreferrer"。
  *
  * 不引入第三方库（DSH 浏览器半侧只能 require 基线模块），手写一个基于 DOMParser 的
  * 递归清洗——浏览器半侧必有 DOMParser（这与 vitest 的 node 环境区分：单测里用一份
@@ -18,8 +20,24 @@
 /** 允许的标签（小写）。 */
 const ALLOWED_TAGS = new Set([
   'p', 'ul', 'ol', 'li', 'br',
-  'span', 'strong', 'em', 'u', 's', 'sup', 'sub', 'b', 'i',
+  'span', 'strong', 'em', 'u', 's', 'sup', 'sub', 'b', 'i', 'a',
 ])
+
+/** 连同内容一起丢弃的标签（小写；DOMParser 对 SVG 内元素保留原大小写，比较前统一转小写）。 */
+const DROP_WITH_CONTENT = new Set([
+  'script', 'style', 'template', 'noscript', 'iframe', 'object', 'embed',
+  'svg', 'math', 'title', 'textarea', 'select', 'head',
+])
+
+/** 超链接只放行这三种协议；其余（javascript:、data: 等）整条 href 丢弃。 */
+const SAFE_HREF = /^(https?:\/\/|mailto:)/i
+
+/** 返回可写进 <a> 的属性串（不含 style）；href 不合规时为空串，标签退化为纯文本容器。 */
+export function linkAttrs(href: string | null | undefined): string {
+  const value = (href ?? '').trim()
+  if (!SAFE_HREF.test(value)) return ''
+  return ` href="${escapeAttr(value)}" target="_blank" rel="noopener noreferrer"`
+}
 
 /** style 里允许出现的 CSS 属性（小写）。 */
 const ALLOWED_CSS = new Set([
@@ -74,6 +92,8 @@ function cleanChildren(node: Element): string {
 
 function cleanElement(el: Element): string {
   const tag = el.tagName.toLowerCase()
+  // 脚本、样式、模板、嵌入对象与 SVG/MathML 连同内容一起丢弃（其文本不是正文）。
+  if (DROP_WITH_CONTENT.has(tag)) return ''
   if (!ALLOWED_TAGS.has(tag)) {
     // 不允许的标签：丢掉标签本身，但保留其清洗后的文本子树（不丢内容）。
     return cleanChildren(el)
@@ -85,7 +105,8 @@ function cleanElement(el: Element): string {
     const cleaned = sanitizeStyle(raw)
     if (cleaned) style = ` style="${escapeAttr(cleaned)}"`
   }
-  return `<${tag}${style}>${cleanChildren(el)}</${tag}>`
+  const link = tag === 'a' ? linkAttrs(el.getAttribute('href')) : ''
+  return `<${tag}${link}${style}>${cleanChildren(el)}</${tag}>`
 }
 
 /** 纯字符串回退（无 DOMParser 的环境，如 vitest node）：正则级粗清洗，宁可保守。 */
@@ -112,7 +133,10 @@ export function sanitizeHtmlString(html: string): string {
 function cleanOpenTag(tagText: string, tag: string): string {
   const styleMatch = tagText.match(/\sstyle\s*=\s*"([^"]*)"/i) || tagText.match(/\sstyle\s*=\s*'([^']*)'/i)
   const cleaned = styleMatch ? sanitizeStyle(styleMatch[1]) : ''
-  return cleaned ? `<${tag} style="${escapeAttr(cleaned)}">` : `<${tag}>`
+  const hrefMatch =
+    tag === 'a' ? tagText.match(/\shref\s*=\s*"([^"]*)"/i) || tagText.match(/\shref\s*=\s*'([^']*)'/i) : null
+  const link = hrefMatch ? linkAttrs(hrefMatch[1].replace(/&amp;/g, '&')) : ''
+  return cleaned ? `<${tag}${link} style="${escapeAttr(cleaned)}">` : `<${tag}${link}>`
 }
 
 function escapeHtml(s: string): string {
