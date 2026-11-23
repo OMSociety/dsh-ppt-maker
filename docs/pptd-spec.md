@@ -1807,7 +1807,7 @@ interface SourceRef {
 }
 ```
 
-- `sourceRef: SourceRef` —— 必填。导入器为每个元素生成稳定 elementId：`el-{slideIndex}-{shapeId}`（占位元素为 `ph-{slideIndex}-{shapeId}`，见 §10.2）；`sourceRef` 回指源文件中的页与形状，供增量重导与人工对照。
+- `sourceRef: SourceRef` —— 必填。导入器为每个元素生成稳定 elementId：`el-{slideIndex}-{shapeId}`（占位元素为 `ph-{slideIndex}-{shapeId}`，见 §10.2）；`sourceRef` 回指源文件中的页与形状，供增量重导与人工对照。编辑触碰内容字段时，所在页普通元素的 `sourceRef` 一并清除；placeholder 代表源对象本身，`sourceRef` 始终保留，导出时据此拷回原件（§10.4）。
 - `originalName?: string` —— 源形状名称（`<p:cNvPr name>`），如「Rectangle 3」。
 - `partName?: string` —— Image 元素与页背景图片记录媒体在源包中的 OPC 部件名（如 `ppt/media/image1.png`）；工程内 `src` 仍指向 `media/` 目录下落盘的副本。
 - `builtinStyle?: { id: string }` —— Table 专属：源表格引用的内置表格样式 id（GUID）。显式单元格填充/对齐已按字面量还原，样式表派生的条纹与首行强调不还原，同时记 `table.styleId` 降级条目（§10.1）。
@@ -2175,8 +2175,9 @@ interface DeckSource {
 1. **存档骨架**：存档文件存在且 sha1 与 `originalSha1` 一致 → 以存档为底稿构建 deck：主题、母版、版式、字体表原样沿用；
 2. **逐页沿用**：某页当前内容的指纹与某张源页导入时的指纹相同 → 该页直接沿用源页（chart / workbook / notes / media / 动画 / 未知部件原样保留）。按指纹匹配，页可以重排、删除或复制；同一张源页最多被沿用一次；
 3. **逐页重建**：其余页按 PPTD 元素重建，并挂回 `Page.layoutRef.partName` 指向的存档版式，母版与版式上的装饰随之显示；存档里找不到该版式时按默认版式重建并记 warning；
-4. 未被沿用的源页从结果中移除，最终页序与 `deck.pages` 一致；导出 warnings 记一条「沿用 N 页 / 重建 M 页」说明；
-5. 存档缺失、越界或 sha1 不符 → 整份按 PPTD 从空白文档重建（主题与母版装饰不在场），warnings 说明原因；页指纹文件缺失 → 仍用存档骨架，但全部页重建。
+4. **占位直通**：重建页上的 `placeholder` 若 `sourceRef` 指向的源形状仍在存档里，导出时拷回该原件（图表、SmartArt、OLE、媒体等连同其部件），按占位的 `bounds` 定位；找不到源形状或拷贝失败时按占位框落盘并记 warning。placeholder 的 `sourceRef` 不随页面编辑失效（§6.8）；
+5. 未被沿用的源页从结果中移除，最终页序与 `deck.pages` 一致；导出 warnings 记一条「沿用 N 页 / 重建 M 页」说明；
+6. 存档缺失、越界或 sha1 不符 → 整份按 PPTD 从空白文档重建（主题与母版装饰不在场），warnings 说明原因；页指纹文件缺失 → 仍用存档骨架，但全部页重建。
 
 存档与页指纹不参与 `manifest.checksum`，不随编辑变化；`originalSha1` 永远指向「整轮导入」那一刻的源文件。
 
@@ -2192,7 +2193,7 @@ interface DeckSource {
 6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入；存在逐点隐藏的标签时整图不写标签并记 degraded）；
 7. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
 
-图表的字体、网格线样式、坐标轴格式、数据表与趋势线等细节不进入 PPTD；所在页未改动时整页沿用源存档（§10.4），这些细节随之保留。
+图表的字体、网格线样式、坐标轴格式、数据表与趋势线等细节不进入 PPTD；所在页未改动时整页沿用源存档（§10.4），这些细节随之保留。落 placeholder 的图表在所在页重建时按占位直通拷回原件。
 
 ## 11. 错误码表
 

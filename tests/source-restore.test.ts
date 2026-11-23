@@ -16,6 +16,8 @@ import {
   addSlideTextBox,
   createPresentation,
   emu,
+  getShapeBounds,
+  getShapeChartSpec,
   getShapeText,
   getSlideLayout,
   getSlideLayoutPartName,
@@ -105,6 +107,38 @@ describe('源存档骨架与逐页沿用', () => {
     expect(slides).toHaveLength(pageCount)
     const layoutRef = (pages[0] as { layoutRef?: { partName?: string } }).layoutRef
     if (layoutRef?.partName) expect(getSlideLayoutPartName(getSlideLayout(slides[0])!)).toBe(layoutRef.partName)
+  })
+
+  it('占位直通：重建页上的 placeholder 从源存档拷回原件，并按占位 bounds 定位', async () => {
+    const bytes = await buildChartPptx('radar')
+    await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
+    const before = await loadProject(cwd, 'proj')
+    const pageKey = String(before.deck.pages[0])
+    const ph = before.pages.get(pageKey)!.elements.find((e) => e.elementType === 'placeholder') as
+      | { elementId: string; sourceRef?: unknown }
+      | undefined
+    expect(ph?.sourceRef).toBeDefined()
+
+    await editProject(cwd, {
+      dir: 'proj',
+      baseRevision: before.manifest.revision,
+      sessionId: 's1',
+      ops: [
+        { op: 'update_page', page: pageKey, patch: { notes: '编辑痕迹' } },
+        { op: 'update_element', page: pageKey, elementId: ph!.elementId, patch: { bounds: [40, 50, 320, 200] } }
+      ]
+    })
+    const after = await loadProject(cwd, 'proj')
+    const kept = after.pages.get(pageKey)!.elements.find((e) => e.elementId === ph!.elementId) as { sourceRef?: unknown }
+    expect(kept.sourceRef).toEqual(ph!.sourceRef)
+
+    const pipeline = await buildProjectDeck(cwd, 'proj')
+    expect(pipeline.buildWarnings.some((w) => w.includes('按 PPTD 重建'))).toBe(true)
+    const pres = await loadPresentation(await saveRawProjectPptx(pipeline))
+    const chart = getSlideShapes(getSlides(pres)[0]).find((s) => isChartShape(s))
+    expect(chart).toBeDefined()
+    expect(getShapeBounds(chart!)).toEqual({ x: 40 * 12700, y: 50 * 12700, w: 320 * 12700, h: 200 * 12700 })
+    expect(getShapeChartSpec(chart!)?.kind).toBe('radar')
   })
 
   it('重排与删页：按指纹逐页沿用，导出页序跟随 deck.pages', async () => {

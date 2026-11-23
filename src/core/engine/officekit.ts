@@ -27,6 +27,7 @@ import {
   addSlideTable,
   addSlideTextBox,
   clearSlideShapes,
+  copyShape,
   createPresentation,
   emu,
   getPresentationFonts,
@@ -34,9 +35,13 @@ import {
   getShapeFillOpacity,
   getShapeGradientFill,
   getShapeStroke,
+  getGroupChildren,
+  getShapeId,
+  getShapeKind,
   getSlideIndex,
   getSlideLayoutPartName,
   getSlideLayouts,
+  getSlideShapes,
   getSlides,
   getTableCell,
   hasShapeImage,
@@ -90,6 +95,7 @@ import {
   setTableCellText,
   setShapeText,
   setTableCellParagraphs,
+  ungroupShapes,
   type ChartSpec,
   type Color,
   type ColorTransform,
@@ -122,6 +128,54 @@ import type { BuildContext, DeckBuildResult, DeckEngine } from './types.js'
  * ------------------------------------------------------------------ */
 
 const PX_TO_EMU = 12700
+
+/** Depth-first search for a shape by id, descending into groups. */
+function findShapeById(shapes: readonly SlideShapeData[], id: number): SlideShapeData | null {
+  for (const shape of shapes) {
+    if (getShapeId(shape) === id) return shape
+    if (getShapeKind(shape) === 'group') {
+      const hit = findShapeById(getGroupChildren(shape), id)
+      if (hit) return hit
+    }
+  }
+  return null
+}
+
+/**
+ * Placeholder passthrough (spec §10.4): a reverse placeholder whose source
+ * shape is still in the archive is replaced by a copy of that original object
+ * (chart, SmartArt, OLE, media …) at the placeholder's bounds. Group wrappers
+ * kept by `preserveGroupTransform` are dissolved so the copy lands in slide
+ * coordinates, exactly as the importer flattened it.
+ */
+function copyArchivedOriginal(
+  slide: SlideData,
+  element: Record<string, unknown>,
+  archiveSlides: readonly SlideData[],
+  ctx: { warnings: string[] },
+  pageLabel: string
+): SlideShapeData | null {
+  const ref = element.sourceRef as { slideIndex?: unknown; shapeId?: unknown } | undefined
+  if (!ref || typeof ref.slideIndex !== 'number' || typeof ref.shapeId !== 'number') return null
+  const sourceSlide = archiveSlides[ref.slideIndex - 1]
+  if (!sourceSlide) return null
+  const source = findShapeById(getSlideShapes(sourceSlide), ref.shapeId)
+  if (!source) return null
+  try {
+    let copied = copyShape(slide, source, { preserveGroupTransform: true })
+    while (getShapeKind(copied) === 'group' && getShapeKind(source) !== 'group') {
+      const children = ungroupShapes(copied)
+      if (children.length !== 1) break
+      copied = children[0]
+    }
+    const [x, y, w, h] = element.bounds as [number, number, number, number]
+    setShapeBounds(copied, { x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h) })
+    return copied
+  } catch (err) {
+    ctx.warnings.push(`${pageLabel}：占位 ${String(element.elementId)} 的源对象拷贝失败（${(err as Error).message}），按占位框落盘`)
+    return null
+  }
+}
 
 function toEmu(px: number): Emu {
   return emu(Math.round(px * PX_TO_EMU))
@@ -2031,7 +2085,9 @@ export function createOfficeKitEngine(): DeckEngine {
                 shape = buildShape(slide, record, resolver, ctx)
                 break
               case 'placeholder':
-                shape = buildPlaceholder(slide, record, resolver, ctx, fonts)
+                shape =
+                  (archive ? copyArchivedOriginal(slide, record, archiveSlides, ctx, pageLabel) : null) ??
+                  buildPlaceholder(slide, record, resolver, ctx, fonts)
                 break
               case 'image': {
                 const bytes = await preloadImageBytes(record.src, ctx, `元素 ${String(record.elementId)}`)

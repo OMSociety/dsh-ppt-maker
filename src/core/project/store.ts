@@ -432,7 +432,7 @@ function nextPagePath(model: ProjectModel): string {
  * sourceRef 表示「该元素与源 pptx 的某个形状逐字段对应」。update_page /
  * update_element 是顶层浅合并，patch 不改 sourceRef；内容字段（content/bounds/
  * fill/…）一变，这层对应关系就不再成立，整页 sourceRef 全部抹掉。纯溯源字段
- * （sourceRef/originalName）的 patch 不触发失效。整页恢复另按页指纹判定
+ * （sourceRef/originalName）的 patch 不触发失效。placeholder 代表源对象本身，sourceRef 始终保留，\n * 导出时据此从源存档拷回原件。整页恢复另按页指纹判定
  * （src/core/reverse/restore.ts）。
  */
 const PROVENANCE_KEYS = new Set(['sourceRef', 'originalName'])
@@ -442,7 +442,10 @@ function invalidatePageProvenance(page: Page, patch: Record<string, unknown>): v
   const touchesContent = Object.keys(patch).some((k) => !PROVENANCE_KEYS.has(k))
   if (!touchesContent) return
   for (const el of page.elements) {
-    if (el && typeof el === 'object') delete (el as Record<string, unknown>).sourceRef
+    // A placeholder stands for the source object itself, so its link survives edits.
+    if (el && typeof el === 'object' && (el as Record<string, unknown>).elementType !== 'placeholder') {
+      delete (el as Record<string, unknown>).sourceRef
+    }
   }
 }
 
