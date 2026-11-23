@@ -13,7 +13,8 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
     description:
       '把工程导出为 .pptx：统一发布管线 = QA 指纹门禁 + 构建 + 字体嵌入 + postflight 回读校验。' +
       '导出前必须先跑 ppt_check 且通过；工程在质检后有改动会被判 stale 拒导出（重新 ppt_check 即可）。' +
-      '传 skipCheck: true 跳过质检门禁（postflight 仍强制执行，落账会标注未检）。',
+      '传 skipCheck: true 跳过质检门禁（postflight 仍强制执行，落账会标注未检）。' +
+      '传 pdf 时同时把成品转成 PDF（与 ppt_render 同一引擎），便于直接分发或打印。',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -21,12 +22,14 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
       properties: {
         dir: { type: 'string', minLength: 1, description: '工程目录（相对于会话 cwd）' },
         out: { type: 'string', minLength: 1, description: '导出文件路径（相对于会话 cwd，.pptx）' },
+        pdf: { type: 'string', minLength: 1, description: '可选：同时导出 PDF 的路径（相对于会话 cwd，.pdf）' },
         skipCheck: { type: 'boolean', description: '跳过 QA 指纹门禁直接导出（默认 false；postflight 不跳）' }
       }
     },
     output: {
       schema: resultSchema({
         path: { type: 'string' },
+        pdf: { type: 'object', additionalProperties: false, properties: { path: { type: 'string' }, bytes: { type: 'integer' } } },
         revision: { type: 'integer' },
         bytes: { type: 'integer' },
         sha256: { type: 'string' },
@@ -50,7 +53,8 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
         const pf = r.postflight as { ok?: boolean; slides?: number } | undefined
         const verdict = check?.skipped === true ? '未质检' : '质检已绑定'
         const pfNote = pf?.ok === true ? `，postflight ${pf.slides} 页` : ''
-        return `已导出 ${p ?? ''}（${verdict}${pfNote}）`
+        const pdf = r.pdf as { path?: string } | undefined
+        return `已导出 ${p ?? ''}${pdf?.path ? ` 与 ${pdf.path}` : ''}（${verdict}${pfNote}）`
       })
     },
     execute: async (args, exec) => {
@@ -59,11 +63,13 @@ export function registerExportTool(ctx: PluginToolCtx): (() => void) | undefined
         const dir = args.dir as string
         const out = args.out as string
 
-        const rel = await releaseProject(cwd, dir, { out, skipCheck: args.skipCheck === true })
+        const pdf = typeof args.pdf === 'string' ? args.pdf : undefined
+        const rel = await releaseProject(cwd, dir, { out, pdf, skipCheck: args.skipCheck === true })
 
         return {
           ok: true,
           path: rel.out,
+          ...(rel.pdf ? { pdf: rel.pdf } : {}),
           revision: rel.revision,
           bytes: rel.bytes.byteLength,
           sha256: rel.sha256,

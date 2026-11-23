@@ -148,6 +148,26 @@ async function loadMediaBytes(projectDir: string, src: string): Promise<Uint8Arr
  * LibreOffice rendering (ppt_render + missing-font diagnostics)
  * ------------------------------------------------------------------ */
 
+/** Converts final .pptx bytes to a PDF file at `outPath` with the same engine `ppt_render` uses. */
+export async function convertPptxToPdf(pptxBytes: Uint8Array, outPath: string): Promise<number> {
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'ppt-maker-pdf-'))
+  const inputPath = path.join(tmp, 'deck.pptx')
+  const pdfPath = path.join(tmp, 'deck.pdf')
+  await writeFile(inputPath, pptxBytes)
+  let conv: Converter | null = null
+  try {
+    conv = await createConverter()
+    await conv.render({ inputPath, outputPath: pdfPath })
+    const pdf = await readFile(pdfPath)
+    await mkdir(path.dirname(outPath), { recursive: true })
+    await writeFile(outPath, pdf)
+    return pdf.byteLength
+  } finally {
+    await conv?.dispose().catch(() => {})
+    await rm(tmp, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
 export interface RenderedImages {
   result: RenderImagesResult
   outputDir: string

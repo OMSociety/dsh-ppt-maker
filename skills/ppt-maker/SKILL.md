@@ -1,6 +1,6 @@
 ---
 name: ppt-maker
-description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：用插件注册的十二个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出，以及把既有 .pptx 逆向成 PPTD 工程或外科手术式轻改（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx，成品逐元素可编辑）；Python 脚本是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作五族共 30 套设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/路演/讲义/课件、信息图、海报，或要求套用设计风格、美化或改写已有 PPT、转换 .pptd/.pptx 时使用。
+description: 设计、生成、重做与导出 PPT 演示文稿：从内容出发设计整套页面，成品逐元素可编辑。工具优先：用插件注册的十二个 ppt_* 工具完成创建/编辑/撤销/重做/渲染/质检/导出，以及把既有 .pptx 逆向成 PPTD 工程或外科手术式轻改（引擎 @office-kit/pptx，本地纯 TS 构建最终 pptx，成品逐元素可编辑）；Python 脚本是逃生舱，只在库拒收的破损文件上启用。内置学术/咨询/金融/促销/工作五族共 30 套设计系统。当用户要求 PPT、PowerPoint、PPTX、幻灯片、演示文稿、答辩/汇报/路演/讲义/课件、信息图、海报，或要求套用设计风格、美化或改写已有 PPT、转换 .pptd/.pptx 时使用。只需查看、转换格式或提取一份现成 Office 文件内容、不涉及设计与改稿时，用会话里的通用 Office 能力。
 ---
 
 # ppt-maker：把内容做成好用、好看、好改的 PPT
@@ -22,7 +22,7 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 | `ppt_svg` | SVG 页面轨：写 SVG 源并挂页，或立即编译早检 | `ref`、`compiled` |
 | `ppt_render` | 构建最终 pptx 并光栅化成每页 PNG | `images[].absolutePath` |
 | `ppt_check` | 规则质检（`ai: true` 追加 AI 视觉建议） | `pass`、`issues[]` |
-| `ppt_export` | 导出 .pptx（质检门禁 + 字体嵌入 + 回读校验） | `path`、`sha256` |
+| `ppt_export` | 导出 .pptx，可同时出 PDF（质检门禁 + 字体嵌入 + 回读校验） | `path`、`pdf`、`sha256` |
 | `ppt_import` | 把既有 .pptx 全量逆向成 PPTD 工程 | `dir`、`report` |
 | `ppt_patch` | 对 .pptx 做外科手术式轻改（改字 / 换图 / 调页序） | `path`、`lostParts` |
 | `ppt_open` | 在右侧栏「PPT 工作台」打开工程，用户可在里面直接看、点、改 | `requested` |
@@ -75,11 +75,13 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 
 ### 6. 导出与交付
 
-`ppt_export` 先比对质检指纹：质检之后工程有任何改动都会判过期并拒绝，重新跑一遍 `ppt_check` 即可。随后构建、嵌入字体、回读校验（成品 ZIP 重新解析，有错误就拒绝落盘），成功后返回 SHA-256 并写入 `manifest.exportReport`。`skipCheck: true` 只跳过质检门禁，回读校验照跑。
+`ppt_export` 先比对质检指纹：质检之后工程有任何改动都会判过期并拒绝，重新跑一遍 `ppt_check` 即可。随后构建、嵌入字体、回读校验（成品 ZIP 重新解析，有错误就拒绝落盘），成功后返回 SHA-256 并写入 `manifest.exportReport`。`skipCheck: true` 只跳过质检门禁，回读校验照跑。用户要 PDF 时传 `pdf: "<路径>.pdf"`，同一次导出会把成品转成 PDF。
 
 用户在工作台里点「导出 .pptx」时，插件会就地补跑全页规则质检，有 blocker 才拦下并列出问题。
 
 交付时给出可点击的绝对路径：工程目录与最终 `.pptx`。需要让用户继续手改时，用 `ppt_open` 把工程打开到右侧栏。
+
+会话里如果还有通用的 Office 工具，可以配合使用：用它们读取或预览用户给的旧格式 `.ppt`、`.odp`，或把导出的 `.pptx` 转成其他格式。读一份现成 PPT 的内容时，先用它们看一遍原稿，再决定用 `ppt_patch` 轻改还是用 `ppt_import` 重做。这些工具是否存在、叫什么名字，以当前会话实际提供的为准。
 
 ## 三、怎样做出好看的页
 

@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { getSlides, loadPresentation, validatePresentation } from '@office-kit/pptx'
-import { buildProjectDeck, saveProjectPptx, type PipelineResult } from '../export-pipeline.js'
+import { buildProjectDeck, convertPptxToPdf, saveProjectPptx, type PipelineResult } from '../export-pipeline.js'
 import { ProjectError, writeExportReport } from '../project/store.js'
 import type { FontEmbedSummary } from '../fonts/embed-pipeline.js'
 import { computeProjectFingerprint } from './fingerprint.js'
@@ -20,6 +20,8 @@ import { computeProjectFingerprint } from './fingerprint.js'
 export interface ReleaseOptions {
   /** 落盘路径（相对 cwd 或绝对路径，必须位于 cwd 内）；缺省只回字节不落盘。 */
   out?: string
+  /** 同时把成品 .pptx 转成 PDF 落到此路径（相对 cwd 或绝对路径，必须位于 cwd 内）。 */
+  pdf?: string
   /** 跳过 QA 指纹门禁（postflight 仍然强制执行）。 */
   skipCheck?: boolean
   /** 追加进 manifest.exportReport 的调用方字段（如 kind: 'panel-export'）。 */
@@ -38,6 +40,8 @@ export interface ReleaseResult {
   bytes: Uint8Array
   /** out 落盘后的 cwd 相对路径（未落盘为 null）。 */
   out: string | null
+  /** PDF 落盘结果（未请求为 null）。 */
+  pdf: { path: string; bytes: number } | null
   fontsUsed: string[]
   buildWarnings: string[]
   fontEmbed: FontEmbedSummary | null
@@ -103,22 +107,29 @@ export async function releaseProject(cwd: string, dir: string, options: ReleaseO
   }
   const sha256 = createHash('sha256').update(saved.bytes).digest('hex')
 
+  const absPdf = typeof options.pdf === 'string' && options.pdf.length > 0 ? insideCwd(cwd, options.pdf) : null
   let outRel: string | null = null
   if (typeof options.out === 'string' && options.out.length > 0) {
-    const absOut = path.resolve(cwd, options.out)
-    const rel = path.relative(cwd, absOut)
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
-      throw new ProjectError('PathOutsideCwd', `导出路径必须位于会话 cwd 内：${options.out}`, { status: 400 })
-    }
+    const absOut = insideCwd(cwd, options.out)
     await mkdir(path.dirname(absOut), { recursive: true })
     await writeFile(absOut, saved.bytes)
-    outRel = rel.replace(/\\/g, '/')
+    outRel = path.relative(cwd, absOut).replace(/\\/g, '/')
+  }
+  let pdf: ReleaseResult['pdf'] = null
+  if (absPdf) {
+    try {
+      const bytes = await convertPptxToPdf(saved.bytes, absPdf)
+      pdf = { path: path.relative(cwd, absPdf).replace(/\\/g, '/'), bytes }
+    } catch (err) {
+      throw new ProjectError('PdfExportFailed', `PDF 转换失败：${(err as Error).message}`, { status: 500 })
+    }
   }
 
   const report = {
     revision: pipeline.revision,
     exportedAt: new Date().toISOString(),
     out: outRel,
+    ...(pdf ? { pdf } : {}),
     bytes: saved.bytes.byteLength,
     sha256,
     postflight: pf,
@@ -148,6 +159,7 @@ export async function releaseProject(cwd: string, dir: string, options: ReleaseO
     revision: pipeline.revision,
     bytes: saved.bytes,
     out: outRel,
+    pdf,
     fontsUsed: pipeline.fontsUsed,
     buildWarnings: pipeline.buildWarnings,
     fontEmbed: saved.fontEmbed,
@@ -155,4 +167,14 @@ export async function releaseProject(cwd: string, dir: string, options: ReleaseO
     postflight: pf,
     check
   }
+}
+
+/** Resolves an output path and rejects anything outside the session cwd. */
+function insideCwd(cwd: string, target: string): string {
+  const abs = path.resolve(cwd, target)
+  const rel = path.relative(cwd, abs)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new ProjectError('PathOutsideCwd', `导出路径必须位于会话 cwd 内：${target}`, { status: 400 })
+  }
+  return abs
 }

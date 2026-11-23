@@ -279,9 +279,13 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     expect(checkDef.output.render({}, checked)[0].text).toContain('全页覆盖')
 
     // export（质检指纹匹配 → 产物落盘 + exportReport 落账 + postflight 通过）
-    const exported = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx' })
+    const exported = await call('ppt_export', { dir: 'deck', out: 'deck/out.pptx', pdf: 'deck/out.pdf' })
     expect(exported.ok).toBe(true)
     expect(await fileExists('deck/out.pptx')).toBe(true)
+    // 同一次导出附带的 PDF：真实 PDF 字节
+    expect((exported.pdf as { path: string }).path).toBe('deck/out.pdf')
+    expect((await readFile(path.join(cwd, 'deck/out.pdf'))).subarray(0, 5).toString()).toBe('%PDF-')
+    expect(await call('ppt_export', { dir: 'deck', out: 'deck/x.pptx', pdf: '../escape.pdf' })).toMatchObject({ ok: false, error: { code: 'PathOutsideCwd' } })
     expect((exported.check as { pass: boolean }).pass).toBe(true)
     expect(typeof exported.sha256).toBe('string')
     expect((exported.postflight as { ok: boolean; slides: number })).toMatchObject({ ok: true, slides: 1 })
