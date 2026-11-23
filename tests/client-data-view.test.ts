@@ -363,13 +363,14 @@ describe('ChartView · candlestick', () => {
     expect(chartSvg(content)).not.toContain('<rect')
     expect(chartSvg(content)).toContain('<circle')
   })
-  it('图例：默认不画，legend:true 画涨/跌', () => {
+  it('K 线不画图例：开高低收是数据通道，legend 写什么都不出图例项', () => {
     const base = { type: 'candlestick', data, series: [{ type: 'candlestick', encode: { x: 'd', open: 'o', high: 'h', low: 'l', close: 'c' } }] }
-    expect(chartSvg(base)).not.toContain('上涨')
-    const on = chartSvg({ ...base, legend: true })
-    expect(on).toContain('上涨')
-    expect(on).toContain('下跌')
-    expect(chartSvg({ ...base, legend: { show: false } })).not.toContain('上涨')
+    for (const legend of [undefined, true, { position: 'top' }]) {
+      const svg = chartSvg({ ...base, ...(legend === undefined ? {} : { legend }) })
+      expect(svg).not.toContain('上涨')
+      expect(svg).not.toContain('下跌')
+      expect(svg).not.toContain('高低收')
+    }
   })
 })
 
