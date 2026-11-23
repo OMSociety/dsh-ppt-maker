@@ -41,7 +41,7 @@ export interface ChartPatch {
   container?: PatternPaint | GradientPaint
   /** 系列级标签内容开关；逐点标签块新建 dLbls 时用作其余点的默认 */
   labelDefault?: { showValue: boolean; showCategory: boolean; showPercent: boolean }
-  series: Array<{ index: number; fill?: PatternPaint; points?: Record<number, PatternPaint> }>
+  series: Array<{ index: number; fill?: PatternPaint; /** 系列不填充（填充雷达里只描边的系列） */ noFill?: boolean; points?: Record<number, PatternPaint> }>
   pointLabels?: PointLabelPatch[]
 }
 
@@ -258,6 +258,7 @@ export function patchChartXml(chartXml: string, patch: ChartPatch): string {
       let out = ser
       for (const [idx, paint] of Object.entries(s.points ?? {})) out = patchPoint(out, Number(idx), pattFillXml(paint))
       if (s.fill) out = patchSeriesFill(out, pattFillXml(s.fill))
+      else if (s.noFill) out = patchSeriesFill(out, '<a:noFill/>')
       return out
     })
   }

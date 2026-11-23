@@ -465,6 +465,12 @@ function xyModelOf(content: Rec, theme: ThemeLike | null | undefined, size: Char
       const pad = (hi - lo) * rMax / Math.max(1, plotPx - 2 * rMax)
       if (pad > 0) padded = [lo - pad, hi + pad]
     }
+    if (min === undefined && max === undefined && values.length > 1) {
+      const u = [...new Set(values)].sort((a, b) => a - b)
+      if (u.every((v, i) => Number.isInteger(v) && (i === 0 || v - u[i - 1] === 1))) {
+        padded = [Math.min(padded[0], u[0] - 0.5), Math.max(padded[padded.length - 1], u[u.length - 1] + 0.5)]
+      }
+    }
     return niceScale(padded, min, max, true)
   }
   const xScale = scaleOf(raws.flatMap((raw) => raw.rows.map((row) => row.x)), xAxisRaw, plot.width)
@@ -862,9 +868,8 @@ export interface CandlestickBarModel {
   openY?: number
   /** 实体矩形（仅 OHLC）。 */
   body?: { x: number; y: number; width: number; height: number }
-  /** HLC 模式收盘短横的两端 x。 */
-  tickX1?: number
-  tickX2?: number
+  /** HLC 模式收盘圆点半径。 */
+  dotR?: number
   up?: boolean
   color: string
 }
@@ -881,6 +886,7 @@ export interface CandlestickChartModel {
   upBorder?: ChartLineModel
   downBorder?: ChartLineModel
   title?: ChartTitleModel
+  legend?: ChartLegendModel
 }
 
 export function candlestickModelOf(content: Rec, theme: ThemeLike | null | undefined, size: ChartSize): CandlestickChartModel | null {
@@ -904,7 +910,12 @@ export function candlestickModelOf(content: Rec, theme: ThemeLike | null | undef
     return [{ label: String(row[xi] ?? ''), high, low, close, open }]
   })
   if (!rows.length) return null
-  const frame = chartFrameOf(content, size, [], { left: 44, right: 14, top: 14, bottom: 30 }, theme)
+  const upFill = resolveColor(recOf(spec.upBars).fill, theme) ?? '#d93a2b'
+  const downFill = resolveColor(recOf(spec.downBars).fill, theme) ?? '#2a9d5c'
+  const lineColor = lineOf(spec.wickStyle, theme, '#555555')?.color ?? '#555555'
+  const legendOn = content.legend === true || (!!content.legend && typeof content.legend === 'object' && recOf(content.legend).show !== false)
+  const legendItems = legendOn ? (ohlc ? [{ name: '上涨', color: upFill }, { name: '下跌', color: downFill }] : [{ name: '高低收', color: lineColor }]) : []
+  const frame = chartFrameOf(content, size, legendItems, { left: 44, right: 14, top: 14, bottom: 30 }, theme)
   const { plot } = frame
   const axis = axisOf(content.yAxis)
   const scale = niceScale(rows.flatMap((r) => [r.high, r.low]), numberOf(axis.min), numberOf(axis.max), true)
@@ -912,14 +923,12 @@ export function candlestickModelOf(content: Rec, theme: ThemeLike | null | undef
   const yPos = (v: number) => plot.top + plot.height - (v - scale.min) / span * plot.height
   const slot = plot.width / rows.length
   const bodyW = slot * 0.5
-  const upFill = resolveColor(recOf(spec.upBars).fill, theme) ?? '#d93a2b'
-  const downFill = resolveColor(recOf(spec.downBars).fill, theme) ?? '#2a9d5c'
   const bars = rows.map((r, i): CandlestickBarModel => {
     const cx = plot.left + slot * (i + 0.5)
     const up = ohlc ? r.close > r.open! : true
     const color = ohlc ? (up ? upFill : downFill) : (resolveColor(recOf(spec.wickStyle).color, theme) ?? '#555555')
     const base = { label: r.label, cx, highY: yPos(r.high), lowY: yPos(r.low), closeY: yPos(r.close), up, color }
-    if (!ohlc) return { ...base, tickX1: cx - bodyW / 2, tickX2: cx + bodyW / 2 }
+    if (!ohlc) return { ...base, dotR: 3 }
     const top = yPos(Math.max(r.open!, r.close))
     const bottom = yPos(Math.min(r.open!, r.close))
     return { ...base, openY: yPos(r.open!), body: { x: cx - bodyW / 2, y: top, width: bodyW, height: Math.max(1, bottom - top) } }
@@ -934,5 +943,6 @@ export function candlestickModelOf(content: Rec, theme: ThemeLike | null | undef
     ...(lineOf(recOf(spec.upBars).border, theme) ? { upBorder: lineOf(recOf(spec.upBars).border, theme) } : {}),
     ...(lineOf(recOf(spec.downBars).border, theme) ? { downBorder: lineOf(recOf(spec.downBars).border, theme) } : {}),
     ...(frame.title ? { title: frame.title } : {}),
+    ...(frame.legend ? { legend: frame.legend } : {}),
   }
 }

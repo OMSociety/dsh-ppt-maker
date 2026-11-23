@@ -1564,7 +1564,7 @@ function chartSpecOf(
   }
 
   if (firstType === 'scatter' || firstType === 'bubble') return pointChartSpecOf(element, data, series, firstType, resolver, ctx, where)
-  if (firstType === 'radar') return radarChartSpecOf(element, data, series, resolver, ctx, where)
+  if (firstType === 'radar') return radarChartSpecOf(element, data, series, resolver, ctx, where, patch)
   if (firstType === 'candlestick') return stockChartSpecOf(element, data, series, resolver, ctx, where)
 
   const horizontal = firstType === 'bar' && chartRecordOf(element.yAxis).type === 'category'
@@ -1742,7 +1742,8 @@ function radarChartSpecOf(
   series: Array<Record<string, unknown>>,
   resolver: ThemeResolver,
   ctx: BuildContext,
-  where: string
+  where: string,
+  patch: ChartPatch
 ): unknown {
   const cols = data.cols
   const colIndex = (name: unknown): number => (typeof name === 'string' ? cols.indexOf(name) : -1)
@@ -1768,6 +1769,7 @@ function radarChartSpecOf(
     const line = chartColorOf(s.lineColor, resolver)
     const area = chartColorOf(s.areaColor, resolver)
     if (s.areaColor !== false) outlineOnly = false
+    else if (line) patch.series.push({ index: mapped.length, noFill: true })
     if (area ?? line) out.color = area ?? line
     if (line) out.lineColor = line
     if (typeof s.width === 'number' && s.width > 0) out.lineWidthEmu = Math.round(s.width * 9525)
@@ -1791,6 +1793,8 @@ function radarChartSpecOf(
     series: mapped,
     radarStyle: outlineOnly ? (anyMarker ? 'marker' : 'standard') : 'filled'
   }
+  // 整图只有一个雷达样式：全部只描边时用轮廓样式；混合时按填充样式写，只描边的系列由补丁去掉填充。
+  if (outlineOnly) patch.series.length = 0
   const spoke = chartRecordOf(element.spokeAxis)
   const scaling: Record<string, unknown> = {}
   if (typeof spoke.min === 'number' && Number.isFinite(spoke.min)) scaling.min = spoke.min

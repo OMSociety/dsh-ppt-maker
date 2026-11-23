@@ -122,6 +122,11 @@ describe('散点 / 气泡 / 雷达生成', () => {
     expect(spec.categories).toEqual(['速度', '质量', '成本', '体验', '安全'])
     expect(spec.series.map((s: any) => s.name)).toEqual(['本期', '上期'])
     expect(spec.valueAxis).toMatchObject({ min: 0, max: 6 })
+    // 混合样式：areaColor:false 的第二个系列写成无填充，第一个系列保留填充
+    const sers = [...chartXml(bytes).matchAll(/<c:ser>[\s\S]*?<\/c:ser>/g)].map((m) => m[0])
+    expect(sers).toHaveLength(2)
+    expect(sers[0]).not.toMatch(/<c:spPr>\s*<a:noFill\/>/)
+    expect(sers[1]).toMatch(/<c:spPr>\s*<a:noFill\/>/)
   })
 
   it('全部系列都不填充的雷达写成轮廓雷达', async () => {
@@ -254,5 +259,7 @@ describe('散点 / 气泡 / 雷达逆向往返', () => {
     expect(chart.series).toHaveLength(2)
     expect(chart.series[0].type).toBe('radar')
     expect(chart.spokeAxis).toMatchObject({ min: 0, max: 6 })
+    expect(chart.series[0].areaColor).not.toBe(false)
+    expect(chart.series[1].areaColor).toBe(false)
   })
 })

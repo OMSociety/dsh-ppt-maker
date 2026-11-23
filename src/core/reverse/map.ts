@@ -1677,7 +1677,8 @@ function mapChart(
       const line = series.lineColor ?? paintColorOf(color)
       if (line) out.lineColor = asLiteralColor(line)
       if (filled) {
-        if (color) out.areaColor = color
+        // 填充雷达里没有填充色的系列是只描边的系列
+        out.areaColor = color ?? false
       } else out.areaColor = false
       const shape = PPTD_MARKER_SHAPES[String(series.markerSymbol)]
       if (series.markerSymbol && series.markerSymbol !== 'none') out.marker = shape && shape !== 'circle' ? { shape } : {}

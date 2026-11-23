@@ -2235,7 +2235,7 @@ interface DeckSource {
 5. 饼图 → `pie` 系列；环形图另写 `innerRadius = holeSize / 100`（限定在 [0.1, 0.9]）；首扇区角度 → `startAngle`；逐点颜色齐全时 → `fill` 数组；
 6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入）；饼 / 环形图的逐点标签（隐藏、手动位置、字号、颜色、加粗）→ `dataLabels.points`；
 7. 散点 / 气泡没有类目列：每个系列占相邻的 `{系列名} X`、`{系列名}`（气泡再加 `{系列名} 大小`）列，行按点序号对齐，较短系列补 `null`；系列 `encode` 指向这些列；标记形状（圆形以外）与大小（pt 换算为 px）写入 `marker`，气泡按宽度表示大小 → `sizeScale: "linear"`；散点连线样式记 degraded（feature `unknown`），按仅标记落盘；
-8. 雷达沿用 `类别` 列放辐条标签，每个系列一列；填充雷达 → `areaColor`，轮廓 / 带标记雷达 → `areaColor: false`；数值轴的 min / max / 隐藏 / 无网格线 → `spokeAxis`。生成时雷达的样式由全部系列共同决定：只要有一个系列填充，整图按填充雷达写；
+8. 雷达沿用 `类别` 列放辐条标签，每个系列一列；填充雷达 → `areaColor`，轮廓 / 带标记雷达 → `areaColor: false`；数值轴的 min / max / 隐藏 / 无网格线 → `spokeAxis`。生成时雷达的样式由全部系列共同决定：只要有一个系列填充，整图按填充雷达写，`areaColor: false` 的系列写成无填充、只留轮廓线；逆向时填充雷达里无填充的系列回到 `areaColor: false`。
 9. 股价图（三个系列 = 高低收，四个 = 开高低收）→ 一个 `candlestick` 系列，`encode.x` 为 `类别`，开 / 高 / 低 / 收各取对应系列列；涨跌柱颜色 → `upBars.fill` / `downBars.fill`；其他系列个数的股价图落占位；
 10. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
 

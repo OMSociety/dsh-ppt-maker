@@ -558,6 +558,7 @@ function CandlestickChart({ model }: { model: CandlestickChartModel }) {
   return (
     <svg width={model.width} height={model.height} viewBox={`0 0 ${model.width} ${model.height}`} style={{ display: 'block' }}>
       {model.title && <text x={model.title.x} y={model.title.y} textAnchor="middle" fontSize={model.title.fontSize} fontWeight={600} fill={model.title.color ?? '#333'}>{model.title.text}</text>}
+      <ChartTitleAndLegend legend={model.legend} />
       {model.yAxis.ticks.map((t) => (
         <g key={`y:${t.value}`}>
           <line x1={plot.left} y1={t.pos} x2={plot.left + plot.width} y2={t.pos} stroke={GRID} strokeWidth={1} />
@@ -570,7 +571,7 @@ function CandlestickChart({ model }: { model: CandlestickChartModel }) {
           <line x1={b.cx} y1={b.highY} x2={b.cx} y2={b.lowY} {...w(model.wick, b.color)} />
           {b.body
             ? <rect x={b.body.x} y={b.body.y} width={b.body.width} height={b.body.height} fill={b.color} {...(b.up ? (model.upBorder ? w(model.upBorder, b.color) : {}) : (model.downBorder ? w(model.downBorder, b.color) : {}))} />
-            : <line x1={b.tickX1} y1={b.closeY} x2={b.tickX2} y2={b.closeY} {...w(model.wick, b.color)} />}
+            : <circle cx={b.cx} cy={b.closeY} r={b.dotR ?? 3} fill={model.wick.color ?? b.color} />}
         </g>
       ))}
     </svg>

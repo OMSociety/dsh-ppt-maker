@@ -359,8 +359,25 @@ describe('ChartView · candlestick', () => {
     const content = { type: 'candlestick', data, series: [{ type: 'candlestick', encode: { x: 'd', high: 'h', low: 'l', close: 'c' } }] }
     const m = candlestickModelOf(content, null, { width: 400, height: 240 })!
     expect(m.ohlc).toBe(false)
-    expect(m.bars.every((b) => !b.body && b.tickX1 !== undefined)).toBe(true)
+    expect(m.bars.every((b) => !b.body && b.dotR === 3)).toBe(true)
     expect(chartSvg(content)).not.toContain('<rect')
+    expect(chartSvg(content)).toContain('<circle')
+  })
+  it('图例：默认不画，legend:true 画涨/跌', () => {
+    const base = { type: 'candlestick', data, series: [{ type: 'candlestick', encode: { x: 'd', open: 'o', high: 'h', low: 'l', close: 'c' } }] }
+    expect(chartSvg(base)).not.toContain('上涨')
+    const on = chartSvg({ ...base, legend: true })
+    expect(on).toContain('上涨')
+    expect(on).toContain('下跌')
+    expect(chartSvg({ ...base, legend: { show: false } })).not.toContain('上涨')
+  })
+})
+
+describe('ChartView · 整数轴外扩半步', () => {
+  it('x 为 1..3 时范围含 0.5–3.5', () => {
+    const m = scatterModelOf({ type: 'scatter', data: { cols: ['x', 'y'], rows: [[1, 1.5], [2, 2.5], [3, 9]] }, series: [{ type: 'scatter', encode: { x: 'x', y: 'y' } }] }, null, { width: 400, height: 240 })!
+    expect(m.xAxis.min).toBeLessThanOrEqual(0.5)
+    expect(m.xAxis.max).toBeGreaterThanOrEqual(3.5)
   })
 })
 describe('ChartView · 散点留白', () => {
