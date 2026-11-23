@@ -8,6 +8,7 @@
 import * as React from 'react'
 import { api, type HistoryEntry } from '../api'
 import type { PptStore } from '../store'
+import { opsSummaryOf } from '../render/op-label'
 import { PptdView, type PptdPage } from './PptdView'
 
 interface PreviewState {
@@ -25,10 +26,7 @@ function formatTime(iso: string): string {
 }
 
 function opsSummary(entry: HistoryEntry): string {
-  const head = entry.ops.slice(0, 3).join('、')
-  const more = entry.ops.length > 3 ? ` 等 ${entry.ops.length} 项` : ''
-  const merged = entry.mergedCount > 0 ? `（合并 ${entry.mergedCount} 次编辑）` : ''
-  return `${head || '（创建）'}${more}${merged}`
+  return opsSummaryOf(entry.ops, entry.mergedCount)
 }
 
 export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: () => void }) {

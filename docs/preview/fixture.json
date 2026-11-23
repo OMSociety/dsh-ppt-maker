@@ -35,9 +35,9 @@
       "theme": "blue-flame-brand",
       "checksum": "30bdff00242bd94b0cab497cd6d1121b0ca79ce7",
       "qaReport": {
-        "revision": 18,
-        "checkedAt": "2026-11-22T20:34:58.557Z",
-        "tool": "ppt_check",
+        "revision": 22,
+        "checkedAt": "2026-11-23T13:27:54.499Z",
+        "tool": "panel-check",
         "pass": true,
         "issueCount": 69,
         "blockerCount": 0,
@@ -596,14 +596,14 @@
         ],
         "pages": null,
         "ai": null,
-        "fingerprint": "1945a95a0cc8b92865bc63202fb1a7394a48b186cec917db023086372cedda6f"
+        "fingerprint": "290ab199ad114ec995263a6cdb82c360020f4d91c27a037aef2ed4a102da68a9"
       },
       "exportReport": {
-        "revision": 18,
-        "exportedAt": "2026-11-22T20:59:30.031Z",
+        "revision": 22,
+        "exportedAt": "2026-11-23T13:27:54.596Z",
         "out": "demo-deck.pptx",
-        "bytes": 239609,
-        "sha256": "8fef639c08d5bc6e053eac3355957f1ed4a86b7f69e68cb7701d4ee80dba0e97",
+        "bytes": 237437,
+        "sha256": "c4aff3f62685b4d21e952592245c01cb7cf791a841e1ffef1b32179676bad6bd",
         "postflight": {
           "ok": true,
           "slides": 3,
@@ -619,8 +619,8 @@
           "mode": "subset",
           "facesEmbedded": 2,
           "skipped": 1,
-          "rawBytes": 24444,
-          "finalBytes": 239609,
+          "rawBytes": 24513,
+          "finalBytes": 237437,
           "warnings": [
             "Noto Sans SC(bold)：实际解析到 regular 槽位（本机路径），与请求的 bold 不符",
             "Noto Sans SC(regular) → rId10 @ fonts/font1.fntdata",
@@ -634,13 +634,13 @@
               "typeface": "Noto Sans SC",
               "slot": "regular",
               "beforeBytes": 17773244,
-              "afterBytes": 145256
+              "afterBytes": 143688
             },
             {
               "typeface": "Microsoft YaHei",
               "slot": "regular",
               "beforeBytes": 19583608,
-              "afterBytes": 81180
+              "afterBytes": 79384
             }
           ],
           "skippedDetail": [
@@ -654,7 +654,7 @@
         "buildWarnings": [],
         "check": {
           "pass": true,
-          "fingerprint": "1945a95a0cc8b92865bc63202fb1a7394a48b186cec917db023086372cedda6f"
+          "fingerprint": "290ab199ad114ec995263a6cdb82c360020f4d91c27a037aef2ed4a102da68a9"
         },
         "kind": "panel-export"
       }
