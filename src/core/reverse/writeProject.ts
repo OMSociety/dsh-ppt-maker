@@ -195,6 +195,10 @@ function remapMediaSrc(mapped: ReverseMapResult, partName: string, alias: string
         rec.src = alias
         delete rec.partName
       }
+      if (rec.previewPartName === partName) {
+        rec.preview = alias
+        delete rec.previewPartName
+      }
       const fill = rec.fill as Record<string, unknown> | undefined
       if (fill && typeof fill === 'object' && fill.partName === partName) {
         fill.src = alias

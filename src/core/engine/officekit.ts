@@ -2127,9 +2127,12 @@ export function createOfficeKitEngine(): DeckEngine {
                 shape = buildShape(slide, record, resolver, ctx)
                 break
               case 'placeholder':
-                shape =
-                  (archive ? copyArchivedOriginal(slide, record, archiveSlides, ctx, pageLabel) : null) ??
-                  buildPlaceholder(slide, record, resolver, ctx, fonts)
+                shape = archive ? copyArchivedOriginal(slide, record, archiveSlides, ctx, pageLabel) : null
+                if (!shape && typeof record.preview === 'string' && record.preview !== '') {
+                  const bytes = await preloadImageBytes(record.preview, ctx, `元素 ${String(record.elementId)} 的预览图`)
+                  if (bytes) shape = buildImage(slide, { ...record, src: record.preview, fit: 'fill' }, resolver, ctx, bytes)
+                }
+                if (!shape) shape = buildPlaceholder(slide, record, resolver, ctx, fonts)
                 break
               case 'image': {
                 const bytes = await preloadImageBytes(record.src, ctx, `元素 ${String(record.elementId)}`)

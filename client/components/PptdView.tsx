@@ -220,8 +220,17 @@ function ElementView({
           <ChartView content={el} theme={theme} />
         </div>
       )
+    case 'placeholder':
+      if (typeof el.preview === 'string' && el.preview !== '') {
+        return <ImageView el={{ ...el, src: el.preview }} style={style} resolveMedia={resolveMedia} fit="fill" />
+      }
+      return (
+        <div style={{ ...style, ...placeholderBox() }} data-element-type={type}>
+          <span style={placeholderLabel()}>{typeof el.label === 'string' ? el.label : placeholderText(type)}</span>
+        </div>
+      )
     default:
-      // icon / smartArt / placeholder 等：灰底占位（与逆向引擎 placeholder 口径一致）。
+      // icon 等：灰底占位（与逆向引擎 placeholder 口径一致）。
       return (
         <div style={{ ...style, ...placeholderBox() }} data-element-type={type}>
           <span style={placeholderLabel()}>{placeholderText(type)}</span>
@@ -426,10 +435,12 @@ function ImageView({
   el,
   style,
   resolveMedia,
+  fit = 'cover',
 }: {
   el: PptdElement
   style: React.CSSProperties
   resolveMedia?: (src: string) => string
+  fit?: 'cover' | 'fill'
 }) {
   const raw = (el.src ?? (el.content?.src as string)) as string | undefined
   const src = raw && resolveMedia ? resolveMedia(raw) : raw
@@ -448,7 +459,7 @@ function ImageView({
       src={src}
       alt=""
       draggable={false}
-      style={{ ...style, objectFit: 'cover', display: 'block' }}
+      style={{ ...style, objectFit: fit, display: 'block' }}
       className="pptd-image"
       onError={() => setFailedSrc(src ?? null)}
     />

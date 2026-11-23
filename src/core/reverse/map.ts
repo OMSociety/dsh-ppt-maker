@@ -142,9 +142,18 @@ function ensurePlaceholder(
   rec: ReverseShapeRecord,
   originalType: 'chart' | 'smartArt' | 'group' | 'media' | 'ole' | 'object3d' | 'unknown',
   report: ImportReport,
-  reason: string
+  reason: string,
+  preview?: { pres: PresentationData; slidePart: string; media: ReverseMediaAsset[] }
 ): void {
   const placeholder = placeholderFor(rec, originalType)
+  if (preview) {
+    const image = previewImageOf(preview.pres, preview.slidePart, rec.raw as SlideShapeData)
+    if (image) {
+      const partName = `ppt/media/preview-${rec.slideIndex}-${rec.shapeId}${image.ext}`
+      preview.media.push({ bytes: image.bytes, ext: image.ext, partName })
+      ;(placeholder as Record<string, unknown>).previewPartName = partName
+    }
+  }
   page.elements.push(placeholder)
   report.dropped.push({
     page: rec.slideIndex,
@@ -1258,25 +1267,54 @@ function chartPaintOf(pres: PresentationData, spPr: string | undefined): string 
  * with transforms, pattern fills and gradients the parsed chart spec leaves
  * unresolved. Returns null when the part cannot be located.
  */
+/** Reads the package part a slide relationship id points at; null when absent or external. */
+function slideRelPart(pres: PresentationData, slidePart: string, rid: string): { name: string; bytes: Uint8Array } | null {
+  const part = slidePart.startsWith('/') ? slidePart : `/${slidePart}`
+  const dir = part.slice(0, part.lastIndexOf('/'))
+  const relsBytes = readPackagePart(pres, `${dir}/_rels/${part.slice(dir.length + 1)}.rels`)
+  if (!relsBytes) return null
+  const rels = new TextDecoder().decode(relsBytes)
+  const rel = [...rels.matchAll(/<Relationship\b[^>]*>/g)].map((m) => m[0]).find((r) => r.includes(`Id="${rid}"`))
+  if (!rel || /TargetMode="External"/.test(rel)) return null
+  const target = /Target="([^"]+)"/.exec(rel)?.[1]
+  if (!target) return null
+  const segments = (target.startsWith('/') ? target : `${dir}/${target}`).split('/')
+  const resolved: string[] = []
+  for (const seg of segments) {
+    if (seg === '..') resolved.pop()
+    else if (seg !== '.' && seg !== '') resolved.push(seg)
+  }
+  const name = `/${resolved.join('/')}`
+  const bytes = readPackagePart(pres, name)
+  return bytes ? { name, bytes } : null
+}
+
+/**
+ * Preview image of an unmapped object: the poster frame of a media clip, the
+ * fallback picture of an OLE object, or any first embedded `<a:blip>` the
+ * frame carries. Only raster/vector picture formats qualify.
+ */
+function previewImageOf(pres: PresentationData, slidePart: string, shape: SlideShapeData): { bytes: Uint8Array; ext: string } | null {
+  try {
+    const xml = getShapeXmlString(shape)
+    for (const m of xml.matchAll(/<a:blip\b[^>]*\br:embed="([^"]+)"/g)) {
+      const hit = slideRelPart(pres, slidePart, m[1])
+      if (!hit) continue
+      const ext = imageExtOf(hit.bytes, hit.name)
+      if (ext === '.bin') continue
+      return { bytes: hit.bytes, ext }
+    }
+  } catch {
+    /* no preview */
+  }
+  return null
+}
+
 function chartPaintsOf(pres: PresentationData, slidePart: string, shape: SlideShapeData): ChartPaint | null {
   try {
     const rid = /<c:chart\b[^>]*\br:id="([^"]+)"/.exec(getShapeXmlString(shape))?.[1]
     if (!rid) return null
-    const part = slidePart.startsWith('/') ? slidePart : `/${slidePart}`
-    const dir = part.slice(0, part.lastIndexOf('/'))
-    const relsBytes = readPackagePart(pres, `${dir}/_rels/${part.slice(dir.length + 1)}.rels`)
-    if (!relsBytes) return null
-    const rels = new TextDecoder().decode(relsBytes)
-    const rel = [...rels.matchAll(/<Relationship\b[^>]*>/g)].map((m) => m[0]).find((r) => r.includes(`Id="${rid}"`))
-    const target = rel ? /Target="([^"]+)"/.exec(rel)?.[1] : undefined
-    if (!target) return null
-    const segments = (target.startsWith('/') ? target : `${dir}/${target}`).split('/')
-    const resolved: string[] = []
-    for (const seg of segments) {
-      if (seg === '..') resolved.pop()
-      else if (seg !== '.' && seg !== '') resolved.push(seg)
-    }
-    const chartBytes = readPackagePart(pres, `/${resolved.join('/')}`)
+    const chartBytes = slideRelPart(pres, slidePart, rid)?.bytes
     if (!chartBytes) return null
     const xml = new TextDecoder().decode(chartBytes)
     const series = [...xml.matchAll(/<c:ser>([\s\S]*?)<\/c:ser>/g)].map((m) => {
@@ -1807,7 +1845,8 @@ function mapPage(
             rec,
             cls?.originalType ?? 'unknown',
             report,
-            cls?.reason ?? 'graphicFrame 无法归类'
+            cls?.reason ?? 'graphicFrame 无法归类',
+            { pres, slidePart: slide.partName, media }
           )
           break
         }
@@ -1815,7 +1854,7 @@ function mapPage(
           // 带媒体剪辑的 picture 不进 image 通道，走 dropped + 占位
           const cls = classifyUnhandledShape(rawShape, rec.kind)
           if (cls && cls.originalType === 'media') {
-            ensurePlaceholder(page, rec, 'media', report, cls.reason)
+            ensurePlaceholder(page, rec, 'media', report, cls.reason, { pres, slidePart: slide.partName, media })
           } else {
             page.elements.push(mapImage(rec, media, report) as Page['elements'][number])
           }

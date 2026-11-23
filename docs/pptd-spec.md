@@ -2128,10 +2128,12 @@ interface Placeholder extends ElementBase {
   originalName?: string;              // 源形状名
   label?: string;                     // 占位上的说明文字；缺省按下表
   labelStyle?: { color?: Color; fontSize?: number };  // 说明文字样式
+  preview?: string;                   // 原对象的预览图（工程内 media/ 路径）
 }
 ```
 
 - elementId 形如 `ph-{slideIndex}-{shapeId}`；`sourceRef` / `originalName` 按 §6.8 填写。
+- `preview`：源对象自带预览图时（媒体的海报帧、嵌入对象的替代图片等）导入器把它落进 `media/` 并记在这里。工作台以它显示占位；导出时若原件无法从源存档拷回（§10.4），按预览图落成图片，否则才落灰底占位框。
 - `label` 缺省文案：`chart` → 此处原为图表；`smartArt` → 此处原为 SmartArt 图示；`group` → 此处原为组合图形；`media` → 此处原为媒体（音频/视频）；`ole` → 此处原为嵌入对象；`object3d` → 此处原为三维图形；`unknown` → 此处原为未建模元素。
 - **对比度闸**：label 文字色对占位底色（默认填充 `#E5E7EB`、默认文字色 `#4B5563`）的 WCAG 相对亮度对比度低于 3:1 → warning `PlaceholderContrastWarning`。
 - 生成方言出现 placeholder → `PlaceholderNotAllowedError`；缺 `originalType` 或越类别表 → `PlaceholderFieldError`。

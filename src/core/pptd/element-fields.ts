@@ -83,6 +83,9 @@ export function validateElementFields(element: Record<string, unknown>, path: st
       issues.push(blocker(ERROR_CODES.SchemaError, 'group 须为非空字符串数组（外层组合在前）', `${path}#group`))
     }
   }
+  if (element.elementType === 'placeholder' && element.preview !== undefined && !nonEmptyString(element.preview)) {
+    issues.push(blocker(ERROR_CODES.SchemaError, 'placeholder.preview 须为非空的工程内路径', `${path}#preview`))
+  }
   switch (element.elementType) {
     case 'text': {
       const content = element.content
