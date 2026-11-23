@@ -174,13 +174,14 @@ export function profileOf(deck: Presentation): Profile {
 }
 
 /** Effective export config (spec §3.2). */
-export function exportConfigOf(deck: Presentation): Required<Presentation['export']> {
+export function exportConfigOf(deck: Presentation): typeof DEFAULT_EXPORT & { transitionMs?: number } {
   const raw = isRecord(deck.export) ? deck.export : {}
   const out = { ...DEFAULT_EXPORT }
   if (raw.fontEmbed === 'subset' || raw.fontEmbed === 'full' || raw.fontEmbed === 'off') out.fontEmbed = raw.fontEmbed
   if (raw.transition === 'morph' || raw.transition === 'fade' || raw.transition === 'none' || raw.transition === 'auto') out.transition = raw.transition
   if (raw.animations === 'auto' || raw.animations === 'off') out.animations = raw.animations
-  return out
+  const ms = raw.transitionMs
+  return typeof ms === 'number' && Number.isFinite(ms) && ms > 0 ? { ...out, transitionMs: ms } : out
 }
 
 /* ------------------------------------------------------------------ *
@@ -320,8 +321,16 @@ export function validateExportConfig(raw: unknown, path: string): Issue[] {
       )
     }
   }
+  const ms = raw.transitionMs
+  if (ms !== undefined && (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0 || ms > 60000)) {
+    issues.push(
+      blocker(ERROR_CODES.ExportFieldValueError, 'export.transitionMs 必须是 1 到 60000 之间的毫秒数', `${path}.transitionMs`, {
+        actual: ms
+      })
+    )
+  }
   for (const key of Object.keys(raw)) {
-    if (!(key in domains)) {
+    if (!(key in domains) && key !== 'transitionMs') {
       issues.push(warning(ERROR_CODES.ExportFieldValueError, `export 里的未知字段 "${key}" 将被忽略`, `${path}.${key}`))
     }
   }

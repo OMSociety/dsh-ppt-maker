@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { loadPresentation, getSlides, getSlideShapes, getShapeText, getShapeBounds, getSlideSize, getSlideTransition, getShapeXmlString, getPresentationFonts, getPresentationTheme } from '@office-kit/pptx'
 import { createOfficeKitEngine } from '../src/core/engine/officekit.js'
 import type { BuildContext } from '../src/core/engine/types.js'
-import type { Page, Presentation } from '../src/core/pptd/parse.js'
+import { validateExportConfig, type Page, type Presentation } from '../src/core/pptd/parse.js'
 
 function ctx(overrides: Partial<BuildContext> = {}): BuildContext {
   return {
@@ -95,6 +95,7 @@ describe('officekit 引擎', () => {
     const withMorph = await engine.buildDeck({ deck: deck(), pages: [page] }, ctx())
     const morphBack = await loadPresentation(await engine.saveDeck(withMorph.native))
     expect(getSlideTransition(getSlides(morphBack)[0])?.effect).toBe('morph')
+    expect(getSlideTransition(getSlides(morphBack)[0])?.durationMs).toBe(2000)
 
     const withFade = await engine.buildDeck(
       { deck: deck({ export: { fontEmbed: 'off', transition: 'fade', animations: 'off' } }), pages: [page] },
@@ -102,6 +103,7 @@ describe('officekit 引擎', () => {
     )
     const fadeBack = await loadPresentation(await engine.saveDeck(withFade.native))
     expect(getSlideTransition(getSlides(fadeBack)[0])?.effect).toBe('fade')
+    expect(getSlideTransition(getSlides(fadeBack)[0])?.speed).toBe('fast')
 
     const noTransition = await engine.buildDeck(
       { deck: deck({ export: { fontEmbed: 'off', transition: 'none', animations: 'off' } }), pages: [page] },
@@ -110,6 +112,25 @@ describe('officekit 引擎', () => {
     const noneBytes = await engine.saveDeck(noTransition.native)
     const noneBack = await loadPresentation(noneBytes)
     expect(getSlideTransition(getSlides(noneBack)[0])).toBeNull()
+  })
+
+  it('export.transitionMs 覆盖转场时长，对平滑与淡入同样生效', async () => {
+    const engine = createOfficeKitEngine()
+    const page: Page = { elements: [] }
+    for (const transition of ['morph', 'fade'] as const) {
+      const built = await engine.buildDeck(
+        { deck: deck({ export: { fontEmbed: 'off', transition, transitionMs: 1200, animations: 'off' } }), pages: [page] },
+        ctx()
+      )
+      const back = await loadPresentation(await engine.saveDeck(built.native))
+      expect(getSlideTransition(getSlides(back)[0])?.durationMs).toBe(1200)
+    }
+  })
+
+  it('export.transitionMs 取值非法时报阻断', () => {
+    expect(validateExportConfig({ transitionMs: 0 }, 'deck#export').some((i) => i.level === 'blocker')).toBe(true)
+    expect(validateExportConfig({ transitionMs: '2s' }, 'deck#export').some((i) => i.level === 'blocker')).toBe(true)
+    expect(validateExportConfig({ transitionMs: 1500 }, 'deck#export')).toEqual([])
   })
 
   it('export.transition=auto 时轮换预设转场表', async () => {

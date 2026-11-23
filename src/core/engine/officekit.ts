@@ -2096,6 +2096,12 @@ const AUTO_TRANSITION_CURATED: ReadonlyArray<{ effect: string; direction?: strin
   { effect: 'wipe', direction: 'r' }
 ]
 
+/** deck 级转场的时长（毫秒）：`export.transitionMs` 优先；缺省时平滑为 2000，其余转场用 `fast`（0.5 秒）。 */
+function transitionDurationOf(effect: string, configured: number | undefined): number | undefined {
+  if (configured !== undefined) return configured
+  return effect === 'morph' ? 2000 : undefined
+}
+
 /** deck 级转场的取值：`morph` 平滑、`fade` 淡入淡出、`auto` 按策展词表轮换。 */
 function deckTransitionOf(mode: 'morph' | 'fade' | 'auto', pageIndex: number): { effect: string; direction?: string } {
   if (mode === 'auto') return AUTO_TRANSITION_CURATED[pageIndex % AUTO_TRANSITION_CURATED.length]
@@ -2400,6 +2406,7 @@ export function createOfficeKitEngine(): DeckEngine {
       const size = Array.isArray(deck.size) ? deck.size : [960, 540]
       const exportCfg = deck.export ?? {}
       const transitionMode = exportCfg.transition ?? 'morph'
+    const transitionMs = typeof exportCfg.transitionMs === 'number' ? exportCfg.transitionMs : undefined
       const animationsMode = exportCfg.animations ?? 'auto'
       const profile = deck.profile ?? 'generate'
 
@@ -2501,6 +2508,9 @@ export function createOfficeKitEngine(): DeckEngine {
                 effect: curated.effect as never,
                 ...(curated.direction !== undefined ? { direction: curated.direction } : {}),
                 speed: 'fast',
+                ...(transitionDurationOf(curated.effect, transitionMs) !== undefined
+                  ? { durationMs: transitionDurationOf(curated.effect, transitionMs) }
+                  : {}),
                 advanceOnClick: true
               })
               stats.transitionPages++
@@ -2602,6 +2612,9 @@ export function createOfficeKitEngine(): DeckEngine {
                 effect: curated.effect as never,
                 ...(curated.direction !== undefined ? { direction: curated.direction } : {}),
                 speed: 'fast',
+                ...(transitionDurationOf(curated.effect, transitionMs) !== undefined
+                  ? { durationMs: transitionDurationOf(curated.effect, transitionMs) }
+                  : {}),
                 advanceOnClick: true
               })
               stats.transitionPages++

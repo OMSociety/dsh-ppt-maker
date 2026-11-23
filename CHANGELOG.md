@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-11-24
+
+### 新增
+
+- **`export.transitionMs` 调整转场时长。** 毫秒数（1–60000），对所有 deck 级转场写入 `p14:dur`；省略时平滑为 2000，其余转场沿用 `fast`（500）。技能文档按风格给出取值建议：快节奏取 300–500，沉稳取 800–1500，平滑想看清位移取 1500–2500。
+
+### 变更
+
+- **平滑转场的时长改为 2 秒。** 默认转场 `morph` 此前沿用其他转场的 `fast`（0.5 秒），位移与缩放一闪而过；现在写入 `p14:dur="2000"`，其余转场仍为 0.5 秒。
+
+### Added
+
+- **`export.transitionMs` sets the transition duration.** A number of milliseconds (1–60000) written as `p14:dur` on every deck-level transition; omitted, Morph lasts 2000 and the other transitions keep `fast` (500). The skill document suggests values by style: 300–500 for fast-paced decks, 800–1500 for measured ones, 1500–2500 when Morph movement should be easy to follow.
+
+### Changed
+
+- **The Morph transition now lasts 2 seconds.** The default `morph` transition used to share the `fast` speed (0.5 s) of the other transitions, so movement and scaling flashed past; it now writes `p14:dur="2000"`, while the other transitions stay at 0.5 s.
 ## [2.0.1] - 2026-11-24
 
 ### 变更

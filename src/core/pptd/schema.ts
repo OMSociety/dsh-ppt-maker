@@ -390,11 +390,13 @@ export type ExportAnimations = 'auto' | 'off'
 export interface ExportConfig {
   fontEmbed?: ExportFontEmbed
   transition?: ExportTransition
+  /** 转场时长（毫秒，> 0）；缺省时 `morph` 为 2000，其余转场为 `fast`（500）。 */
+  transitionMs?: number
   animations?: ExportAnimations
 }
 
 /** Spec §3.2 defaults. */
-export const DEFAULT_EXPORT: Required<ExportConfig> = {
+export const DEFAULT_EXPORT: Required<Omit<ExportConfig, 'transitionMs'>> = {
   fontEmbed: 'subset',
   transition: 'morph',
   animations: 'auto'

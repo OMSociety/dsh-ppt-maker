@@ -1,6 +1,6 @@
 {
   "name": "dsh-ppt-maker",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "type": "module",
   "description": "DSH PPT Maker: AI PowerPoint deck maker for DeepSeek Harness. Create, redesign and edit PPT/PPTX slides and presentations with twelve ppt_* tools, 30 built-in design systems, a right-sidebar visual editor, native charts and tables, import of existing .pptx files, and export to editable PPTX and PDF.",
   "author": "OMSociety (https://github.com/OMSociety)",

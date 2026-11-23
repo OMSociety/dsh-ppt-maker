@@ -349,6 +349,7 @@ deck 级字段，控制导出产物（`.pptx`）的三项全局行为。三字�
 interface ExportConfig {
   fontEmbed?: "subset" | "full" | "off";   // 默认 "subset"；字体嵌入档位，见 §9
   transition?: "morph" | "fade" | "none" | "auto";    // 默认 "morph"；deck 级转场，见 §8.1
+  transitionMs?: number;                   // 转场时长（毫秒，1–60000）；缺省时 morph 为 2000，其余转场 500（fast）
   animations?: "auto" | "off";             // 默认 "auto"；是否写出页级动画，见 §7.8
 }
 ```
@@ -358,7 +359,7 @@ interface ExportConfig {
 | `fontEmbed` | `subset`（默认） | 嵌入工程实际用到的字体，按字符集子集化（CJK 场景体积降一个数量级）；受 fsType 许可闸约束（§9.1） |
 | | `full` | 嵌入整字体，不子集化；目标机可自由编辑新增字符，代价是产物体积 |
 | | `off` | 不嵌入字体；目标机需自行安装，否则回落替代字体并触发 `missingFonts` 警告 |
-| `transition` | `morph`（默认） | 对没有页级转场记录的页写平滑转场（`spd="fast"`、`advClick="1"`，`<p159:morph option="byObject"/>`，回退为 `fade`）；逆向方言里已有 `page.transition` 的页以页级为准 |
+| `transition` | `morph`（默认） | 对没有页级转场记录的页写平滑转场（`<p159:morph option="byObject"/>`，`p14:dur="2000"`，`advClick="1"`，回退为 `fade`）；逆向方言里已有 `page.transition` 的页以页级为准 |
 | | `fade` | 对没有页级转场记录的页写淡入淡出转场（`spd="fast"`、`advClick="1"`）；逆向方言里已有 `page.transition` 的页以页级为准 |
 | | `none` | 导出产物任何页根级都不写 `<p:transition>`（含逆向方言的页级记录） |
 | | `auto` | 对没有页级转场记录的页按策展词表逐页轮换 `fade → push(dir=r) → wipe(dir=r)`（`spd="fast"`、`advClick="1"`）；策展词表是引擎层的固定常量，目的是让 AI 生成的 deck 页间有节奏变化而非清一色淡入；逆向方言里已有 `page.transition` 的页仍以页级为准 |
@@ -2001,9 +2002,10 @@ deck 级 `export.animations`（§3.2）控制动画写出：
 
 `export.transition` 控制导出时写出哪些转场（§3.2）：
 
-- `morph`（默认）：全部页面统一写 `morph` 平滑转场（`option="byObject"`，相邻页同名对象之间做位移与缩放动画）；不识别平滑的软件按 `fade` 显示。
+- `morph`（默认）：全部页面统一写 `morph` 平滑转场（`option="byObject"`，相邻页同名对象之间做位移与缩放动画，时长 2 秒；其余转场为 `fast`，0.5 秒）；不识别平滑的软件按 `fade` 显示。
 - `fade`：全部页面统一写 `fade` 转场。
 - `auto`：按策展词表逐页轮换——`fade` → `push(direction: r)` → `wipe(direction: r)` 循环，避免整副片子全是同一种淡入。
+- `transitionMs`：转场时长，毫秒。写了就对所有 deck 级转场生效（`p14:dur`）；省略时平滑 2000，其余转场 `fast`（500）。快节奏的风格（促销、路演）取 300–500，沉稳的风格（学术、金融）取 800–1500，平滑要看清位移取 1500–2500。
 - `none`：不写任何转场。`none` 是该字段的哨兵值，**不是**转场效果 token，不可出现在 `page.transition.effect` 中。
 
 **方言差异**：生成方言按上表由 deck 级统一下发（`page.transition` 属逆向专属字段，生成方言出现 → `ProfileViolationError`）。逆向方言一律以**页级记录**为准——源文件没有转场的页保持无转场，不会被套上 deck 级的 fade 妆；此时 `export.transition` 只在 `none` 时起「全部剥掉」的作用。
