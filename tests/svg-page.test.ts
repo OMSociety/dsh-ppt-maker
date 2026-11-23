@@ -7,7 +7,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { getShapePosition, getShapeSize, getShapeText, getShapeTextAutoFit, getShapeTextWrap, getSlideCount, getSlideShapes, getSlideSize, getSlideText, getSlides, loadPresentation, validatePresentation } from '@office-kit/pptx'
+import { getShapePosition, getShapeSize, getShapeText, getShapeTextAutoFit, getShapeTextWrap, getSlideCount, getSlideMasterCount, getSlideShapes, getSlideSize, getSlideText, getSlides, isSlideBackgroundGraphicsHidden, loadPresentation, validatePresentation } from '@office-kit/pptx'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { compileSvgPage, themeHashOf } from '../src/core/svg/compiler.js'
 import { createProject, editProject, loadProject } from '../src/core/project/store.js'
@@ -120,6 +120,11 @@ describe.skipIf(!hasVenv)('svg 页轨道', () => {
     expect(getSlideText(slides[2])).toContain('尾页')
     expect(getShapePosition(getSlideShapes(slides[1])[0])).toEqual({ x: 60 * 12700, y: 60 * 12700 })
     expect(getShapeSize(getSlideShapes(slides[1])[0])).toEqual({ w: 840 * 12700, h: 420 * 12700 })
+
+    // PowerPoint 拒绝打开含两份母版引用的 deck，SVG 页必须挂在主 deck 既有版式上。
+    expect(getSlideMasterCount(pres)).toBe(1)
+    expect(isSlideBackgroundGraphicsHidden(slides[1])).toBe(true)
+    expect(isSlideBackgroundGraphicsHidden(slides[0])).toBe(false)
 
     const validation = validatePresentation(pres)
     expect(validation.filter((i) => i.severity === 'error')).toEqual([])

@@ -35,9 +35,9 @@
 
 ![DSH 深色主题中的 PPT 工作台：中间画布显示可编辑的原生条形图与表格](docs/workbench-dark.png)
 
-### 实际导出 · SVG 页面
+### 页面切换 · 平滑转场
 
-![同一工程第三页的实际导出渲染：SVG 绘制的流程页编译为可编辑的文本与形状](docs/export-svg.png)
+![三页之间的平滑转场：导出成 .pptx 后在 PowerPoint 里播放的真实录屏](docs/export-morph.gif)
 
 ## 快速开始
 

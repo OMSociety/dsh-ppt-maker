@@ -80,6 +80,7 @@ import {
   setShapeTextMargins,
   setShapeTextWrap,
   setSlideBackground,
+  setSlideBackgroundGraphicsHidden,
   setSlideBackgroundGradientFill,
   setSlideBackgroundPatternFill,
   setShapePatternFill,
@@ -2096,6 +2097,34 @@ const AUTO_TRANSITION_CURATED: ReadonlyArray<{ effect: string; direction?: strin
   { effect: 'wipe', direction: 'r' }
 ]
 
+/**
+ * SVG 页并入主 deck 时挂接的版式。
+ *
+ * 编成页自带完整版面（底色与全部形状都在页上），只借用主 deck 的版式来避开
+ * 第二套母版：PowerPoint 打开含两份母版引用的 deck 会报文件损坏，而
+ * `importSlide` 默认会带进源文档的母版/版式/主题。因此一律显式指定目标版式，
+ * 再隐藏版式与母版装饰（`setSlideBackgroundGraphicsHidden`）。
+ */
+function svgPageLayoutOf(
+  pres: PresentationData,
+  page: Page,
+  layoutByName: Map<string, SlideLayoutData>,
+  layoutByPart: Map<string, SlideLayoutData>
+): SlideLayoutData | undefined {
+  const name = page.layoutRef?.name
+  if (name) {
+    const layout = layoutByName.get(name)
+    if (layout) return layout
+  }
+  const part = page.layoutRef?.partName
+  if (part) {
+    const layout = layoutByPart.get(part)
+    if (layout) return layout
+  }
+  // 没有声明版式时借用主 deck 的第一个版式：它属于已存在的母版，不会多出母版。
+  return getSlideLayouts(pres)[0]
+}
+
 /** deck 级转场的时长（毫秒）：`export.transitionMs` 优先；缺省时平滑为 2000，其余转场为 700。 */
 function transitionDurationOf(effect: string, configured: number | undefined): number {
   if (configured !== undefined) return configured
@@ -2495,7 +2524,9 @@ export function createOfficeKitEngine(): DeckEngine {
           if (srcSlides.length !== 1) {
             throw new Error(`${pageLabel}：svg 编译产物页数异常（${srcSlides.length}）`)
           }
-          const slide = importSlide(pres, srcSlides[0])
+          const slide = importSlide(pres, srcSlides[0], svgPageLayoutOf(pres, page, layoutByName, layoutByPart))
+          // 编成页自带完整版面（含底色与全部形状），不继承母版/版式装饰。
+          setSlideBackgroundGraphicsHidden(slide, true)
           slides.push(slide)
           shapesPerPage.set(pageIndex, new Map())
           for (const family of compiled.fonts) fonts.add(family)

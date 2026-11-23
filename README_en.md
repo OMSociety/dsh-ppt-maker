@@ -33,9 +33,9 @@ The plugin also ships the `ppt-maker` skill, with 30 design systems across five 
 
 ![The PPT Workbench in the DSH dark theme: the canvas shows an editable native bar chart and table](docs/workbench-dark.png)
 
-### Actual export · SVG page
+### Page transitions · morph
 
-![The actual exported rendering of the project's third page: an SVG flow page compiled into editable text and shapes](docs/export-svg.png)
+![Morph transitions between the three pages, recorded from the exported .pptx playing in PowerPoint](docs/export-morph.gif)
 
 ## Quick start
 
