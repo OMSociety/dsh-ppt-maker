@@ -2119,7 +2119,7 @@ interface ReportDroppedEntry {
 }
 
 type DroppedOriginalType =
-  | "chart"      // 无法映射为 chart 元素的原生图表（散点、雷达、股价、曲面、三维等，见 §10.5）
+  | "chart"      // 无法映射为 chart 元素的原生图表（股价、曲面、三维等，见 §10.5）
   | "smartArt"   // 缺少绘图缓存、无法展开的 SmartArt 图示（§10.6）
   | "group"      // 组合（子形状展平见 §6.8；展平失败/空组合时容器落此类）
   | "media"      // 音频/视频
@@ -2226,7 +2226,7 @@ interface DeckSource {
 
 ### 10.5 原生图表映射
 
-二维的柱形、条形、折线、面积（含组合与堆叠）、饼图与环形图映射为 `chart` 元素（§6.7），其余类型（散点、气泡、雷达、股价、曲面、任何三维图表）落 dropped + placeholder。映射规则：
+二维的柱形、条形、折线、面积（含组合与堆叠）、饼图与环形图、散点、气泡与雷达映射为 `chart` 元素（§6.7），其余类型（股价、曲面、任何三维图表）落 dropped + placeholder。映射规则：
 
 1. `data.cols` 首列固定为 `类别`，其后每个系列一列，列名取系列名（空名为 `系列N`，重名追加序号）；缺失值写 `null`；
 2. 条形图（横向）写 `yAxis.type: "category"`，系列 `encode.x` 为数值列、`encode.y` 为 `类别`；其余直角坐标图 `encode.x` 为 `类别`；
@@ -2234,7 +2234,9 @@ interface DeckSource {
 4. 系列色与逐点色从图表部件解析（主题色与亮度变换、渐变取首个色标）→ 柱的 `fill`、折线与面积的 `lineColor`；柱 / 面积系列、饼切片与图表容器背景的图案填充 → `PatternFill`（预设与前景 / 背景色原样写入），容器背景 → `fill`；坐标轴隐藏 → `show: false`，数值轴无主网格线 → `gridLine: false`；平滑折线 → `smooth: true`；数值轴的 min / max 原样写入；绘图区手动位置 → `plotLayout`；分类间距 `gapWidth` 换算为 `barWidth = 100 / (100 + gapWidth)`；
 5. 饼图 → `pie` 系列；环形图另写 `innerRadius = holeSize / 100`（限定在 [0.1, 0.9]）；首扇区角度 → `startAngle`；逐点颜色齐全时 → `fill` 数组；
 6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入）；饼 / 环形图的逐点标签（隐藏、手动位置、字号、颜色、加粗）→ `dataLabels.points`；
-7. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
+7. 散点 / 气泡没有类目列：每个系列占相邻的 `{系列名} X`、`{系列名}`（气泡再加 `{系列名} 大小`）列，行按点序号对齐，较短系列补 `null`；系列 `encode` 指向这些列；标记形状（圆形以外）与大小（pt 换算为 px）写入 `marker`，气泡按宽度表示大小 → `sizeScale: "linear"`；散点连线样式记 degraded（feature `unknown`），按仅标记落盘；
+8. 雷达沿用 `类别` 列放辐条标签，每个系列一列；填充雷达 → `areaColor`，轮廓 / 带标记雷达 → `areaColor: false`；数值轴的 min / max / 隐藏 / 无网格线 → `spokeAxis`。生成时雷达的样式由全部系列共同决定：只要有一个系列填充，整图按填充雷达写；
+9. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
 
 图表的字体、网格线样式、坐标轴格式、数据表与趋势线等细节不进入 PPTD；所在页未改动时整页沿用源存档（§10.4），这些细节随之保留。落 placeholder 的图表在所在页重建时按占位直通拷回原件。
 

@@ -93,14 +93,16 @@ export async function buildFixturePptx(): Promise<Uint8Array> {
   return savePresentation(pres)
 }
 
-export async function buildChartPptx(kind: 'column' | 'radar' = 'column'): Promise<Uint8Array> {
+export async function buildChartPptx(kind: 'column' | 'stock' = 'column'): Promise<Uint8Array> {
   const pres = createPresentation({ size: '16:9' })
   const slide = addBlankSlide(pres)
   addSlideChart(slide, {
     spec: ({
       kind,
       categories: ['Q1', 'Q2', 'Q3'],
-      series: [{ name: 'Series 1', values: [10, 20, 30] }]
+      series: kind === 'stock'
+        ? [{ name: 'High', values: [12, 22, 32] }, { name: 'Low', values: [8, 18, 28] }, { name: 'Close', values: [10, 20, 30] }]
+        : [{ name: 'Series 1', values: [10, 20, 30] }]
     }) as ChartSpec,
     x: emu(100 * 12700),
     y: emu(100 * 12700),

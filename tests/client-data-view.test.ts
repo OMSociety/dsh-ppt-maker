@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { scatterModelOf, bubbleModelOf, radarModelOf, bubbleRadius } from '../client/render/chart-xy-model'
 import { chartModelOf } from '../client/render/chart-model'
 import { patternTileOf } from '../client/render/pattern-svg'
 // @ts-expect-error 根 tsconfig 不启用 JSX；组件由 tsconfig.client.json 完整校验。
@@ -288,5 +289,58 @@ describe('ChartView · 图案填充与逐点标签', () => {
     })
     expect(model[0].pattern).toEqual({ preset: 'ltUpDiag', foreground: '#005193', background: '#ffffff' })
     expect(model[0].color).toBe('#005193')
+  })
+})
+
+describe('ChartView · scatter / bubble / radar', () => {
+  const size = { width: 400, height: 240 }
+  const scatter = {
+    type: 'scatter',
+    data: { cols: ['a', 'b', 'c', 'd'], rows: [[1, 10, 5, 2], [2, 20, 6, 4], [3, 30, 7, 8]] },
+    series: [{ type: 'scatter', name: 'S', encode: { x: 'a', y: 'b' } }, { type: 'scatter', name: 'T', encode: { x: 'c', y: 'd' } }],
+    xAxis: { min: 0, max: 10 },
+  }
+
+  it('散点：各系列取自己的 x/y 列，轴范围读 xAxis', () => {
+    const m = scatterModelOf(scatter, null, size)!
+    expect(m.series).toHaveLength(2)
+    expect(m.series[0].points.map((p) => [p.x, p.y])).toEqual([[1, 10], [2, 20], [3, 30]])
+    expect(m.series[1].points.map((p) => [p.x, p.y])).toEqual([[5, 2], [6, 4], [7, 8]])
+    expect([m.xAxis.min, m.xAxis.max]).toEqual([0, 10])
+    expect(m.series[0].points[0].px).toBeLessThan(m.series[0].points[2].px)
+    expect(chartSvg(scatter)).toContain('<circle')
+  })
+
+  it('气泡：sqrt/linear 缩放，size 负值半径为 0', () => {
+    expect(bubbleRadius(25, 100, 'sqrt', [0, 20])).toBeCloseTo(10)
+    expect(bubbleRadius(25, 100, 'linear', [0, 20])).toBeCloseTo(5)
+    expect(bubbleRadius(-5, 100, 'sqrt', [0, 20])).toBe(0)
+    const m = bubbleModelOf({
+      type: 'bubble',
+      data: { cols: ['x', 'y', 's'], rows: [[1, 1, 100], [2, 2, -4]] },
+      series: [{ type: 'bubble', encode: { x: 'x', y: 'y', size: 's' } }],
+    }, null, size)!
+    expect(m.series[0].points[1].r).toBe(0)
+    expect(m.series[0].points[0].r!).toBeGreaterThan(0)
+  })
+
+  const radar = (area?: unknown) => ({
+    type: 'radar',
+    data: { cols: ['k', 'v'], rows: [['A', 1], ['B', 2], ['C', 3], ['D', 4]] },
+    series: [{ type: 'radar', encode: { category: 'k', y: 'v' }, ...(area === undefined ? {} : { areaColor: area }) }],
+  })
+
+  it('雷达：辐条数与角度，areaColor:false 不填充', () => {
+    const m = radarModelOf(radar(false), null, size)!
+    expect(m.spokes.map((s) => s.angle)).toEqual([0, 90, 180, 270])
+    expect(m.series[0].area).toBe(false)
+    expect(radarModelOf(radar(), null, size)!.series[0].area).not.toBe(false)
+    expect(chartSvg(radar(false))).toContain('<path')
+  })
+
+  it('混排降级提示且不抛错', () => {
+    const mixed = { ...scatter, series: [scatter.series[0], { type: 'bar', encode: { x: 'a', y: 'b' } }] }
+    expect(() => chartSvg(mixed)).not.toThrow()
+    expect(chartSvg(mixed)).toContain('导出后查看')
   })
 })

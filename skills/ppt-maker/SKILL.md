@@ -118,6 +118,7 @@ description: 设计、生成、重做与导出 PPT 演示文稿：从内容出�
 - **线条**：`line` 必须给 `viewBox` 与 `points`（至少两点）；粗斜线用细长的 `custom` 平行四边形更可控。
 - **横向条形图**：`yAxis.type: "category"`，系列的 `encode.x` 指向数值列、`encode.y` 指向类目列。要每个类目一种颜色：每个类目建一个系列、同设 `stack: "value"`，数据行里其他系列的格子留 `null`。关图例用 `legend.show: false`，标数值用 `dataLabels.show: true`。
 - **图表填充与逐点标签**：柱、面积、饼的系列填充可写图案；饼图的 `dataLabels.points` 能给单个切片换位置、字号与颜色——把一个点的标签用 `offset` 挪到环中心、其余点 `show: false`，就成了环中央的大字；数字长又离切片远时补 `size: {w, h}` 给足标签框，否则会逐字折行。图表的绘图区位置写 `plotLayout`。
+- **散点 / 气泡 / 雷达**：散点、气泡每个系列各有 `encode.x`、`encode.y`（气泡再加 `size`），一张长表可用 `dataFilter: {col, value}` 按列值分成多个系列；`marker: {shape, size, fill}` 控制标记。雷达用 `encode.category` 放辐条、每个系列一列数值，`areaColor: false` 只画轮廓，数值范围写 `spokeAxis: {min, max}`。这三类只能与自己同类的系列同图，混排会落成占位。
 - **表格**：`rows` 是二维数组，`columnWidths`、`rowHeights` 是比例且各自加起来为 1，`rowHeights` 的项数等于行数。只要底部细横线：`border: [null, null, {style: solid, width: 1, color: "#c4bcab"}, null]`（顺序为上、右、下、左）。表格不能旋转。
 - **图片**：放进 `media/` 再用相对路径引用；保持原始宽高比，**严禁拉伸变形**。配图优先级：用户材料 → 官方来源 → 检索到的真实图片 → 生成图；不放与页面结论无关的凑数图。
 

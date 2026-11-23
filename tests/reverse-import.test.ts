@@ -9,7 +9,7 @@
  * Two fixtures cover the spec §10 mapping matrix:
  *   - reverse-fixture.pptx: text with multiple paragraph runs + shape with
  *     adjustments + image with crop + merged-cell table + connector;
- *   - reverse-chart.pptx: a chart whose type has no PPTD mapping (radar) so we
+ *   - reverse-chart.pptx: a chart whose type has no PPTD mapping (stock) so we
  *     can assert `dropped` and the grey 占位 shape sitting where it used to be.
  */
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
@@ -125,7 +125,7 @@ describe('reverse engine（PPTX → PPTD 逆向）', () => {
   })
 
   it('无法映射的图表走 dropped：占位形状插回原位置 + 报告记录', async () => {
-    const bytes = await buildChartPptx('radar')
+    const bytes = await buildChartPptx('stock')
     const result = await reverseImport({
       cwd,
       source: bytes,

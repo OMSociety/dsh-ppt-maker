@@ -1302,7 +1302,10 @@ function mapLine(rec: ReverseShapeRecord, pres: PresentationData, report: Import
   return element
 }
 
-const CHART_KINDS = new Set(['bar', 'column', 'line', 'area', 'pie', 'doughnut'])
+const CHART_KINDS = new Set(['bar', 'column', 'line', 'area', 'pie', 'doughnut', 'scatter', 'bubble', 'radar'])
+
+/** 库的标记符号 → PPTD `marker.shape`；其余符号（星、叉、加号等）没有对应写法，回落默认圆。 */
+const PPTD_MARKER_SHAPES: Record<string, string> = { circle: 'circle', square: 'rect', diamond: 'diamond', triangle: 'triangle' }
 
 /** A chart paint: a colour string or a PPTD PatternFill record. */
 type ChartPaintValue = string | Record<string, unknown>
@@ -1393,8 +1396,7 @@ function chartPaintsOf(pres: PresentationData, slidePart: string, shape: SlideSh
   try {
     const rid = /<c:chart\b[^>]*\br:id="([^"]+)"/.exec(getShapeXmlString(shape))?.[1]
     if (!rid) return null
-    const partObj = slideRelPart(pres, slidePart, rid); console.log('PART', slidePart, rid, partObj?.name)
-    const chartBytes = partObj?.bytes
+    const chartBytes = slideRelPart(pres, slidePart, rid)?.bytes
     if (!chartBytes) return null
     const xml = new TextDecoder().decode(chartBytes)
     const series = [...xml.matchAll(/<c:ser>([\s\S]*?)<\/c:ser>/g)].map((m) => {
@@ -1502,6 +1504,9 @@ function mapChart(
     valueAxisHidden?: boolean
     categoryAxisHidden?: boolean
     valueAxisMajorGridlines?: boolean
+    radarStyle?: 'standard' | 'marker' | 'filled'
+    scatterStyle?: string
+    bubbleSizeRepresents?: 'area' | 'width'
     plotAreaLayout?: { x: number; y: number; w: number; h: number; target?: 'inner' | 'outer' }
   }
   if (s.view3D) return null
@@ -1520,17 +1525,33 @@ function mapChart(
     used.add(name)
     return name
   })
-  const rows = src.categories.map((category, r) => [
-    category,
-    ...src.series.map((series) => {
-      const v = series.values[r]
-      return typeof v === 'number' && Number.isFinite(v) ? v : null
-    })
-  ])
+  const finiteOrNull = (v: number | null | undefined): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v : null
+  const isPoint = src.kind === 'scatter' || src.kind === 'bubble'
+  // 散点 / 气泡没有类目：每个系列占 x、y（气泡再加 size）三列，行按点序号对齐，短系列补 null。
+  const extraCol = (base: string, suffix: string): string => {
+    let name = `${base} ${suffix}`
+    for (let n = 2; used.has(name); n++) name = `${base} ${suffix}${n}`
+    used.add(name)
+    return name
+  }
+  const xNames = isPoint ? colNames.map((name) => extraCol(name, 'X')) : []
+  const sizeNames = src.kind === 'bubble' ? colNames.map((name) => extraCol(name, '大小')) : []
+  const pointCols = src.series.flatMap((_series, i) => [xNames[i], colNames[i], ...(src.kind === 'bubble' ? [sizeNames[i]] : [])])
+  const pointRows = Array.from({ length: Math.max(0, ...src.series.map((series) => series.values.length)) }, (_unused, r) =>
+    src.series.flatMap((series) => [
+      finiteOrNull(series.xValues?.[r]),
+      finiteOrNull(series.values[r]),
+      ...(src.kind === 'bubble' ? [finiteOrNull(series.bubbleSizes?.[r])] : [])
+    ])
+  )
+  const rows = isPoint
+    ? pointRows
+    : src.categories.map((category, r) => [category, ...src.series.map((series) => finiteOrNull(series.values[r]))])
   const element: Record<string, unknown> = {
     ...baseElement(rec),
     elementType: 'chart',
-    data: { cols: [categoryCol, ...colNames], rows }
+    data: { cols: isPoint ? pointCols : [categoryCol, ...colNames], rows }
   }
   if (paints?.container) element.fill = paints.container
   const isPie = src.kind === 'pie' || src.kind === 'doughnut'
@@ -1581,6 +1602,74 @@ function mapChart(
       pie.dataLabels = config
     }
     element.series = [pie]
+  } else if (isPoint) {
+    element.series = src.series.map((series, i) => {
+      const out: Record<string, unknown> = {
+        type: src.kind,
+        name: colNames[i],
+        encode: src.kind === 'bubble'
+          ? { x: xNames[i], y: colNames[i], size: sizeNames[i] }
+          : { x: xNames[i], y: colNames[i] }
+      }
+      const color = series.markerColor ?? paintColorOf(seriesColor(i))
+      if (color) out.fill = asLiteralColor(color)
+      if (src.kind === 'scatter') {
+        const marker: Record<string, unknown> = {}
+        const shape = PPTD_MARKER_SHAPES[String(series.markerSymbol)]
+        if (shape && shape !== 'circle') marker.shape = shape
+        if (typeof series.markerSizePt === 'number') marker.size = fmtNum(series.markerSizePt / 0.75)
+        if (Object.keys(marker).length > 0) out.marker = marker
+      }
+      const own = series.dataLabels ?? src.dataLabels
+      if (own && (own.showValue || own.showPercent || own.showCategory)) out.dataLabels = labelConfig()
+      return out
+    })
+    if (src.kind === 'bubble' && s.bubbleSizeRepresents === 'width') {
+      for (const series of element.series as Array<Record<string, unknown>>) series.sizeScale = 'linear'
+    }
+    if (src.kind === 'scatter' && s.scatterStyle && /line|smooth/i.test(s.scatterStyle)) {
+      report.degraded.push({
+        page: rec.slideIndex,
+        elementId: elementIdOf(rec),
+        feature: 'unknown',
+        detail: `散点图连线（${s.scatterStyle}）按仅标记落盘`
+      } as ImportReport['degraded'][number])
+    }
+    const xAxis: Record<string, unknown> = {}
+    if (s.categoryAxisHidden) xAxis.show = false
+    const yAxis: Record<string, unknown> = {}
+    if (typeof src.valueAxis?.min === 'number') yAxis.min = src.valueAxis.min
+    if (typeof src.valueAxis?.max === 'number') yAxis.max = src.valueAxis.max
+    if (s.valueAxisHidden) yAxis.show = false
+    if (s.valueAxisMajorGridlines === false) yAxis.gridLine = false
+    if (Object.keys(xAxis).length > 0) element.xAxis = xAxis
+    if (Object.keys(yAxis).length > 0) element.yAxis = yAxis
+  } else if (src.kind === 'radar') {
+    const filled = s.radarStyle === 'filled'
+    element.series = src.series.map((series, i) => {
+      const out: Record<string, unknown> = {
+        type: 'radar',
+        name: colNames[i],
+        encode: { category: categoryCol, y: colNames[i] }
+      }
+      const color = seriesColor(i)
+      const line = series.lineColor ?? paintColorOf(color)
+      if (line) out.lineColor = asLiteralColor(line)
+      if (filled) {
+        if (color) out.areaColor = color
+      } else out.areaColor = false
+      const shape = PPTD_MARKER_SHAPES[String(series.markerSymbol)]
+      if (series.markerSymbol && series.markerSymbol !== 'none') out.marker = shape && shape !== 'circle' ? { shape } : {}
+      const own = series.dataLabels ?? src.dataLabels
+      if (own && (own.showValue || own.showPercent || own.showCategory)) out.dataLabels = labelConfig()
+      return out
+    })
+    const spoke: Record<string, unknown> = {}
+    if (typeof src.valueAxis?.min === 'number') spoke.min = src.valueAxis.min
+    if (typeof src.valueAxis?.max === 'number') spoke.max = src.valueAxis.max
+    if (s.valueAxisHidden) spoke.show = false
+    if (s.valueAxisMajorGridlines === false) spoke.gridLine = false
+    if (Object.keys(spoke).length > 0) element.spokeAxis = spoke
   } else {
     const horizontal = src.kind === 'bar'
     const stack = s.grouping === 'stacked' ? 'value' : s.grouping === 'percentStacked' ? 'percent' : undefined

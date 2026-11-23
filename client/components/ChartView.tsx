@@ -7,7 +7,18 @@
  */
 import * as React from 'react'
 import type { ThemeLike } from '../render/resolve'
-import { CHART_PALETTE, chartModelOf, type ChartPatternModel, type ChartSeriesModel } from '../render/chart-model'
+import { CHART_PALETTE, chartModelOf, niceScale, type ChartPatternModel, type ChartSeriesModel } from '../render/chart-model'
+import {
+  type ChartLegendModel,
+  type ChartTitleModel,
+  type RadarChartModel,
+  type XYChartModel,
+  bubbleModelOf,
+  chartKindOf,
+  markerGeometry,
+  radarModelOf,
+  scatterModelOf,
+} from '../render/chart-xy-model'
 import { patternTileOf } from '../render/pattern-svg'
 const GRID = 'rgba(60,60,60,0.16)'
 const LABEL = '#5c5c5c'
@@ -61,21 +72,6 @@ function PatternDefs({ defs }: { defs: Array<{ id: string; pattern: ChartPattern
 
 /** 图案填充引用：有瓦片时指向 `url(#id)`，否则回落实色。 */
 export type FillOf = (paint: ChartPatternModel | undefined, color: string) => string
-
-function niceScale(values: number[], minOverride?: number, maxOverride?: number) {
-  const min = minOverride ?? Math.min(0, ...values)
-  const max = maxOverride ?? Math.max(0, ...values)
-  const span = Math.max(1, max - min)
-  const rough = span / 4
-  const power = 10 ** Math.floor(Math.log10(rough))
-  const ratio = rough / power
-  const step = (ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10) * power
-  const low = minOverride ?? Math.floor(min / step) * step
-  const high = maxOverride ?? Math.ceil(max / step) * step
-  const ticks: number[] = []
-  for (let value = low; value <= high + step * 0.001; value += step) ticks.push(Number(value.toFixed(10)))
-  return { min: low, max: high, ticks }
-}
 
 function tickText(value: number): string {
   return Math.abs(value) >= 1000 ? value.toLocaleString('zh-CN') : String(value)
@@ -383,6 +379,177 @@ function PieChart({
   )
 }
 
+function lineProps(style: { color?: string; width?: number; dash?: string } | undefined, color: string, width = 1) {
+  return {
+    stroke: style?.color ?? color,
+    strokeWidth: style?.width ?? width,
+    ...(style?.dash ? { strokeDasharray: style.dash } : {}),
+  }
+}
+
+function ChartTitleAndLegend({ title, legend }: { title?: ChartTitleModel; legend?: ChartLegendModel }) {
+  return (
+    <>
+      {title && (
+        <text
+          x={title.x}
+          y={title.y}
+          textAnchor="middle"
+          fontSize={title.fontSize}
+          fontWeight={600}
+          fill={title.color ?? '#333'}
+          {...(title.fontFamily ? { fontFamily: title.fontFamily } : {})}
+        >{title.text}</text>
+      )}
+      {legend?.items.map((item, index) => (
+        <g key={`legend:${index}`}>
+          <rect x={item.swatchX} y={item.swatchY} width={10} height={10} rx={2} fill={item.color} />
+          <text
+            x={item.textX}
+            y={item.textY}
+            fontSize={legend.fontSize}
+            fill={legend.color ?? LABEL}
+            {...(legend.fontFamily ? { fontFamily: legend.fontFamily } : {})}
+          >{item.name}</text>
+        </g>
+      ))}
+    </>
+  )
+}
+
+function XYChart({ model }: { model: XYChartModel }) {
+  const clipId = `pptd-xy-clip-${React.useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+  const { plot, xAxis, yAxis } = model
+  const xText = { fontSize: xAxis.fontSize ?? 9, fill: xAxis.color ?? LABEL, ...(xAxis.fontFamily ? { fontFamily: xAxis.fontFamily } : {}) }
+  const yText = { fontSize: yAxis.fontSize ?? 9, fill: yAxis.color ?? LABEL, ...(yAxis.fontFamily ? { fontFamily: yAxis.fontFamily } : {}) }
+  const tickLabel = (value: number, format?: string) => format ? formatLabel(value, format) : tickText(value)
+  return (
+    <svg width={model.width} height={model.height} viewBox={`0 0 ${model.width} ${model.height}`} style={{ display: 'block' }}>
+      <defs>
+        <clipPath id={clipId}><rect x={plot.left} y={plot.top} width={plot.width} height={plot.height} /></clipPath>
+      </defs>
+      <ChartTitleAndLegend title={model.title} legend={model.legend} />
+      {xAxis.ticks.map((tick) => (
+        <g key={`x:${tick.value}`}>
+          {xAxis.gridLine && <line x1={tick.pos} y1={plot.top} x2={tick.pos} y2={plot.top + plot.height} {...lineProps(xAxis.gridStyle, GRID)} />}
+          {xAxis.label && <text x={tick.pos} y={plot.top + plot.height + 14} textAnchor="middle" {...xText}>{tickLabel(tick.value, xAxis.numberFormat)}</text>}
+        </g>
+      ))}
+      {yAxis.ticks.map((tick) => (
+        <g key={`y:${tick.value}`}>
+          {yAxis.gridLine && <line x1={plot.left} y1={tick.pos} x2={plot.left + plot.width} y2={tick.pos} {...lineProps(yAxis.gridStyle, GRID)} />}
+          {yAxis.label && <text x={plot.left - 5} y={tick.pos + 3} textAnchor="end" {...yText}>{tickLabel(tick.value, yAxis.numberFormat)}</text>}
+        </g>
+      ))}
+      {xAxis.axisLine && <line x1={plot.left} y1={plot.top + plot.height} x2={plot.left + plot.width} y2={plot.top + plot.height} {...lineProps(xAxis.axisStyle, 'rgba(0,0,0,0.45)')} />}
+      {yAxis.axisLine && <line x1={plot.left} y1={plot.top} x2={plot.left} y2={plot.top + plot.height} {...lineProps(yAxis.axisStyle, 'rgba(0,0,0,0.45)')} />}
+      <g clipPath={`url(#${clipId})`}>
+        {model.series.map((series, seriesIndex) => {
+          // 大气泡先画，小气泡留在上层。
+          const points = series.kind === 'bubble'
+            ? [...series.points].sort((a, b) => (b.r ?? 0) - (a.r ?? 0))
+            : series.points
+          return (
+            <g key={`${series.name}:${seriesIndex}`}>
+              {points.map((point, index) => {
+                const common = {
+                  fill: series.color,
+                  fillOpacity: series.opacity,
+                  ...(series.border ? lineProps(series.border, '#000') : {}),
+                }
+                if (series.kind === 'bubble') {
+                  return <circle key={index} cx={point.px} cy={point.py} r={point.r ?? 0} {...common} />
+                }
+                const geo = markerGeometry(series.marker!.shape, point.px, point.py, series.marker!.size)
+                return geo.type === 'circle'
+                  ? <circle key={index} cx={geo.cx} cy={geo.cy} r={geo.r} {...common} />
+                  : <polygon key={index} points={geo.points} {...common} />
+              })}
+            </g>
+          )
+        })}
+      </g>
+      {model.series.map((series, seriesIndex) => {
+        const labels = series.dataLabels
+        if (!labels?.show) return null
+        const fontSize = labels.fontSize ?? 10
+        return series.points.map((point, index) => (
+          <text
+            key={`label:${seriesIndex}:${index}`}
+            x={point.labelX}
+            y={series.labelPlacement === 'center' ? point.labelY + fontSize / 3 : point.labelY}
+            textAnchor="middle"
+            fontSize={fontSize}
+            fill={labels.color ?? LABEL}
+            {...(labels.fontFamily ? { fontFamily: labels.fontFamily } : {})}
+          >{formatLabel(point.value, labels.numberFormat)}</text>
+        ))
+      })}
+    </svg>
+  )
+}
+
+function RadarChart({ model }: { model: RadarChartModel }) {
+  const { axis } = model
+  const ringText = { fontSize: axis.fontSize ?? 9, fill: axis.color ?? LABEL, ...(axis.fontFamily ? { fontFamily: axis.fontFamily } : {}) }
+  return (
+    <svg width={model.width} height={model.height} viewBox={`0 0 ${model.width} ${model.height}`} style={{ display: 'block' }}>
+      <ChartTitleAndLegend title={model.title} legend={model.legend} />
+      {axis.gridLine && model.rings.map((ring) => (
+        <polygon key={`ring:${ring.value}`} points={ring.points} fill="none" {...lineProps(axis.gridStyle, GRID)} />
+      ))}
+      {axis.axisLine && model.spokes.map((spoke) => (
+        <line key={`spoke:${spoke.index}`} x1={model.cx} y1={model.cy} x2={spoke.x} y2={spoke.y} {...lineProps(axis.axisStyle, GRID)} />
+      ))}
+      {model.spokes.map((spoke) => (
+        <text key={`label:${spoke.index}`} x={spoke.labelX} y={spoke.labelY} textAnchor={spoke.anchor} fontSize={10} fill={LABEL}>{spoke.label}</text>
+      ))}
+      {axis.label && model.rings.map((ring) => (
+        <text key={`tick:${ring.value}`} x={ring.labelX} y={ring.labelY} {...ringText}>
+          {axis.numberFormat ? formatLabel(ring.value, axis.numberFormat) : tickText(ring.value)}
+        </text>
+      ))}
+      {model.series.map((series, seriesIndex) => (
+        <g key={`${series.name}:${seriesIndex}`}>
+          {series.area !== false && series.fills.map((d, index) => (
+            <path key={`fill:${index}`} d={d} fill={series.area ? series.area.color : 'none'} fillOpacity={series.area ? series.area.opacity : 0} stroke="none" />
+          ))}
+          {series.outlines.map((d, index) => (
+            <path
+              key={`line:${index}`}
+              d={d}
+              fill="none"
+              stroke={series.color}
+              strokeWidth={series.width}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              {...(series.dash ? { strokeDasharray: series.dash } : {})}
+            />
+          ))}
+          {series.marker && series.points.map((point, index) => {
+            if (!point) return null
+            const geo = markerGeometry(series.marker!.shape, point.x, point.y, series.marker!.size)
+            const common = { fill: series.marker!.color, ...(series.marker!.border ? lineProps(series.marker!.border, '#000') : {}) }
+            return geo.type === 'circle'
+              ? <circle key={`m:${index}`} cx={geo.cx} cy={geo.cy} r={geo.r} {...common} />
+              : <polygon key={`m:${index}`} points={geo.points} {...common} />
+          })}
+          {series.dataLabels?.show && series.points.map((point, index) => point && (
+            <text
+              key={`v:${index}`}
+              x={point.labelX}
+              y={point.labelY + (series.dataLabels!.fontSize ?? 10) / 3}
+              textAnchor="middle"
+              fontSize={series.dataLabels!.fontSize ?? 10}
+              fill={series.dataLabels!.color ?? LABEL}
+              {...(series.dataLabels!.fontFamily ? { fontFamily: series.dataLabels!.fontFamily } : {})}
+            >{formatLabel(point.value, series.dataLabels!.numberFormat)}</text>
+          ))}
+        </g>
+      ))}
+    </svg>
+  )
+}
 function useElementSize() {
   const ref = React.useRef<HTMLDivElement>(null)
   const [size, setSize] = React.useState({ width: 400, height: 240 })
@@ -404,34 +571,44 @@ function useElementSize() {
 }
 
 export function ChartView({ content, theme }: { content: Record<string, unknown>; theme?: ThemeLike | null }) {
-  const model = chartModelOf(content, theme)
+  const kind = chartKindOf(content)
   const { ref, width, height } = useElementSize()
+  const model = React.useMemo(
+    () => kind === 'classic' || kind === 'mixed' ? chartModelOf(content, theme) : [],
+    [content, theme, kind]
+  )
   const paints = React.useMemo(
     () => model.flatMap((series) => [series.pattern, ...series.points.map((point) => point.paint?.pattern)]),
     [model]
   )
   const patterns = usePatternDefs(paints)
-  if (!model.length) {
-    return <div style={{ fontSize: 12, color: '#6b7280', padding: 8 }}>图表无有效数据</div>
+  const note = (text: string) => <div style={{ fontSize: 12, color: '#6b7280', padding: 8 }}>{text}</div>
+  const wrap = (body: React.ReactNode) => (
+    <div ref={ref} style={{ width: '100%', height: '100%', overflow: 'hidden' }}>{body}</div>
+  )
+  if (kind === 'scatter' || kind === 'bubble') {
+    const xy = (kind === 'scatter' ? scatterModelOf : bubbleModelOf)(content, theme, { width, height })
+    return wrap(xy ? <XYChart model={xy} /> : note('图表无有效数据'))
   }
-  const kind = model[0].kind
-  const isPie = kind === 'pie' || kind === 'doughnut'
+  if (kind === 'radar') {
+    const radar = radarModelOf(content, theme, { width, height })
+    return wrap(radar ? <RadarChart model={radar} /> : note('图表无有效数据'))
+  }
+  if (!model.length) return note('图表无有效数据')
+  const first = model[0].kind
+  const isPie = first === 'pie' || first === 'doughnut'
   const supported = isPie || model.every((series) => ['bar', 'line', 'area'].includes(series.kind))
   const fillOf = (paint: ChartPatternModel | undefined, color: string) => {
     const id = paint ? patterns.idOf(paint) : undefined
     return id ? `url(#${id})` : color
   }
-  return (
-    <div ref={ref} style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-      {isPie ? (
-        <PieChart series={model[0]} width={width} height={height} fillOf={fillOf} defs={<PatternDefs defs={patterns.defs} />} />
-      ) : supported ? (
-        <CartesianChart model={model} content={content} width={width} height={height} fillOf={fillOf} defs={<PatternDefs defs={patterns.defs} />} />
-      ) : (
-        <div style={{ fontSize: 12, color: '#6b7280', padding: 8 }}>{kind} 图请在导出后查看精确外观</div>
-      )}
-    </div>
+  return wrap(
+    isPie ? (
+      <PieChart series={model[0]} width={width} height={height} fillOf={fillOf} defs={<PatternDefs defs={patterns.defs} />} />
+    ) : supported ? (
+      <CartesianChart model={model} content={content} width={width} height={height} fillOf={fillOf} defs={<PatternDefs defs={patterns.defs} />} />
+    ) : (
+      note(`${first} 图请在导出后查看精确外观`)
+    )
   )
 }
-
-

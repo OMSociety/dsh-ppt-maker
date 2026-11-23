@@ -1311,10 +1311,14 @@ function buildChart(
   }
   const [x, y, w, h] = (element.bounds as number[]) ?? [0, 0, 400, 300]
 
-  const supported = new Set(['bar', 'line', 'area', 'pie'])
+  const supported = new Set(['bar', 'line', 'area', 'pie', 'scatter', 'bubble', 'radar'])
   const firstType = String(series[0]?.type ?? '')
   if (!supported.has(firstType)) {
-    ctx.warnings.push(`${where}：图表类型 ${firstType} 暂不支持（最小集只覆盖 bar/line/area/pie），落为占位`)
+    ctx.warnings.push(`${where}：图表类型 ${firstType} 无原生图表写法（原生支持 bar/line/area/pie/scatter/bubble/radar），落为占位；需要时改用 SVG 页`)
+    return buildPlaceholder(slide, { ...element, originalType: 'chart' }, resolver, ctx, new Set())
+  }
+  if (SINGLE_KIND_CHARTS.has(firstType) && series.some((s) => s.type !== firstType)) {
+    ctx.warnings.push(`${where}：${firstType} 图表不能与其他系列类型混排，落为占位`)
     return buildPlaceholder(slide, { ...element, originalType: 'chart' }, resolver, ctx, new Set())
   }
 
@@ -1431,6 +1435,11 @@ function chartDataLabelsOf(
 function applyChartFrameOptions(spec: Record<string, unknown>, element: Record<string, unknown>): void {
   const legend = element.legend
   if (legend === false || chartRecordOf(legend).show === false) spec.legend = { position: null }
+  else {
+    const side = chartRecordOf(legend).position
+    const position = side === 'top' ? 't' : side === 'left' ? 'l' : side === 'right' ? 'r' : 'b'
+    spec.legend = { position }
+  }
 
   const plotLayout = chartRecordOf(element.plotLayout)
   if (['x', 'y', 'w', 'h'].every((k) => typeof plotLayout[k] === 'number')) {
@@ -1467,7 +1476,7 @@ function applyCartesianChartOptions(
   if (categoryAxis.axisLine === false) spec.categoryAxisLineHidden = true
   if (valueAxis.axisLine === false) spec.valueAxisLineHidden = true
   if (categoryAxis.gridLine === false) spec.categoryAxisMajorGridlines = false
-  if (valueAxis.gridLine === false) spec.valueAxisMajorGridlines = false
+  spec.valueAxisMajorGridlines = valueAxis.gridLine !== false
 
   const categoryLabelStyle = chartTextStyleOf(categoryAxis.label, resolver)
   const valueLabelStyle = chartTextStyleOf(valueAxis.label, resolver)
@@ -1554,6 +1563,9 @@ function chartSpecOf(
     return pieSpec
   }
 
+  if (firstType === 'scatter' || firstType === 'bubble') return pointChartSpecOf(element, data, series, firstType, resolver, ctx, where)
+  if (firstType === 'radar') return radarChartSpecOf(element, data, series, resolver, ctx, where)
+
   const horizontal = firstType === 'bar' && chartRecordOf(element.yAxis).type === 'category'
   const kind = firstType === 'bar' ? (horizontal ? 'bar' : 'column') : firstType
   const mappedSeries = series.map((s, seriesPos) => {
@@ -1596,6 +1608,160 @@ function chartSpecOf(
     series: mappedSeries.map((s) => s!.out)
   }
   applyCartesianChartOptions(spec, element, series, horizontal, resolver)
+  return spec
+}
+
+/** 这几类图表的系列只能同类，不与柱 / 线 / 面积混排。 */
+const SINGLE_KIND_CHARTS = new Set(['pie', 'scatter', 'bubble', 'radar'])
+
+const MARKER_SYMBOLS: Record<string, 'circle' | 'square' | 'diamond' | 'triangle'> = {
+  circle: 'circle',
+  rect: 'square',
+  diamond: 'diamond',
+  triangle: 'triangle'
+}
+
+/** 标记大小：PPTD 的 px → 库的 pt（96dpi），限定在 OOXML 允许的 2–72。 */
+function markerSizePtOf(px: unknown): number | undefined {
+  if (typeof px !== 'number' || !Number.isFinite(px) || px <= 0) return undefined
+  return Math.min(72, Math.max(2, Math.round(px * 0.75)))
+}
+
+function chartColorOf(value: unknown, resolver: ThemeResolver): string | undefined {
+  if (value === undefined || value === null || typeof value === 'boolean') return undefined
+  if (typeof value === 'object' && (value as { type?: unknown }).type !== undefined) return undefined
+  const color = resolver.color(value)
+  return color === undefined ? undefined : String(color)
+}
+
+/** scatter / bubble：每个系列各用自己的 x / y（/ size）列；`dataFilter` 把长表按分组筛成系列。 */
+function pointChartSpecOf(
+  element: Record<string, unknown>,
+  data: { cols: string[]; rows: Array<Array<number | string | null>> },
+  series: Array<Record<string, unknown>>,
+  kind: 'scatter' | 'bubble',
+  resolver: ThemeResolver,
+  ctx: BuildContext,
+  where: string
+): unknown {
+  const cols = data.cols
+  const colIndex = (name: unknown): number => (typeof name === 'string' ? cols.indexOf(name) : -1)
+  const mapped: Array<Record<string, unknown>> = []
+  for (const s of series) {
+    const encode = chartRecordOf(s.encode)
+    const xIdx = colIndex(encode.x)
+    const yIdx = colIndex(encode.y)
+    const sizeIdx = kind === 'bubble' ? colIndex(encode.size) : 0
+    if (xIdx < 0 || yIdx < 0 || sizeIdx < 0) {
+      ctx.warnings.push(`${where}：系列 ${String(s.name ?? '?')} 的 encode 未命中 data.cols`)
+      return null
+    }
+    const filter = chartRecordOf(s.dataFilter)
+    const filterIdx = colIndex(filter.col)
+    const rows = filterIdx >= 0 ? data.rows.filter((r) => r[filterIdx] === filter.value) : data.rows
+    const out: Record<string, unknown> = {
+      name: typeof s.name === 'string' ? s.name : String(encode.y ?? ''),
+      values: rows.map((r) => numOrNull(r[yIdx])),
+      xValues: rows.map((r) => numOrNull(r[xIdx]))
+    }
+    if (kind === 'bubble') out.bubbleSizes = rows.map((r) => Math.max(0, numOrNull(r[sizeIdx]) ?? 0))
+    const marker = chartRecordOf(s.marker)
+    const fill = chartColorOf(marker.fill, resolver) ?? chartColorOf(s.fill, resolver)
+    if (fill) out.color = fill
+    const line = chartColorOf(chartRecordOf(marker.border).color, resolver) ?? chartColorOf(chartRecordOf(s.border).color, resolver)
+    if (line) out.markerLineColor = line
+    if (kind === 'scatter') {
+      out.markerSymbol = MARKER_SYMBOLS[String(marker.shape ?? 'circle')] ?? 'circle'
+      const size = markerSizePtOf(marker.size)
+      if (size !== undefined) out.markerSizePt = size
+    }
+    if (s.dataLabels !== undefined) {
+      const dataLabels = chartDataLabelsOf(element.dataLabels, s.dataLabels, resolver)
+      if (dataLabels) out.dataLabels = dataLabels
+    }
+    mapped.push(out)
+  }
+  const spec: Record<string, unknown> = { kind, categories: [], series: mapped }
+  if (kind === 'scatter') spec.scatterStyle = 'marker'
+  if (kind === 'bubble') spec.bubbleSizeRepresents = series[0]?.sizeScale === 'linear' ? 'width' : 'area'
+  const xAxis = chartRecordOf(element.xAxis)
+  if (typeof xAxis.min === 'number' || typeof xAxis.max === 'number') {
+    ctx.warnings.push(`${where}：${kind} 图表的 xAxis.min / max 无法写入原生图表，X 轴范围由 PowerPoint 按数据自适应`)
+  }
+  applyCartesianChartOptions(spec, element, series, false, resolver)
+  return spec
+}
+
+/** radar：`encode.category` 列放辐条标签；`areaColor: false` 只画轮廓，其余按填充雷达写。 */
+function radarChartSpecOf(
+  element: Record<string, unknown>,
+  data: { cols: string[]; rows: Array<Array<number | string | null>> },
+  series: Array<Record<string, unknown>>,
+  resolver: ThemeResolver,
+  ctx: BuildContext,
+  where: string
+): unknown {
+  const cols = data.cols
+  const colIndex = (name: unknown): number => (typeof name === 'string' ? cols.indexOf(name) : -1)
+  const categoryIdx = colIndex(chartRecordOf(series[0]?.encode).category)
+  if (categoryIdx < 0) {
+    ctx.warnings.push(`${where}：radar 图表 encode.category 未命中 data.cols`)
+    return null
+  }
+  const mapped: Array<Record<string, unknown>> = []
+  let outlineOnly = true
+  let anyMarker = false
+  for (const s of series) {
+    const encode = chartRecordOf(s.encode)
+    const yIdx = colIndex(encode.y)
+    if (yIdx < 0) {
+      ctx.warnings.push(`${where}：系列 ${String(s.name ?? '?')} 的 encode 未命中 data.cols`)
+      return null
+    }
+    const out: Record<string, unknown> = {
+      name: typeof s.name === 'string' ? s.name : String(encode.y ?? ''),
+      values: data.rows.map((r) => numOrNull(r[yIdx]))
+    }
+    const line = chartColorOf(s.lineColor, resolver)
+    const area = chartColorOf(s.areaColor, resolver)
+    if (s.areaColor !== false) outlineOnly = false
+    if (area ?? line) out.color = area ?? line
+    if (line) out.lineColor = line
+    if (typeof s.width === 'number' && s.width > 0) out.lineWidthEmu = Math.round(s.width * 9525)
+    if (s.lineStyle === 'dash' || s.lineStyle === 'dot') out.lineDash = s.lineStyle
+    const marker = s.marker
+    if (marker !== undefined && marker !== false) {
+      anyMarker = true
+      out.markerSymbol = MARKER_SYMBOLS[String(chartRecordOf(marker).shape ?? 'circle')] ?? 'circle'
+      const size = markerSizePtOf(chartRecordOf(marker).size)
+      if (size !== undefined) out.markerSizePt = size
+    }
+    if (s.dataLabels !== undefined) {
+      const dataLabels = chartDataLabelsOf(element.dataLabels, s.dataLabels, resolver)
+      if (dataLabels) out.dataLabels = dataLabels
+    }
+    mapped.push(out)
+  }
+  const spec: Record<string, unknown> = {
+    kind: 'radar',
+    categories: data.rows.map((r) => String(r[categoryIdx] ?? '')),
+    series: mapped,
+    radarStyle: outlineOnly ? (anyMarker ? 'marker' : 'standard') : 'filled'
+  }
+  const spoke = chartRecordOf(element.spokeAxis)
+  const scaling: Record<string, unknown> = {}
+  if (typeof spoke.min === 'number' && Number.isFinite(spoke.min)) scaling.min = spoke.min
+  if (typeof spoke.max === 'number' && Number.isFinite(spoke.max)) scaling.max = spoke.max
+  const spokeLabel = chartRecordOf(spoke.label)
+  if (typeof spokeLabel.numberFormat === 'string') scaling.numberFormat = spokeLabel.numberFormat
+  if (Object.keys(scaling).length) spec.valueAxis = scaling
+  if (spoke.show === false) spec.valueAxisHidden = true
+  if (spoke.label === false) spec.valueAxisTickLabelPos = 'none'
+  if (spoke.axisLine === false) spec.valueAxisLineHidden = true
+  spec.valueAxisMajorGridlines = spoke.gridLine !== false
+  applyChartFrameOptions(spec, element)
+  const dataLabels = chartDataLabelsOf(element.dataLabels, undefined, resolver)
+  if (dataLabels) spec.dataLabels = dataLabels
   return spec
 }
 

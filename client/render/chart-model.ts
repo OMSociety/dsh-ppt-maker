@@ -68,7 +68,7 @@ function patternOf(fill: unknown, theme?: ThemeLike | null): ChartPatternModel |
   return { preset: rec.preset, foreground, background }
 }
 
-function paintOf(fill: unknown, index: number, theme?: ThemeLike | null): ChartPaintModel {
+export function paintOf(fill: unknown, index: number, theme?: ThemeLike | null): ChartPaintModel {
   const first = Array.isArray(fill) ? fill[0] : fill
   const pattern = patternOf(first, theme)
   if (pattern) return { color: pattern.foreground, pattern }
@@ -87,7 +87,7 @@ function paintOf(fill: unknown, index: number, theme?: ThemeLike | null): ChartP
   return { color: CHART_PALETTE[index % CHART_PALETTE.length] }
 }
 
-function columnIndex(cols: unknown[], name: unknown, fallback: number): number {
+export function columnIndex(cols: unknown[], name: unknown, fallback: number): number {
   if (typeof name === 'number' && Number.isInteger(name)) return name
   if (typeof name === 'string') {
     const index = cols.findIndex((col) => String(col) === name)
@@ -109,7 +109,7 @@ function labelPointOf(value: unknown, theme?: ThemeLike | null): ChartDataLabelP
   return out
 }
 
-function dataLabelModelOf(
+export function dataLabelModelOf(
   chartValue: unknown,
   seriesValue: unknown,
   theme?: ThemeLike | null
@@ -183,4 +183,54 @@ export function chartModelOf(content: Record<string, unknown>, theme?: ThemeLike
       ...(dataLabels ? { dataLabels } : {}),
     }]
   })
+}
+
+export interface NiceScale {
+  min: number
+  max: number
+  ticks: number[]
+}
+
+function round10(value: number): number {
+  return Number(value.toFixed(10))
+}
+
+/**
+ * 「整齐」刻度。默认行为（柱/线/面积）：范围含 0、跨度至少 1。
+ * `adaptive` 为真时（散点/气泡/雷达）：范围只按数据（或覆盖值）取，跨度用真实值，
+ * 允许 0.1 量级的小数据，数据全相等时前后各留 10%（或 1）。
+ */
+export function niceScale(
+  values: number[],
+  minOverride?: number,
+  maxOverride?: number,
+  adaptive = false
+): NiceScale {
+  let min = minOverride ?? (adaptive ? Math.min(...values) : Math.min(0, ...values))
+  let max = maxOverride ?? (adaptive ? Math.max(...values) : Math.max(0, ...values))
+  if (!Number.isFinite(min)) min = 0
+  if (!Number.isFinite(max)) max = min + 1
+  if (adaptive && max <= min) {
+    const pad = Math.abs(min) * 0.1 || 1
+    if (minOverride === undefined) min -= pad
+    if (maxOverride === undefined) max += pad
+    if (max <= min) max = min + 1
+  }
+  const span = adaptive ? Math.max(Number.EPSILON, max - min) : Math.max(1, max - min)
+  const rough = span / 4
+  const power = 10 ** Math.floor(Math.log10(rough))
+  const ratio = rough / power
+  const step = (ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10) * power
+  const low = minOverride ?? round10(Math.floor(min / step) * step)
+  const high = maxOverride ?? round10(Math.ceil(max / step) * step)
+  const ticks: number[] = []
+  for (let value = low; value <= high + step * 0.001; value += step) ticks.push(round10(value))
+  return { min: low, max: high, ticks }
+}
+
+/** 取数值单元格：null / 空串 / 非有限数 → undefined。 */
+export function numberOf(raw: unknown): number | undefined {
+  if (raw === null || raw === undefined || (typeof raw === 'string' && raw.trim() === '')) return undefined
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : undefined
 }

@@ -110,7 +110,7 @@ describe('源存档骨架与逐页沿用', () => {
   })
 
   it('占位直通：重建页上的 placeholder 从源存档拷回原件，并按占位 bounds 定位', async () => {
-    const bytes = await buildChartPptx('radar')
+    const bytes = await buildChartPptx('stock')
     await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
     const before = await loadProject(cwd, 'proj')
     const pageKey = String(before.deck.pages[0])
@@ -138,7 +138,7 @@ describe('源存档骨架与逐页沿用', () => {
     const chart = getSlideShapes(getSlides(pres)[0]).find((s) => isChartShape(s))
     expect(chart).toBeDefined()
     expect(getShapeBounds(chart!)).toEqual({ x: 40 * 12700, y: 50 * 12700, w: 320 * 12700, h: 200 * 12700 })
-    expect(getShapeChartSpec(chart!)?.kind).toBe('radar')
+    expect(getShapeChartSpec(chart!)?.kind).toBe('stock')
   })
 
   it('重排与删页：按指纹逐页沿用，导出页序跟随 deck.pages', async () => {
