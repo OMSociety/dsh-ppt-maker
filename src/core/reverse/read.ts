@@ -22,6 +22,7 @@ import {
   getPresentationTheme,
   getShapeBoundsResolved,
   getShapeFlip,
+  getGroupChildren,
   getShapeId,
   getShapeKind,
   getShapeName,
@@ -73,8 +74,21 @@ export async function loadReverseModel(bytes: Uint8Array): Promise<ReverseReadRe
     const slideIndex = i + 1
     const layout = getSlideLayout(slide)
     const shapes: ReverseShapeRecord[] = []
-    for (const shape of getSlideShapes(slide)) {
-      collectShape(pres, shape, slideIndex, shapes, /* fromGroup */ false)
+    // getSlideShapes also lists group members; those are reached through their group.
+    // Snapshot first: ungrouping inserts the members into the live shape tree.
+    const all = [...getSlideShapes(slide)]
+    const nested = new Map<number, number>()
+    for (const shape of all) {
+      if (getShapeKind(shape) === 'group') countDescendants(shape, nested)
+    }
+    for (const shape of all) {
+      const id = getShapeId(shape)
+      const pending = nested.get(id) ?? 0
+      if (pending > 0) {
+        nested.set(id, pending - 1)
+        continue
+      }
+      collectShape(pres, shape, slideIndex, shapes, /* fromGroup */ false, undefined, [])
     }
     slides.push({
       slideIndex,
@@ -119,7 +133,8 @@ function collectShape(
   slideIndex: number,
   into: ReverseShapeRecord[],
   fromGroup: boolean,
-  groupFill?: string
+  groupFill: string | undefined,
+  groups: readonly string[]
 ): void {
   const kind = getShapeKind(shape)
   if (kind === 'group') {
@@ -128,25 +143,35 @@ function collectShape(
     // The group's own fill is read first: children marked <a:grpFill/> paint
     // with it, and the container disappears once ungrouped.
     const ownFill = groupSolidFill(pres, shape) ?? groupFill
+    const path = [...groups, `g-${slideIndex}-${getShapeId(shape)}`]
     try {
       const children = ungroupShapes(shape)
       if (children.length === 0) {
-        into.push(withGroupFill(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'), groupFill))
+        into.push(withGroup(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'), groupFill, groups))
       }
       for (const child of children) {
-        collectShape(pres, child, slideIndex, into, true, ownFill)
+        collectShape(pres, child, slideIndex, into, true, ownFill, path)
       }
       return
     } catch {
-      into.push(withGroupFill(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'), groupFill))
+      into.push(withGroup(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'), groupFill, groups))
       return
     }
   }
-  into.push(withGroupFill(baseRecord(pres, shape, slideIndex, kind, fromGroup), groupFill))
+  into.push(withGroup(baseRecord(pres, shape, slideIndex, kind, fromGroup), groupFill, groups))
 }
 
-function withGroupFill(rec: ReverseShapeRecord, groupFill: string | undefined): ReverseShapeRecord {
+/** Counts every shape id below a group (direct children only — nested groups count their own). */
+function countDescendants(group: SlideShapeData, into: Map<number, number>): void {
+  for (const child of getGroupChildren(group)) {
+    const id = getShapeId(child)
+    into.set(id, (into.get(id) ?? 0) + 1)
+  }
+}
+
+function withGroup(rec: ReverseShapeRecord, groupFill: string | undefined, groups: readonly string[]): ReverseShapeRecord {
   if (groupFill) rec.groupFill = groupFill
+  if (groups.length > 0) rec.groups = [...groups]
   return rec
 }
 

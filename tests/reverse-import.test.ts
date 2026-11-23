@@ -22,7 +22,6 @@ import {
   createPresentation,
   emu,
   getShapeId,
-  groupShapes,
   savePresentation,
   setShapeAnimation,
   setParagraphAlignment,
@@ -272,10 +271,15 @@ describe('reverse engine（PPTX → PPTD 逆向）', () => {
       h: emu(60 * 12700),
       text: '第二个组合子形状'
     })
-    groupShapes([first, second])
     setShapeAnimation(first, { effect: 'fadeIn', start: 'click' })
     const animatedShapeId = getShapeId(first)
-    const bytes = await savePresentation(pres)
+    // 库不会写出重复 id；直接改 XML，让第二个文本框沿用第一个的 id。
+    const { unzipSync, zipSync } = await import('fflate')
+    const entries = unzipSync(await savePresentation(pres))
+    const slidePath = 'ppt/slides/slide1.xml'
+    const xml = new TextDecoder().decode(entries[slidePath])
+    entries[slidePath] = new TextEncoder().encode(xml.replace(`<p:cNvPr id="${getShapeId(second)}"`, `<p:cNvPr id="${animatedShapeId}"`))
+    const bytes = zipSync(entries)
 
     await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
     const loaded = await loadProject(cwd, 'proj')

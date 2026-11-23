@@ -77,6 +77,12 @@ export function validateElementFields(element: Record<string, unknown>, path: st
       issues.push(blocker(ERROR_CODES.SchemaError, 'border.gradient 须为 GradientFill（type: gradient，至少 2 个 stops）', `${path}#border.gradient`))
     }
   }
+  if (element.group !== undefined) {
+    const g = element.group
+    if (!Array.isArray(g) || g.length === 0 || g.some((id) => typeof id !== 'string' || id === '')) {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'group 须为非空字符串数组（外层组合在前）', `${path}#group`))
+    }
+  }
   switch (element.elementType) {
     case 'text': {
       const content = element.content

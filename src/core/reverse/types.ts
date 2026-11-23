@@ -114,6 +114,8 @@ export interface ReverseShapeRecord {
    * `#RRGGBB`. Children filled with `<a:grpFill/>` paint with it.
    */
   groupFill?: string
+  /** Ids of the source groups this shape sat in, outermost first (`g-{slideIndex}-{shapeId}`). */
+  groups?: string[]
 }
 
 export interface ReverseSlideRecord {

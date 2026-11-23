@@ -44,6 +44,7 @@ import {
   getSlideShapes,
   getSlides,
   getTableCell,
+  groupShapes,
   hasShapeImage,
   importSlide,
   loadPresentation,
@@ -128,6 +129,47 @@ import type { BuildContext, DeckBuildResult, DeckEngine } from './types.js'
  * ------------------------------------------------------------------ */
 
 const PX_TO_EMU = 12700
+
+/**
+ * Element groups (spec §6.0): elements sharing `group[d]` are combined into
+ * one group shape, innermost level first, so nested groups wrap their inner
+ * groups. A level with a single member stays ungrouped.
+ */
+function applyElementGroups(
+  elements: readonly Record<string, unknown>[],
+  shapeMap: Map<string, SlideShapeData>,
+  warnings: string[],
+  pageLabel: string
+): void {
+  const levels: { id: string; depth: number }[] = []
+  const seen = new Set<string>()
+  for (const el of elements) {
+    const path = Array.isArray(el.group) ? (el.group as unknown[]) : []
+    path.forEach((id, depth) => {
+      if (typeof id === 'string' && !seen.has(id)) {
+        seen.add(id)
+        levels.push({ id, depth })
+      }
+    })
+  }
+  if (levels.length === 0) return
+  const top = new Map<string, SlideShapeData>()
+  for (const [id, shape] of shapeMap) top.set(id, shape)
+  levels.sort((a, b) => b.depth - a.depth)
+  for (const { id, depth } of levels) {
+    const memberIds = elements
+      .filter((el) => Array.isArray(el.group) && (el.group as unknown[])[depth] === id && top.has(String(el.elementId)))
+      .map((el) => String(el.elementId))
+    const shapes = [...new Set(memberIds.map((m) => top.get(m)!))]
+    if (shapes.length < 2) continue
+    try {
+      const group = groupShapes(shapes, { name: id })
+      for (const m of memberIds) top.set(m, group)
+    } catch (err) {
+      warnings.push(`${pageLabel}：组合 ${id} 未能还原（${(err as Error).message}），成员按独立元素落盘`)
+    }
+  }
+}
 
 /** Depth-first search for a shape by id, descending into groups. */
 function findShapeById(shapes: readonly SlideShapeData[], id: number): SlideShapeData | null {
@@ -2117,6 +2159,7 @@ export function createOfficeKitEngine(): DeckEngine {
           if (shape) shapeMap.set(String(record.elementId), shape)
         }
 
+        applyElementGroups(page.elements as Record<string, unknown>[], shapeMap, warnings, pageLabel)
         if (typeof page.notes === 'string' && page.notes !== '') setSlideNotes(slide, page.notes)
         if (profile === 'reverse' && page.hidden === true) setSlideHidden(slide, true)
 

@@ -697,6 +697,7 @@ interface ElementBase {
   elementId: string;    // 必填；页内唯一
   elementType: "text" | "shape" | "line" | "image" | "icon" | "table" | "chart" | "placeholder";
   bounds: [number, number, number, number];   // 必填；[x, y, w, h]，见 §1.2
+  group?: string[];     // 所属组合，外层在前；见下文
 }
 
 type Element =
@@ -711,6 +712,8 @@ type Element =
 | `text` / `shape` / `line` / `image` / `table` / `chart` | 产出 | 产出 |
 | `icon` | 产出 | 不产出（源文件里的图标按 `shape`（custGeom）或 `image` 映射） |
 | `placeholder` | 不允许 | 产出 |
+
+**组合**：`group` 列出元素所在的组合 id，外层在前。导出时同一层 id 相同的元素组合成一个组合形状，内层先组、外层再把内层组合包进去；某层只有一个成员时不组合。`bounds` 始终是画布坐标，组合不改变元素位置。逆向导入时源文件的组合拆平为成员元素，组合关系记入 `group`（id 为 `g-{slideIndex}-{shapeId}`）。两个方言都可以写 `group`。
 
 ### 6.1 Text
 

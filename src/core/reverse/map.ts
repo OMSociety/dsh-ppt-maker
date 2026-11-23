@@ -1838,6 +1838,7 @@ function mapPage(
         const baseId = element.elementId
         const elementId = uniquePageElementId(baseId, usedElementIds)
         element.elementId = elementId
+        if (rec.groups && rec.groups.length > 0) (element as Record<string, unknown>).group = [...rec.groups]
         for (let reportIndex = droppedStart; reportIndex < report.dropped.length; reportIndex += 1) {
           const dropped = report.dropped[reportIndex]
           if (dropped.placeholder?.elementId === baseId) dropped.placeholder.elementId = elementId

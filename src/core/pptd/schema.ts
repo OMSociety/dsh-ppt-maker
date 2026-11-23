@@ -539,6 +539,8 @@ export interface ElementBase {
   rotation?: number
   opacity?: number
   flip?: [boolean, boolean]
+  /** Group path, outermost first (spec §6.0). */
+  group?: string[]
   // reverse dialect provenance (§6.1)
   sourceRef?: SourceRef
   originalName?: string

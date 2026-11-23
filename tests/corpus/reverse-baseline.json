@@ -3,7 +3,7 @@
     "pages": 8,
     "sourceChars": 859,
     "keptChars": 859,
-    "pictures": 65,
+    "pictures": 42,
     "tables": 0,
     "charts": 0,
     "sourcePictures": 42,
@@ -17,7 +17,7 @@
     "pages": 7,
     "sourceChars": 790,
     "keptChars": 790,
-    "pictures": 57,
+    "pictures": 37,
     "tables": 0,
     "charts": 0,
     "sourcePictures": 37,
@@ -38,7 +38,7 @@
     "sourceTables": 0,
     "sourceCharts": 0,
     "dropped": 0,
-    "degraded": 29,
+    "degraded": 27,
     "placeholders": 0
   },
   "real-training-v2.pptx": {
@@ -52,7 +52,7 @@
     "sourceTables": 0,
     "sourceCharts": 0,
     "dropped": 0,
-    "degraded": 27,
+    "degraded": 25,
     "placeholders": 0
   },
   "real-training-v3.pptx": {
@@ -66,7 +66,7 @@
     "sourceTables": 0,
     "sourceCharts": 0,
     "dropped": 0,
-    "degraded": 30,
+    "degraded": 28,
     "placeholders": 0
   },
   "syn-academic-v1.pptx": {
@@ -94,7 +94,7 @@
     "sourceTables": 1,
     "sourceCharts": 1,
     "dropped": 0,
-    "degraded": 20,
+    "degraded": 18,
     "placeholders": 0
   },
   "syn-consulting-v1.pptx": {
@@ -122,7 +122,7 @@
     "sourceTables": 1,
     "sourceCharts": 1,
     "dropped": 0,
-    "degraded": 20,
+    "degraded": 18,
     "placeholders": 0
   },
   "syn-finance-v1.pptx": {
@@ -150,7 +150,7 @@
     "sourceTables": 1,
     "sourceCharts": 1,
     "dropped": 0,
-    "degraded": 20,
+    "degraded": 18,
     "placeholders": 0
   },
   "syn-promotion-v1.pptx": {
@@ -178,7 +178,7 @@
     "sourceTables": 1,
     "sourceCharts": 1,
     "dropped": 0,
-    "degraded": 20,
+    "degraded": 18,
     "placeholders": 0
   },
   "syn-work-v1.pptx": {
@@ -206,7 +206,7 @@
     "sourceTables": 1,
     "sourceCharts": 1,
     "dropped": 0,
-    "degraded": 20,
+    "degraded": 18,
     "placeholders": 0
   },
   "tpl-badge-blue-desens.pptx": {
@@ -220,7 +220,7 @@
     "sourceTables": 1,
     "sourceCharts": 6,
     "dropped": 1,
-    "degraded": 130,
+    "degraded": 110,
     "placeholders": 1
   },
   "tpl-badge-red-desens.pptx": {
@@ -234,7 +234,7 @@
     "sourceTables": 1,
     "sourceCharts": 6,
     "dropped": 1,
-    "degraded": 130,
+    "degraded": 110,
     "placeholders": 1
   },
   "tpl-defense-desens.pptx": {
