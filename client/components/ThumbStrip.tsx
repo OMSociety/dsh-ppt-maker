@@ -38,7 +38,7 @@ export function ThumbStrip({ store, headerAction }: { store: PptStore; headerAct
             type="button"
             className="ppt-btn"
             onClick={() => void store.actions.addPage()}
-            title="新建页面（add_page：在末尾追加一页空白页）"
+            title="在末尾新建一页空白页"
           >
             <NewPageGlyph size={13} /> 新页
           </button>
@@ -84,7 +84,7 @@ export function ThumbStrip({ store, headerAction }: { store: PptStore; headerAct
           type="button"
           className="ppt-btn"
           onClick={() => void store.actions.addPage()}
-          title="新建页面（add_page：在末尾追加一页空白页）"
+          title="在末尾新建一页空白页"
         >
           <NewPageGlyph size={13} /> 新页
         </button>
@@ -134,7 +134,7 @@ export function ThumbStrip({ store, headerAction }: { store: PptStore; headerAct
                     type="button"
                     className="ppt-btn ppt-thumb-action"
                     onClick={() => void store.actions.duplicatePage(pagePath)}
-                    title="复制这页（page_duplicate）"
+                    title="复制这一页"
                   >
                     复制
                   </button>
@@ -147,7 +147,7 @@ export function ThumbStrip({ store, headerAction }: { store: PptStore; headerAct
                         void store.actions.removePage(pagePath)
                       }
                     }}
-                    title={pages.length <= 1 ? '至少保留一页' : '删除这页（remove_page）'}
+                    title={pages.length <= 1 ? '仅剩一页' : '删除这一页'}
                   >
                     删除
                   </button>

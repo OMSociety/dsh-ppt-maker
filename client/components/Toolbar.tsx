@@ -43,7 +43,7 @@ export function Toolbar({
           className={`ppt-btn${historyOpen ? ' ppt-btn-on' : ''}`}
           disabled={disabled}
           onClick={() => onShowHistory?.()}
-          title="版本历史：预览并恢复到任意历史版本（再点一次收起）"
+          title="版本历史：预览并恢复到任意历史版本"
         >
           <HistoryGlyph size={13} /> 历史
         </button>
@@ -52,7 +52,7 @@ export function Toolbar({
           className="ppt-btn"
           disabled={disabled || !state.canUndo}
           onClick={() => void store.actions.undo()}
-          title="撤销（先提交草稿再撤）"
+          title="撤销上一步修改"
         >
           <UndoGlyph size={13} /> 撤销
         </button>

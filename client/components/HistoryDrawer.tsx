@@ -187,7 +187,7 @@ export function HistoryDrawer({ store, onClose }: { store: PptStore; onClose: ()
               className="ppt-btn ppt-btn-primary"
               disabled={busy || selected === cursor}
               onClick={() => void restore()}
-              title={selected === cursor ? '目标就是当前版本' : '把工程恢复到这个版本（与撤销同一套游标语义）'}
+              title={selected === cursor ? '当前版本' : '恢复到这个版本'}
             >
               {busy ? '恢复中…' : `恢复到此版本（r${selected}）`}
             </button>
