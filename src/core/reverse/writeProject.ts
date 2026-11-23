@@ -195,6 +195,11 @@ function remapMediaSrc(mapped: ReverseMapResult, partName: string, alias: string
         rec.src = alias
         delete rec.partName
       }
+      const fill = rec.fill as Record<string, unknown> | undefined
+      if (fill && typeof fill === 'object' && fill.partName === partName) {
+        fill.src = alias
+        delete fill.partName
+      }
     }
     const bg = page.background as Record<string, unknown> | undefined
     if (bg && typeof bg === 'object' && bg.partName === partName) {

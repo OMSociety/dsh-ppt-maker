@@ -59,4 +59,22 @@ describe('文本水平对齐', () => {
     expect(count(mixed, /algn="ctr"/g)).toBe(1)
     expect(count(mixed, /algn="r"/g)).toBe(1)
   })
+
+  it('<br> 写成段内 <a:br>：同一段、对齐与两侧 run 格式保留', async () => {
+    const xml = await xmlOf({
+      elements: [
+        {
+          ...text('br', {}),
+          content: {
+            text: '<p style="text-align:center"><span style="font-size:36px">甲</span><br><span style="font-size:44px">乙</span></p><p>丙<br>丁</p>'
+          }
+        }
+      ]
+    } as unknown as Page)
+    const body = xml.get('br')!
+    expect((body.match(/<a:p>/g) ?? []).length).toBe(2)
+    expect((body.match(/<a:br>/g) ?? []).length).toBe(2)
+    expect(body).not.toMatch(/<a:t>[^<]*\n/)
+    expect(body).toMatch(/<a:pPr[^>]*algn="ctr"[^>]*\/?>(?:<a:lnSpc>[\s\S]*?<\/a:lnSpc><\/a:pPr>)?<a:r><a:rPr[^>]*sz="3600"[\s\S]*?<a:t>甲<\/a:t><\/a:r><a:br>[\s\S]*?<a:r><a:rPr[^>]*sz="4400"[\s\S]*?<a:t>乙<\/a:t>/)
+  })
 })

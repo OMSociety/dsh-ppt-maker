@@ -19,6 +19,7 @@
 import {
   getExtendedProperties,
   getPresentationFonts,
+  getPresentationTheme,
   getShapeBoundsResolved,
   getShapeFlip,
   getShapeId,
@@ -26,6 +27,7 @@ import {
   getShapeName,
   getShapeRotation,
   getShapeText,
+  getShapeXmlString,
   getSlideAt,
   getSlideCount,
   getSlideLayout,
@@ -41,6 +43,7 @@ import {
   isSlideHidden,
   ungroupShapes,
   type PresentationData,
+  type PresentationTheme,
   type SlideData,
   type SlideShapeData
 } from '@office-kit/pptx'
@@ -115,27 +118,105 @@ function collectShape(
   shape: SlideShapeData,
   slideIndex: number,
   into: ReverseShapeRecord[],
-  fromGroup: boolean
+  fromGroup: boolean,
+  groupFill?: string
 ): void {
   const kind = getShapeKind(shape)
   if (kind === 'group') {
     // Spec §10.1: flatten when every child maps; the container itself never
     // becomes an element. ungroupShapes on a group returns its children.
+    // The group's own fill is read first: children marked <a:grpFill/> paint
+    // with it, and the container disappears once ungrouped.
+    const ownFill = groupSolidFill(pres, shape) ?? groupFill
     try {
       const children = ungroupShapes(shape)
       if (children.length === 0) {
-        into.push(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'))
+        into.push(withGroupFill(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'), groupFill))
       }
       for (const child of children) {
-        collectShape(pres, child, slideIndex, into, true)
+        collectShape(pres, child, slideIndex, into, true, ownFill)
       }
       return
     } catch {
-      into.push(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'))
+      into.push(withGroupFill(baseRecord(pres, shape, slideIndex, kind, fromGroup, 'group'), groupFill))
       return
     }
   }
-  into.push(baseRecord(pres, shape, slideIndex, kind, fromGroup))
+  into.push(withGroupFill(baseRecord(pres, shape, slideIndex, kind, fromGroup), groupFill))
+}
+
+function withGroupFill(rec: ReverseShapeRecord, groupFill: string | undefined): ReverseShapeRecord {
+  if (groupFill) rec.groupFill = groupFill
+  return rec
+}
+
+const THEME_SLOT: Record<string, keyof PresentationTheme> = {
+  dk1: 'dark1', lt1: 'light1', dk2: 'dark2', lt2: 'light2',
+  accent1: 'accent1', accent2: 'accent2', accent3: 'accent3',
+  accent4: 'accent4', accent5: 'accent5', accent6: 'accent6',
+  hlink: 'hyperlink', folHlink: 'followedHyperlink'
+}
+const DEFAULT_CLR_MAP: Record<string, string> = { bg1: 'lt1', tx1: 'dk1', bg2: 'lt2', tx2: 'dk2' }
+
+/** lumMod / lumOff / shade / tint applied to `#RRGGBB` (ECMA-376 §20.1.2.3, HSL luminance). */
+function applyTransforms(hex: string, transforms: Array<[string, number]>): string {
+  let [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+  for (const [name, raw] of transforms) {
+    const v = raw / 100000
+    if (name === 'shade') [r, g, b] = [r * v, g * v, b * v]
+    else if (name === 'tint') [r, g, b] = [r + (1 - r) * v, g + (1 - g) * v, b + (1 - b) * v]
+    else if (name === 'lumMod' || name === 'lumOff') {
+      const max = Math.max(r, g, b)
+      const min = Math.min(r, g, b)
+      let l = (max + min) / 2
+      const d = max - min
+      const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1))
+      let h = 0
+      if (d !== 0) {
+        if (max === r) h = ((g - b) / d) % 6
+        else if (max === g) h = (b - r) / d + 2
+        else h = (r - g) / d + 4
+      }
+      l = name === 'lumMod' ? l * v : l + v
+      l = Math.min(1, Math.max(0, l))
+      const c = (1 - Math.abs(2 * l - 1)) * s
+      const x = c * (1 - Math.abs((h % 2) - 1))
+      const m = l - c / 2
+      const sector = Math.floor(((h % 6) + 6) % 6)
+      const rgb = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][sector]
+      ;[r, g, b] = [rgb[0] + m, rgb[1] + m, rgb[2] + m]
+    }
+  }
+  return `#${[r, g, b].map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`
+}
+
+/**
+ * Solid fill of a group container, read from its own `<p:grpSpPr>`: children
+ * filled with `<a:grpFill/>` paint with it. Theme colours resolve through the
+ * deck theme and the default colour map; transforms apply in document order.
+ */
+function groupSolidFill(pres: PresentationData, group: SlideShapeData): string | undefined {
+  let xml: string
+  try {
+    xml = getShapeXmlString(group)
+  } catch {
+    return undefined
+  }
+  const grpSpPr = /<p:grpSpPr\b[^>]*>([\s\S]*?)<\/p:grpSpPr>/.exec(xml)?.[1]
+  const solid = grpSpPr ? /<a:solidFill>([\s\S]*?)<\/a:solidFill>/.exec(grpSpPr)?.[1] : undefined
+  if (!solid) return undefined
+  const transforms = [...solid.matchAll(/<a:(lumMod|lumOff|shade|tint)\s+val="(\d+)"/g)].map(
+    (m) => [m[1], Number(m[2])] as [string, number]
+  )
+  const srgb = /<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/.exec(solid)?.[1]
+  if (srgb) return applyTransforms(`#${srgb.toUpperCase()}`, transforms)
+  const scheme = /<a:schemeClr\s+val="(\w+)"/.exec(solid)?.[1]
+  if (!scheme) return undefined
+  const theme = getPresentationTheme(pres)
+  const slot = THEME_SLOT[DEFAULT_CLR_MAP[scheme] ?? scheme]
+  const base = theme && slot ? theme[slot] : null
+  if (!base || !/^#?[0-9A-Fa-f]{6}$/.test(base)) return undefined
+  return applyTransforms(base.startsWith('#') ? base.toUpperCase() : `#${base.toUpperCase()}`, transforms)
 }
 
 function baseRecord(

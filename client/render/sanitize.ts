@@ -60,6 +60,11 @@ export function sanitizeStyle(style: string): string {
     const value = decl.slice(idx + 1).trim()
     if (!ALLOWED_CSS.has(prop)) continue
     if (!value || CSS_VALUE_DENY.test(value)) continue
+    // PPTD 的分散对齐 distributed 不是 CSS 值：落成两端对齐且末行也撑满。
+    if (prop === 'text-align' && value.toLowerCase() === 'distributed') {
+      out.push('text-align:justify', 'text-align-last:justify')
+      continue
+    }
     out.push(`${prop}:${value}`)
   }
   return out.join(';')

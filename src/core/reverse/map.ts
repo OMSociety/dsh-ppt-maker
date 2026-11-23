@@ -16,14 +16,24 @@ import {
   getParagraphAlignment,
   getParagraphBullet,
   getParagraphLineSpacing,
+  getParagraphPropertiesEffective,
   getParagraphSpacing,
+  type ParagraphProperties,
   getShapeAdjustValues,
+  getShapeBodyPrEffective,
   getShapeAnimation,
   getShapeCustomGeometry,
+  getShapeEffectsEffective,
   getShapeFill,
+  getShapeFillColorResolved,
+  getShapeFillEffective,
+  getShapeFillOpacity,
+  getShapePatternFill,
   getShapeImageBytes,
   getShapeImageCrop,
   getShapeImagePartName,
+  getShapeGradientFill,
+  getShapeGradientFillEffective,
   getShapeImageFillBytes,
   getShapeImageOpacity,
   getShapeMedia,
@@ -32,6 +42,8 @@ import {
   getShapePreset,
   getShapeRunFormatEffective,
   getShapeStroke,
+  getShapeStrokeEffective,
+  getShapeStrokeGradient,
   getShapeStrokeArrow,
   getShapeStrokeDash,
   getShapeTextAnchor,
@@ -72,6 +84,7 @@ import {
   type SlideLayoutData,
   type SlideShapeData
 } from '@office-kit/pptx'
+import { PRESET_ADJUST_GUIDES } from '../engine/preset-adjust-guides.js'
 import {
   PLACEHOLDER_DEFAULT_LABELS,
   type Animation,
@@ -183,13 +196,18 @@ function baseElement(rec: ReverseShapeRecord): Record<string, unknown> {
  * ------------------------------------------------------------------ */
 
 const H_ALIGN_MAP: Record<string, string> = {
+  left: 'left',
+  center: 'center',
+  right: 'right',
+  justify: 'justify',
+  distribute: 'distributed',
   l: 'left',
   ctr: 'center',
   r: 'right',
   just: 'justify',
-  dist: 'distribute',
+  dist: 'distributed',
   justLow: 'justify',
-  thaiDist: 'distribute'
+  thaiDist: 'distributed'
 }
 
 // getShapeTextAnchor 返回库词汇（top/center/bottom）与 OOXML token（t/ctr/b）都可能出现，两种都收。
@@ -268,6 +286,8 @@ interface RichParagraph {
   lineSpacingPts: number | null
   spaceBeforePts: number | null
   bulletKind: 'bullet' | 'number' | null
+  /** 各文字 run 的字间距（spc，1/100 pt），未写为 null */
+  spacings: Array<number | null>
   /** 段落是否读过 run 级格式（用于 degraded 判定） */
   runsRead: boolean
 }
@@ -296,7 +316,8 @@ function readTextFit(shape: SlideShapeData): TextFit {
 function readRichParagraphs(
   pres: PresentationData,
   shape: SlideShapeData,
-  fit: TextFit = NO_FIT
+  fit: TextFit = NO_FIT,
+  onFillFlattened?: (kind: string) => void
 ): RichParagraph[] | null {
   let paraCount = 0
   try {
@@ -315,6 +336,7 @@ function readRichParagraphs(
   for (let p = 0; p < paraCount; p++) {
     const parts: string[] = []
     let runsRead = false
+    const spacings: Array<number | null> = []
     const els = elements[p] ?? []
     let runIndex = -1 // effective format 的索引只数常规 run（d.ts: numeric indices count only regular runs）
     for (const el of els) {
@@ -335,12 +357,13 @@ function readRichParagraphs(
       } catch {
         if (el.format) runsRead = true
       }
+      spacings.push(typeof fmt.spc === 'number' ? fmt.spc : null)
       parts.push(
         runToHtml(text, {
           font: typeof fmt.font === 'string' ? fmt.font : undefined,
           fontEastAsian: typeof fmt.fontEastAsian === 'string' ? fmt.fontEastAsian : undefined,
           size: typeof fmt.size === 'number' ? fmt.size * fit.fontScale : undefined,
-          color: typeof fmt.color === 'string' ? fmt.color : null,
+          color: runColorOf(fmt, onFillFlattened),
           bold: fmt.bold === true,
           italic: fmt.italic === true,
           underline: (fmt.underline as boolean | string | undefined) ?? false,
@@ -348,9 +371,17 @@ function readRichParagraphs(
         })
       )
     }
+    // 段落属性取 slide → layout → master 继承链上的有效值（spec §2.3 R4）：
+    // 占位符的居中、行距、项目符号多半写在版式/母版里，只读字面 <a:pPr> 会丢。
+    let eff: ParagraphProperties | null = null
+    try {
+      eff = getParagraphPropertiesEffective(pres, shape, p)
+    } catch {
+      eff = null
+    }
     let align: string | null = null
     try {
-      const a = getParagraphAlignment(shape, p)
+      const a = eff?.align ?? getParagraphAlignment(shape, p)
       if (a && H_ALIGN_MAP[a]) align = H_ALIGN_MAP[a]
     } catch {
       /* inherit */
@@ -358,7 +389,7 @@ function readRichParagraphs(
     let lineSpacingPct: number | null = null
     let lineSpacingPts: number | null = null
     try {
-      const ls = getParagraphLineSpacing(shape, p)
+      const ls = eff?.lineSpacing ?? getParagraphLineSpacing(shape, p)
       if (ls?.kind === 'pct') lineSpacingPct = ls.value
       else if (ls?.kind === 'pts') lineSpacingPts = ls.value
     } catch {
@@ -370,22 +401,47 @@ function readRichParagraphs(
     }
     let spaceBeforePts: number | null = null
     try {
-      const sp = getParagraphSpacing(shape, p)
-      if (typeof sp?.beforePts === 'number') spaceBeforePts = sp.beforePts
+      if (typeof eff?.spcBefPts === 'number') spaceBeforePts = eff.spcBefPts
+      else {
+        const sp = getParagraphSpacing(shape, p)
+        if (typeof sp?.beforePts === 'number') spaceBeforePts = sp.beforePts
+      }
     } catch {
       /* inherit */
     }
     let bulletKind: 'bullet' | 'number' | null = null
     try {
-      const b = getParagraphBullet(shape, p)
+      const b = eff?.bullet ?? getParagraphBullet(shape, p)
       if (b === 'bullet' || (typeof b === 'object' && b !== null && 'char' in b)) bulletKind = 'bullet'
       else if (b === 'number' || (typeof b === 'object' && b !== null && 'autoNum' in b)) bulletKind = 'number'
     } catch {
       /* inherit */
     }
-    out.push({ html: parts.join(''), align, lineSpacingPct, lineSpacingPts, spaceBeforePts, bulletKind, runsRead })
+    out.push({ html: parts.join(''), align, lineSpacingPct, lineSpacingPts, spaceBeforePts, bulletKind, spacings, runsRead })
   }
   return out
+}
+
+/**
+ * Run colour: the solid colour when there is one; a gradient or pattern text
+ * fill (PPTD runs only carry a colour) contributes its first stop / foreground.
+ */
+function runColorOf(fmt: Record<string, unknown>, onFlattened?: (kind: string) => void): string | null {
+  if (typeof fmt.color === 'string') return fmt.color
+  const fill = fmt.textFill as { kind?: string; stops?: Array<{ offset?: number; color?: string; resolvedColor?: string }>; foreground?: string } | undefined
+  if (fill?.kind === 'gradient' && fill.stops && fill.stops.length > 0) {
+    // 渐变停靠点可乱序书写，取轴起点（offset 最小）那一档作为整段文字色。
+    const stop = [...fill.stops].sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0))[0]
+    const color = stop.resolvedColor ?? stop.color
+    if (typeof color !== 'string') return null
+    onFlattened?.('gradient')
+    return color
+  }
+  if (fill?.kind === 'pattern' && typeof fill.foreground === 'string') {
+    onFlattened?.('pattern')
+    return fill.foreground
+  }
+  return null
 }
 
 /** 段落数组 → PPTD content.text 富文本字符串。 */
@@ -431,7 +487,17 @@ function mapText(
 ): Record<string, unknown> {
   const shape = rec.raw as SlideShapeData
   const fit = readTextFit(shape)
-  const rich = readRichParagraphs(pres, shape, fit)
+  const flattened = new Set<string>()
+  const rich = readRichParagraphs(pres, shape, fit, (kind) => flattened.add(kind))
+  if (flattened.size > 0) {
+    report.degraded.push({
+      page: rec.slideIndex,
+      elementId,
+      feature: 'text.gradientFill',
+      detail: '文字的渐变/图案填充按首个色标（或前景色）写成纯色',
+      originalValue: [...flattened].join(',')
+    })
+  }
   if (rich !== null && (fit.fontScale < 1 || fit.lnSpcReduction > 0)) {
     report.degraded.push({
       page: rec.slideIndex,
@@ -454,9 +520,16 @@ function mapText(
       }
     }
   }
+  // 文本框属性同样走继承链：占位符的锚点与换行多半写在版式/母版的 <a:bodyPr> 里。
+  let body: ReturnType<typeof getShapeBodyPrEffective> | null = null
+  try {
+    body = getShapeBodyPrEffective(pres, shape)
+  } catch {
+    body = null
+  }
   let vAlign = 'top'
   try {
-    const anchor = getShapeTextAnchor(shape)
+    const anchor = body?.anchor ?? getShapeTextAnchor(shape)
     if (anchor && V_ALIGN_MAP[anchor]) vAlign = V_ALIGN_MAP[anchor]
   } catch {
     /* default top */
@@ -467,11 +540,39 @@ function mapText(
     align: [hAlign, vAlign],
     wrap: (() => {
       try {
-        return getShapeTextWrap(shape) !== 'none'
+        return (body?.wrap ?? getShapeTextWrap(shape)) !== 'none'
       } catch {
         return true
       }
     })()
+  }
+  // 内边距（bodyPr l/t/r/bIns，EMU）：任一边与 Office 默认不同才写，缺失边取默认。
+  const margins = body?.margins
+  if (margins) {
+    const DEFAULT_PAD: [number, number, number, number] = [3.6, 7.2, 3.6, 7.2]
+    const sides = [margins.top, margins.right, margins.bottom, margins.left]
+    const padding = sides.map((v, i) => (typeof v === 'number' ? Math.round((v / 12700) * 100) / 100 : DEFAULT_PAD[i]))
+    if (padding.some((v, i) => Math.abs(v - DEFAULT_PAD[i]) > 0.01)) content.padding = padding
+  }
+  // 字间距在 PPTD 里是元素级（content.letterSpacing，单位与 spc/100 一致）；
+  // 全部文字 run 同值时整体写入，不一致时取出现最多的非零值并记降级。
+  const spacings = (rich ?? []).flatMap((p) => p.spacings)
+  const nonZero = spacings.filter((v): v is number => typeof v === 'number' && v !== 0)
+  if (nonZero.length > 0) {
+    const counts = new Map<number, number>()
+    for (const v of nonZero) counts.set(v, (counts.get(v) ?? 0) + 1)
+    const [dominant] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+    content.letterSpacing = Math.round(dominant) / 100
+    if (counts.size > 1 || nonZero.length < spacings.length) {
+      report.degraded.push({
+        page: rec.slideIndex,
+        elementId,
+        feature: 'text.letterSpacing',
+        originalValue: [...new Set(spacings.map((v) => v ?? 0))].join(','),
+        fallbackValue: String(content.letterSpacing),
+        detail: '各段字间距不一致，PPTD 字间距为元素级，按出现最多的值统一'
+      })
+    }
   }
   if (rich === null && rec.text !== '') {
     // run 级读不到（非文本形状或库不支持）→ 回落纯文本并记账
@@ -502,47 +603,312 @@ function mapText(
   }
 }
 
-function mapShape(rec: ReverseShapeRecord): Record<string, unknown> {
+function mapShape(
+  rec: ReverseShapeRecord,
+  pres: PresentationData,
+  media: ReverseMediaAsset[],
+  report: ImportReport
+): Record<string, unknown> {
   const shape = rec.raw as SlideShapeData
   const element: Record<string, unknown> = {
     ...baseElement(rec),
     elementType: 'shape'
   }
   element.shapeName = 'rect'
-  try {
-    const preset = getShapePreset(shape)
-    if (preset) element.shapeName = preset
-  } catch {
-    /* rect */
+  const squash = orthographicSquash(shape)
+  if (squash) {
+    // 正交相机绕 x / y 轴旋转后，平面图形在投影里只是被压扁：按 cos 缩放包围盒（中心不动）。
+    const [x, y, w, h] = element.bounds as [number, number, number, number]
+    const nw = w * squash.sx
+    const nh = h * squash.sy
+    element.bounds = [fmtNum(x + (w - nw) / 2), fmtNum(y + (h - nh) / 2), fmtNum(nw), fmtNum(nh)]
+    report.degraded.push({
+      page: rec.slideIndex,
+      elementId: elementIdOf(rec),
+      feature: 'shape.scene3d',
+      detail: '三维旋转（正交相机）按投影压扁包围盒落盘',
+      originalValue: squash.raw
+    })
+  }
+  const custom = rec.bounds ? customGeometryOf(shape, rec.bounds.w, rec.bounds.h) : null
+  if (custom) {
+    element.shapeName = 'custom'
+    element.viewBox = custom.viewBox
+    element.path = custom.path
+  } else {
+    try {
+      const preset = getShapePreset(shape)
+      if (preset) element.shapeName = preset
+    } catch {
+      /* rect */
+    }
   }
   try {
+    // 按预设定义的参数序排列；源文件没写的那一项补该预设的默认值。
     const adjustments = getShapeAdjustValues(shape)
-    const values = Object.values(adjustments).filter((v): v is number => typeof v === 'number')
-    if (values.length > 0) element.adjustments = values
+    const guides = typeof element.shapeName === 'string' ? PRESET_ADJUST_GUIDES[element.shapeName] : undefined
+    if (guides && Object.keys(adjustments).length > 0) {
+      element.adjustments = guides.map(([name, fallback]) => (typeof adjustments[name] === 'number' ? adjustments[name] : fallback))
+    }
   } catch {
     /* no adjustments */
   }
-  try {
-    const fill = getShapeFill(shape)
-    if (fill.kind === 'solid') {
-      element.fill = { type: 'solid', color: asLiteralColor(fill.color) }
-    }
-  } catch {
-    /* degrade into no-fill */
-  }
-  const border = readBorder(shape)
+  const fill = readShapeFill(rec, pres, media, report)
+  if (fill) element.fill = fill
+  const border = readBorder(shape, pres)
   if (border) element.border = border
+  const shadow = readShadow(shape, pres)
+  if (shadow) element.shadow = shadow
   return element
 }
 
-function readBorder(shape: SlideShapeData): Record<string, unknown> | null {
+/**
+ * DrawingML custGeom → PPTD custom shape (spec §6.2): every `<a:path>` is scaled from
+ * its own coordinate space (`w`/`h`, defaulting to the shape's EMU size) into a viewBox
+ * equal to the shape's px size, so the viewBox aspect always matches the bounds.
+ * `arcTo` follows ECMA-376 §20.1.9.3: the pen sits on the ellipse at `stAng`, sweeping
+ * `swAng` (60000ths of a degree, clockwise in y-down space).
+ */
+export function customGeometryOf(
+  shape: SlideShapeData,
+  widthEmu: number,
+  heightEmu: number
+): { viewBox: [number, number]; path: string } | null {
+  let geometry: ReturnType<typeof getShapeCustomGeometry>
   try {
-    const stroke = getShapeStroke(shape)
-    if (stroke.kind !== 'solid') return null
-    const border: Record<string, unknown> = {
-      style: 'solid',
-      width: typeof stroke.widthEmu === 'number' ? emuToPx(stroke.widthEmu) : 1,
-      color: asLiteralColor(stroke.color)
+    geometry = getShapeCustomGeometry(shape)
+  } catch {
+    return null
+  }
+  if (!geometry || geometry.paths.length === 0 || widthEmu <= 0 || heightEmu <= 0) return null
+  const vbW = fmtNum(emuToPx(widthEmu))
+  const vbH = fmtNum(emuToPx(heightEmu))
+  if (vbW <= 0 || vbH <= 0) return null
+  const out: string[] = []
+  const n = (v: number): string => String(Math.round(v * 100) / 100)
+  for (const geomPath of geometry.paths) {
+    const sx = vbW / (geomPath.w && geomPath.w > 0 ? geomPath.w : widthEmu)
+    const sy = vbH / (geomPath.h && geomPath.h > 0 ? geomPath.h : heightEmu)
+    let cx = 0
+    let cy = 0
+    let startX = 0
+    let startY = 0
+    for (const cmd of geomPath.commands) {
+      switch (cmd.kind) {
+        case 'moveTo':
+          cx = startX = cmd.pt.x
+          cy = startY = cmd.pt.y
+          out.push(`M${n(cx * sx)} ${n(cy * sy)}`)
+          break
+        case 'lnTo':
+          cx = cmd.pt.x
+          cy = cmd.pt.y
+          out.push(`L${n(cx * sx)} ${n(cy * sy)}`)
+          break
+        case 'quadBezTo':
+          out.push(`Q${n(cmd.pts[0].x * sx)} ${n(cmd.pts[0].y * sy)} ${n(cmd.pts[1].x * sx)} ${n(cmd.pts[1].y * sy)}`)
+          cx = cmd.pts[1].x
+          cy = cmd.pts[1].y
+          break
+        case 'cubicBezTo':
+          out.push(
+            `C${n(cmd.pts[0].x * sx)} ${n(cmd.pts[0].y * sy)} ${n(cmd.pts[1].x * sx)} ${n(cmd.pts[1].y * sy)} ${n(cmd.pts[2].x * sx)} ${n(cmd.pts[2].y * sy)}`
+          )
+          cx = cmd.pts[2].x
+          cy = cmd.pts[2].y
+          break
+        case 'arcTo': {
+          if (cmd.wR <= 0 || cmd.hR <= 0 || cmd.swAng === 0) break
+          const st = (cmd.stAng / 60000) * (Math.PI / 180)
+          const sw = (cmd.swAng / 60000) * (Math.PI / 180)
+          const centerX = cx - cmd.wR * Math.cos(st)
+          const centerY = cy - cmd.hR * Math.sin(st)
+          const emit = (from: number, span: number): void => {
+            const end = from + span
+            const ex = centerX + cmd.wR * Math.cos(end)
+            const ey = centerY + cmd.hR * Math.sin(end)
+            const large = Math.abs(span) > Math.PI ? 1 : 0
+            const sweep = span > 0 ? 1 : 0
+            out.push(`A${n(cmd.wR * sx)} ${n(cmd.hR * sy)} 0 ${large} ${sweep} ${n(ex * sx)} ${n(ey * sy)}`)
+            cx = ex
+            cy = ey
+          }
+          // A full ellipse cannot be one SVG arc (start = end); split it in two.
+          if (Math.abs(sw) >= 2 * Math.PI - 1e-9) {
+            emit(st, sw / 2)
+            emit(st + sw / 2, sw / 2)
+          } else {
+            emit(st, sw)
+          }
+          break
+        }
+        case 'close':
+          out.push('Z')
+          cx = startX
+          cy = startY
+          break
+      }
+    }
+  }
+  if (out.length === 0) return null
+  return { viewBox: [vbW, vbH], path: out.join(' ') }
+}
+
+/** `#RRGGBB` + opacity (0–1) → `#RRGGBB` or `#RRGGBBAA`. */
+/**
+ * 渐变色标颜色。带透明度时须是字面 HEX8：主题色引用（scheme:accent1）无法携带 alpha，
+ * 改用读取侧解析出的实际颜色。
+ */
+function gradientStopColor(stop: { color: string; resolvedColor?: string; opacity?: number }): string {
+  const literal = asLiteralColor(stop.color)
+  if (typeof stop.opacity !== 'number' || stop.opacity >= 1 || /^#[0-9A-Fa-f]{6}$/.test(literal)) {
+    return withAlpha(literal, stop.opacity)
+  }
+  const resolved = stop.resolvedColor ? asLiteralColor(stop.resolvedColor) : ''
+  return /^#[0-9A-Fa-f]{6}$/.test(resolved) ? withAlpha(resolved, stop.opacity) : literal
+}
+
+function withAlpha(color: string, opacity: number | null | undefined): string {
+  if (typeof opacity !== 'number' || opacity >= 1 || !/^#[0-9A-Fa-f]{6}$/.test(color)) return color
+  return `${color}${Math.round(Math.max(0, opacity) * 255).toString(16).padStart(2, '0').toUpperCase()}`
+}
+
+/** Linear blend of two `#RRGGBB` colours; `t` = share of `a`. */
+function blendHex(a: string, b: string, t: number): string {
+  const ch = (hex: string, i: number): number => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)
+  const out = [0, 1, 2].map((i) => Math.round(ch(a, i) * t + ch(b, i) * (1 - t)))
+  return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`
+}
+
+/** Share of foreground ink a preset pattern paints (pctN = N%; hatches ≈ 25%). */
+function patternInk(preset: string): number {
+  const m = /^pct(\d+)$/.exec(preset)
+  if (m) return Number(m[1]) / 100
+  if (/^(dk|wd|smGrid|lgGrid|smCheck|lgCheck|solidDmnd|shingle|plaid|sphere|weave|trellis)/.test(preset)) return 0.4
+  return 0.25
+}
+
+/**
+ * The fill the shape actually paints (spec §2.3 R4 effective values): own fill,
+ * then theme style reference and placeholder cascade (`getShapeFillEffective`),
+ * then `<a:grpFill/>` from the enclosing group. Pattern fills have no PPTD
+ * counterpart and become the solid colour they average to (recorded as degraded).
+ */
+function readShapeFill(
+  rec: ReverseShapeRecord,
+  pres: PresentationData,
+  media: ReverseMediaAsset[],
+  report: ImportReport
+): Record<string, unknown> | null {
+  const shape = rec.raw as SlideShapeData
+  let kind: string
+  try {
+    kind = getShapeFillEffective(pres, shape).kind
+  } catch {
+    return null
+  }
+  if (kind === 'inherit' && rec.groupFill) return { type: 'solid', color: rec.groupFill }
+  if (kind === 'solid') {
+    let color: string | null = null
+    try {
+      color = getShapeFillColorResolved(pres, shape)
+    } catch {
+      color = null
+    }
+    if (!color) {
+      try {
+        const own = getShapeFill(shape)
+        if (own.kind === 'solid') color = asLiteralColor(own.color)
+      } catch {
+        color = null
+      }
+    }
+    if (!color) return null
+    let opacity: number | null = null
+    try {
+      opacity = getShapeFillOpacity(shape, pres)
+    } catch {
+      opacity = null
+    }
+    return { type: 'solid', color: withAlpha(color, opacity) }
+  }
+  if (kind === 'gradient') {
+    try {
+      const gradient = getShapeGradientFillEffective(pres, shape) ?? getShapeGradientFill(shape)
+      if (!gradient || gradient.stops.length < 2) return null
+      const radial = gradient.path !== undefined && gradient.path !== 'linear'
+      return {
+        type: 'gradient',
+        gradientType: radial ? 'radial' : 'linear',
+        stops: gradient.stops.map((stop) => ({
+          position: Math.min(1, Math.max(0, stop.offset)),
+          color: gradientStopColor(stop)
+        })),
+        ...(!radial && typeof gradient.angleDeg === 'number' ? { angle: ((gradient.angleDeg % 360) + 360) % 360 } : {})
+      }
+    } catch {
+      return null
+    }
+  }
+  if (kind === 'pattern') {
+    try {
+      const pattern = getShapePatternFill(pres, shape)
+      if (!pattern || !/^#[0-9A-Fa-f]{6}$/.test(pattern.foreground) || !/^#[0-9A-Fa-f]{6}$/.test(pattern.background)) return null
+      report.degraded.push({
+        page: rec.slideIndex,
+        elementId: elementIdOf(rec),
+        feature: 'shape.patternFill',
+        detail: '图案填充按前景与背景的平均色写成纯色',
+        originalValue: `${pattern.preset} ${pattern.foreground}/${pattern.background}`
+      })
+      return { type: 'solid', color: blendHex(pattern.foreground, pattern.background, patternInk(pattern.preset)) }
+    } catch {
+      return null
+    }
+  }
+  if (kind === 'image') {
+    let bytes: Uint8Array | null = null
+    try {
+      bytes = getShapeImageFillBytes(shape)
+    } catch {
+      bytes = null
+    }
+    if (!bytes) return null
+    const ext = imageExtOf(bytes)
+    const partName = `ppt/media/fill-${rec.slideIndex}-${rec.shapeId}${ext}`
+    media.push({ bytes, ext, partName })
+    return { type: 'image', src: `media/${partName.split('/').pop()}`, fit: 'fill', partName }
+  }
+  return null
+}
+
+/** The outline the shape actually paints: own `<a:ln>`, then style reference / placeholder cascade. */
+function readBorder(shape: SlideShapeData, pres?: PresentationData): Record<string, unknown> | null {
+  try {
+    const stroke = pres ? getShapeStrokeEffective(pres, shape) : getShapeStroke(shape)
+    if (stroke.kind !== 'solid' && stroke.kind !== 'gradient') return null
+    const width = typeof stroke.widthEmu === 'number' ? emuToPx(stroke.widthEmu) : 1
+    let border: Record<string, unknown>
+    if (stroke.kind === 'gradient') {
+      const gradient = getShapeStrokeGradient(shape, pres)
+      if (!gradient || gradient.stops.length < 2) return null
+      const stops = [...gradient.stops].sort((a, b) => a.offset - b.offset)
+      border = {
+        style: 'solid',
+        width,
+        color: asLiteralColor(stops[0].color),
+        gradient: {
+          type: 'gradient',
+          gradientType: 'linear',
+          stops: stops.map((stop) => ({
+            position: Math.min(1, Math.max(0, stop.offset)),
+            color: gradientStopColor(stop)
+          })),
+          ...(typeof gradient.angleDeg === 'number' ? { angle: ((gradient.angleDeg % 360) + 360) % 360 } : {})
+        }
+      }
+    } else {
+      border = { style: 'solid', width, color: asLiteralColor(stroke.color) }
     }
     try {
       const dash = getShapeStrokeDash(shape)
@@ -556,20 +922,64 @@ function readBorder(shape: SlideShapeData): Record<string, unknown> | null {
   }
 }
 
-/** True when the shape paints a fill or an outline of its own. */
-function hasVisibleSurface(shape: SlideShapeData): boolean {
+/**
+ * `<a:scene3d>` 正交相机（orthographic*）的旋转：平面图形投影后只沿 x / y 方向按 cos 压缩。
+ * 无旋转、带 rev 或透视相机时返回 null（透视需要真正的三维投影，不做近似）。
+ */
+function orthographicSquash(shape: SlideShapeData): { sx: number; sy: number; raw: string } | null {
+  let xml = ''
   try {
-    if (getShapeFill(shape).kind !== 'none') return true
+    xml = getShapeXmlString(shape)
+  } catch {
+    return null
+  }
+  const camera = /<a:camera\s+prst="(orthographic\w*)"[^>]*>\s*<a:rot\s+([^>]*)\/>/.exec(xml)
+  if (!camera) return null
+  const attr = (name: string): number => Number(new RegExp(`${name}="(-?\\d+)"`).exec(camera[2])?.[1] ?? 0)
+  const lat = attr('lat') / 60000
+  const lon = attr('lon') / 60000
+  if (attr('rev') !== 0 || (lat === 0 && lon === 0)) return null
+  const sy = Math.abs(Math.cos((lat * Math.PI) / 180))
+  const sx = Math.abs(Math.cos((lon * Math.PI) / 180))
+  if (sx < 0.05 || sy < 0.05) return null
+  return { sx, sy, raw: `${camera[1]} lat=${fmtNum(lat)} lon=${fmtNum(lon)}` }
+}
+
+/** First outer shadow the shape paints (own effects or theme effect style), as a PPTD Shadow. */
+function readShadow(shape: SlideShapeData, pres: PresentationData): Record<string, unknown> | null {
+  try {
+    const outer = getShapeEffectsEffective(pres, shape).find((e) => e.kind === 'outerShdw')
+    if (!outer || outer.kind !== 'outerShdw') return null
+    const rad = (outer.angleDeg * Math.PI) / 180
+    const dist = emuToPx(outer.distEmu)
+    const round = (n: number): number => Math.round(n * 100) / 100
+    const color = asLiteralColor(outer.color)
+    return {
+      blur: emuToPx(outer.blurEmu),
+      color: withAlpha(color, outer.opacity),
+      ...(dist > 0 ? { offset: [round(Math.cos(rad) * dist), round(Math.sin(rad) * dist)] } : {})
+    }
+  } catch {
+    return null
+  }
+}
+
+/** True when the shape paints a fill or an outline of its own. */
+function hasVisibleSurface(rec: ReverseShapeRecord, pres: PresentationData): boolean {
+  const shape = rec.raw as SlideShapeData
+  try {
+    const kind = getShapeFillEffective(pres, shape).kind
+    if (kind !== 'none' && kind !== 'inherit') return true
+    if (kind === 'inherit' && rec.groupFill) return true
   } catch {
     return true
   }
   try {
-    return getShapeStroke(shape).kind !== 'none'
+    return getShapeStrokeEffective(pres, shape).kind === 'solid'
   } catch {
     return true
   }
 }
-
 /** Reverse dialect colours are literals only: `#RRGGBB` / `#RRGGBBAA` or `scheme:<token>`. */
 function asLiteralColor(raw: string): string {
   if (raw.startsWith('#') || raw.startsWith('scheme:')) return raw
@@ -770,7 +1180,7 @@ const ARROW_MAP: Record<string, string> = { triangle: 'arrow', arrow: 'arrow', s
  * selected by the flip flags; flip is folded into `points` so the engine
  * does not apply it twice.
  */
-function mapLine(rec: ReverseShapeRecord, report: ImportReport): Record<string, unknown> {
+function mapLine(rec: ReverseShapeRecord, pres: PresentationData, report: ImportReport): Record<string, unknown> {
   const shape = rec.raw as SlideShapeData
   const base = baseElement(rec)
   const [, , w, h] = base.bounds as [number, number, number, number]
@@ -787,7 +1197,7 @@ function mapLine(rec: ReverseShapeRecord, report: ImportReport): Record<string, 
     viewBox: [fmtNum(vw), fmtNum(vh)],
     points: `${fmtNum(start[0])},${fmtNum(start[1])} ${fmtNum(end[0])},${fmtNum(end[1])}`
   }
-  const border = readBorder(shape)
+  const border = readBorder(shape, pres)
   if (border) element.border = border
   const arrows: Array<string | null> = []
   for (const end of ['head', 'tail'] as const) {
@@ -1116,28 +1526,27 @@ function mapPage(
             page.elements.push(mapText(rec, pres, fonts, report) as Page['elements'][number])
             break
           }
-          let isCustom = false
+          let customLost = false
           try {
-            if (getShapeCustomGeometry(rawShape)) {
-              isCustom = true
-            }
+            customLost = getShapeCustomGeometry(rawShape) !== null &&
+              (rec.bounds === null || customGeometryOf(rawShape, rec.bounds.w, rec.bounds.h) === null)
           } catch {
-            /* ignore */
+            customLost = false
           }
-          if (isCustom) {
+          if (customLost) {
             report.degraded.push({
               page: rec.slideIndex,
               elementId: elementIdOf(rec),
               feature: 'unknown',
-              detail: '自定义几何形状（custGeom）按 rect 落盘，路径数据未保留'
+              detail: '自定义几何形状（custGeom）路径无法换算，按 rect 落盘'
             })
           }
           // PPTD shape carries no text (spec §6.2): a preset shape with text
           // becomes Shape + an overlaid Text sharing the same bounds.
           if (rec.text.trim() !== '') {
             const textId = `${elementIdOf(rec)}-text`
-            if (hasVisibleSurface(rawShape)) {
-              page.elements.push(mapShape(rec) as Page['elements'][number])
+            if (hasVisibleSurface(rec, pres)) {
+              page.elements.push(mapShape(rec, pres, media, report) as Page['elements'][number])
               report.degraded.push({
                 page: rec.slideIndex,
                 elementId: textId,
@@ -1148,11 +1557,11 @@ function mapPage(
             page.elements.push(mapText(rec, pres, fonts, report, textId) as Page['elements'][number])
             break
           }
-          page.elements.push(mapShape(rec) as Page['elements'][number])
+          page.elements.push(mapShape(rec, pres, media, report) as Page['elements'][number])
           break
         }
         case 'connector':
-          page.elements.push(mapLine(rec, report) as Page['elements'][number])
+          page.elements.push(mapLine(rec, pres, report) as Page['elements'][number])
           break
         case 'graphicFrame': {
           // 表/图已在上面分流；其余 graphicFrame（SmartArt/ole/未知）走 dropped + 占位
@@ -1181,7 +1590,7 @@ function mapPage(
           if (textBox || rec.text !== '') {
             page.elements.push(mapText(rec, pres, fonts, report) as Page['elements'][number])
           } else {
-            page.elements.push(mapShape(rec) as Page['elements'][number])
+            page.elements.push(mapShape(rec, pres, media, report) as Page['elements'][number])
           }
         }
       }

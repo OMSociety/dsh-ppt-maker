@@ -70,11 +70,27 @@ function fillIssues(fill: unknown, path: string): Issue[] {
 export function validateElementFields(element: Record<string, unknown>, path: string): Issue[] {
   const issues: Issue[] = []
   if (element.elementType !== 'chart') issues.push(...fillIssues(element.fill, path))
+  const border = element.border
+  if (isRecord(border) && border.gradient !== undefined) {
+    const g = border.gradient
+    if (!isRecord(g) || g.type !== 'gradient' || !Array.isArray(g.stops) || g.stops.length < 2) {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'border.gradient 须为 GradientFill（type: gradient，至少 2 个 stops）', `${path}#border.gradient`))
+    }
+  }
   switch (element.elementType) {
     case 'text': {
       const content = element.content
       if (!isRecord(content) || typeof content.text !== 'string') {
         issues.push(blocker(ERROR_CODES.SchemaError, 'text 元素必须有 content.text（字符串）', `${path}#content`))
+      }
+      if (isRecord(content) && content.padding !== undefined) {
+        const pad = content.padding
+        const ok = Array.isArray(pad) && pad.length === 4 && pad.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0)
+        if (!ok) {
+          issues.push(
+            blocker(ERROR_CODES.SchemaError, 'content.padding 须为 4 个非负数 [上, 右, 下, 左]（px）', `${path}#content.padding`)
+          )
+        }
       }
       break
     }

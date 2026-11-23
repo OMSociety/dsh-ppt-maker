@@ -1,20 +1,33 @@
 /**
- * 逆向保真（spec §10.4）：源存档 + 未改页整页恢复。
+ * 逆向保真（spec §10.4）：源存档骨架 + 逐页沿用。
  *
- * 三条主线：
+ * 主线：
  *  1. reverseImport 落 source/original.pptx，deck.source 记账 archive/originalSha1；
- *  2. 零编辑时 buildProjectDeck 整份从存档恢复（buildWarnings 带恢复说明），
- *     任一页内容与导入时页指纹不符即回退逐页重建；
- *  3. planSourceRestore 的存档级门槛（sha1 不一致 / 存档缺失 / 页数不符 → 全回退）。
+ *  2. 页指纹未变的页沿用源页，改过的页按 PPTD 重建并挂回源版式；页可重排、删除；
+ *  3. planSourceRestore 的存档级门槛（sha1 不一致 / 存档缺失 → 从空白文档重建）。
  */
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import {
+  addBlankSlide,
+  addSlideTextBox,
+  createPresentation,
+  emu,
+  getShapeText,
+  getSlideLayout,
+  getSlideLayoutPartName,
+  getSlideShapes,
+  getSlides,
+  isChartShape,
+  loadPresentation,
+  savePresentation
+} from '@office-kit/pptx'
 import { reverseImport } from '../src/core/reverse/index.js'
 import { editProject, loadProject } from '../src/core/project/store.js'
-import { buildProjectDeck } from '../src/core/export-pipeline.js'
+import { buildProjectDeck, saveRawProjectPptx } from '../src/core/export-pipeline.js'
 import { planSourceRestore } from '../src/core/reverse/restore.js'
 import { buildChartPptx, buildFixturePptx } from './__fixtures__/pptx-fixtures.js'
 
@@ -28,8 +41,23 @@ afterEach(async () => {
   await rm(cwd, { recursive: true, force: true })
 })
 
-describe('源存档与整页恢复', () => {
-  it('导入落 source/original.pptx，deck.source 记账，零编辑导出整份恢复', async () => {
+async function threePageDeck(): Promise<Uint8Array> {
+  const pres = createPresentation({ size: '16:9' })
+  for (const word of ['甲页', '乙页', '丙页']) {
+    const slide = addBlankSlide(pres)
+    addSlideTextBox(slide, { text: word, x: emu(100 * 12700), y: emu(100 * 12700), w: emu(300 * 12700), h: emu(60 * 12700) })
+  }
+  return savePresentation(pres)
+}
+
+async function exportedTexts(): Promise<string[]> {
+  const pipeline = await buildProjectDeck(cwd, 'proj')
+  const pres = await loadPresentation(await saveRawProjectPptx(pipeline))
+  return getSlides(pres).map((slide) => getSlideShapes(slide).map((s) => getShapeText(s)).join('|'))
+}
+
+describe('源存档骨架与逐页沿用', () => {
+  it('导入落 source/original.pptx，deck.source 记账；零编辑导出全部页沿用（图表原样）', async () => {
     const bytes = await buildChartPptx()
     await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
 
@@ -42,51 +70,81 @@ describe('源存档与整页恢复', () => {
     expect(loaded.deck.source?.archive).toBe('source/original.pptx')
     expect(loaded.deck.source?.originalSha1).toBe(sha1)
 
-    // 零编辑 → 整份恢复：chart 等原始部件随存档保留。
     const pipeline = await buildProjectDeck(cwd, 'proj')
-    expect(pipeline.buildWarnings.some((w) => w.includes('零编辑') && w.includes('源存档恢复'))).toBe(true)
+    expect(pipeline.buildWarnings.some((w) => w.includes('直接沿用源存档页'))).toBe(true)
+    const pres = await loadPresentation(await saveRawProjectPptx(pipeline))
+    expect(getSlides(pres).some((slide) => getSlideShapes(slide).some((s) => isChartShape(s)))).toBe(true)
   })
 
-  it('update_page 触内容字段 → 页指纹不符，整份回退逐页重建', async () => {
+  it('改一页：其余页沿用源页，改过的页按 PPTD 重建并挂回源版式', async () => {
     const bytes = await buildFixturePptx()
     await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
     const before = await loadProject(cwd, 'proj')
+    const pageCount = before.deck.pages.length
 
-    const decision = await planSourceRestore(before.deck, [...before.pages.values()], path.join(cwd, 'proj'))
+    const decision = await planSourceRestore(before.deck, before.deck.pages.map((p) => before.pages.get(String(p))!), path.join(cwd, 'proj'))
     expect(decision.archiveReady).toBe(true)
-    expect(decision.restorePage.every(Boolean)).toBe(true)
+    expect(decision.restoreFrom).toEqual([...Array(pageCount).keys()])
 
-    // 改页内容 → 页指纹不符；同时 invalidatePageProvenance 清掉整页 sourceRef。
     await editProject(cwd, {
       dir: 'proj',
       baseRevision: before.manifest.revision,
       sessionId: 's1',
       ops: [{ op: 'update_page', page: 'pages/01.page', patch: { notes: '编辑痕迹' } }]
     })
-
     const after = await loadProject(cwd, 'proj')
-    const page = after.pages.get('pages/01.page')
-    expect(page?.elements.every((el) => (el as { sourceRef?: unknown }).sourceRef === undefined)).toBe(true)
+    const pages = after.deck.pages.map((p) => after.pages.get(String(p))!)
+    const next = await planSourceRestore(after.deck, pages, path.join(cwd, 'proj'))
+    expect(next.restoreFrom[0]).toBeNull()
+    expect(next.restoreFrom.slice(1)).toEqual([...Array(pageCount).keys()].slice(1))
 
     const pipeline = await buildProjectDeck(cwd, 'proj')
-    expect(pipeline.buildWarnings.some((w) => w.includes('源存档恢复'))).toBe(false)
+    expect(pipeline.buildWarnings.some((w) => w.includes(`${pageCount - 1} 页原样保留，1 页按 PPTD 重建`))).toBe(true)
+    const pres = await loadPresentation(await saveRawProjectPptx(pipeline))
+    const slides = getSlides(pres)
+    expect(slides).toHaveLength(pageCount)
+    const layoutRef = (pages[0] as { layoutRef?: { partName?: string } }).layoutRef
+    if (layoutRef?.partName) expect(getSlideLayoutPartName(getSlideLayout(slides[0])!)).toBe(layoutRef.partName)
   })
 
-  it('存档指纹不一致 / 存档缺失 → planSourceRestore 全回退', async () => {
+  it('重排与删页：按指纹逐页沿用，导出页序跟随 deck.pages', async () => {
+    await reverseImport({ cwd, source: await threePageDeck(), targetDir: 'proj', sessionId: 's1' })
+    const loaded = await loadProject(cwd, 'proj')
+    expect(await exportedTexts()).toEqual(['甲页', '乙页', '丙页'])
+
+    await editProject(cwd, {
+      dir: 'proj',
+      baseRevision: loaded.manifest.revision,
+      sessionId: 's1',
+      ops: [
+        { op: 'move_page', page: 'pages/03.page', toIndex: 0 },
+        { op: 'remove_page', page: 'pages/02.page' }
+      ]
+    })
+    expect(await exportedTexts()).toEqual(['丙页', '甲页'])
+    const pipeline = await buildProjectDeck(cwd, 'proj')
+    expect(pipeline.buildWarnings.some((w) => w.includes('全部 2 页内容自导入后未变'))).toBe(true)
+  })
+
+  it('存档指纹不一致 / 存档缺失 → 从空白文档重建；页指纹缺失 → 存档骨架 + 全部重建', async () => {
     const bytes = await buildFixturePptx()
     await reverseImport({ cwd, source: bytes, targetDir: 'proj', sessionId: 's1' })
     const loaded = await loadProject(cwd, 'proj')
     const projAbs = path.join(cwd, 'proj')
+    const pages = loaded.deck.pages.map((ref) => loaded.pages.get(String(ref))!)
 
-    // 篡改存档。
+    await rm(path.join(projAbs, 'source', 'page-fingerprints.json'))
+    const noPrints = await planSourceRestore(loaded.deck, pages, projAbs)
+    expect(noPrints.archiveReady).toBe(true)
+    expect(noPrints.restoreFrom.every((v) => v === null)).toBe(true)
+
     await writeFile(path.join(projAbs, 'source', 'original.pptx'), new Uint8Array([1, 2, 3]))
-    const tampered = await planSourceRestore(loaded.deck, [...loaded.pages.values()], projAbs)
+    const tampered = await planSourceRestore(loaded.deck, pages, projAbs)
     expect(tampered.archiveReady).toBe(false)
     expect(tampered.notes.some((n) => n.includes('指纹'))).toBe(true)
 
-    // 存档缺失。
     await rm(path.join(projAbs, 'source'), { recursive: true, force: true })
-    const missing = await planSourceRestore(loaded.deck, [...loaded.pages.values()], projAbs)
+    const missing = await planSourceRestore(loaded.deck, pages, projAbs)
     expect(missing.archiveReady).toBe(false)
     expect(missing.notes.some((n) => n.includes('读不到'))).toBe(true)
   })
@@ -99,8 +157,7 @@ describe('源存档与整页恢复', () => {
     const pages = loaded.deck.pages.map((ref) => loaded.pages.get(String(ref))!)
 
     const emptied = pages.map((page, i) => (i === 0 ? { ...page, elements: [] } : page))
-    const emptyDecision = await planSourceRestore(loaded.deck, emptied, projAbs)
-    expect(emptyDecision.restorePage[0]).toBe(false)
+    expect((await planSourceRestore(loaded.deck, emptied, projAbs)).restoreFrom[0]).toBeNull()
 
     const retexted = pages.map((page, i) =>
       i === 0
@@ -112,20 +169,11 @@ describe('源存档与整页恢复', () => {
           }
         : page
     )
-    const retextDecision = await planSourceRestore(loaded.deck, retexted as typeof pages, projAbs)
-    expect(retextDecision.restorePage[0]).toBe(false)
-
-    await rm(path.join(projAbs, 'source', 'page-fingerprints.json'))
-    const noPrints = await planSourceRestore(loaded.deck, pages, projAbs)
-    expect(noPrints.archiveReady).toBe(false)
+    expect((await planSourceRestore(loaded.deck, retexted as typeof pages, projAbs)).restoreFrom[0]).toBeNull()
   })
 
-  it('generate 方言工程不触发恢复轨', async () => {
-    const decision = await planSourceRestore(
-      { pages: [], elements: [] } as never,
-      [],
-      cwd,
-    )
+  it('generate 方言工程不触发存档轨', async () => {
+    const decision = await planSourceRestore({ pages: [], elements: [] } as never, [], cwd)
     expect(decision.archiveReady).toBe(false)
   })
 })

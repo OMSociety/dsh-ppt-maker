@@ -34,12 +34,17 @@ import {
   getShapeFillOpacity,
   getShapeGradientFill,
   getShapeStroke,
+  getSlideIndex,
+  getSlideLayoutPartName,
+  getSlideLayouts,
   getSlides,
   getTableCell,
   hasShapeImage,
   importSlide,
   loadPresentation,
   mergeTableCells,
+  moveSlide,
+  removeSlide,
   renameShape,
   savePresentation,
   setParagraphBullet,
@@ -65,6 +70,8 @@ import {
   setShapeStrokeDash,
   setShapeTextAnchor,
   setShapeTextDirection,
+  setShapeAdjustValues,
+  setShapeTextMargins,
   setShapeTextWrap,
   setSlideBackground,
   setSlideBackgroundGradientFill,
@@ -80,6 +87,8 @@ import {
   setTableCellBorders,
   setTableStyleId,
   setTableCellFill,
+  setTableCellText,
+  setShapeText,
   setTableCellParagraphs,
   type ChartSpec,
   type Color,
@@ -99,6 +108,7 @@ import {
   type TextFormat,
   type TransitionOptions
 } from '@office-kit/pptx'
+import { PRESET_ADJUST_GUIDES } from './preset-adjust-guides.js'
 import type { Animation, ElementBase, MasterSpec, Page, PageTransition, Presentation, Theme } from '../pptd/schema.js'
 import { PLACEHOLDER_DEFAULT_LABELS } from '../pptd/schema.js'
 import { SVG_PAGE_TYPE } from '../pptd/schema-v2.js'
@@ -199,6 +209,7 @@ interface ResolvedContent {
   align: [string, string]
   wrap: boolean
   textDirection?: string
+  padding?: [number, number, number, number]
   gradient?: unknown
   shadow?: unknown
 }
@@ -241,6 +252,10 @@ function resolveContent(
     align: (pick<[string, string]>('align') ?? ['left', 'top']),
     wrap: pick<boolean>('wrap') ?? true,
     textDirection: pick<string>('textDirection')
+  }
+  const padding = pick<unknown>('padding')
+  if (Array.isArray(padding) && padding.length === 4 && padding.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0)) {
+    out.padding = padding as [number, number, number, number]
   }
   const bgRaw = pick<unknown>('backgroundColor')
   if (bgRaw !== undefined) {
@@ -285,6 +300,39 @@ function richRunsToSpecs(
     specs.push(spec)
   }
   return specs
+}
+
+/**
+ * UTF-16 offsets of every in-run '\n' (from `<br>`) in the text the library
+ * reports for these paragraphs (paragraphs are joined by one '\n' as well).
+ */
+function lineBreakOffsets(specs: ReadonlyArray<ParagraphSpec>): number[] {
+  const out: number[] = []
+  let offset = 0
+  specs.forEach((spec, index) => {
+    if (index > 0) offset += 1
+    for (const run of spec.runs) {
+      for (let i = 0; i < run.text.length; i++) if (run.text[i] === '\n') out.push(offset + i)
+      offset += run.text.length
+    }
+  })
+  return out
+}
+
+/**
+ * ParagraphSpec runs carry `<br>` as a literal '\n'; DrawingML needs `<a:br>`.
+ * Each newline is replaced in place with a paragraph-internal break, which
+ * keeps run formats and paragraph properties (alignment, spacing) intact.
+ */
+function writeLineBreaks(
+  target: { shape: SlideShapeData } | { cell: TableCellData },
+  specs: ReadonlyArray<ParagraphSpec>
+): void {
+  for (const start of lineBreakOffsets(specs).reverse()) {
+    const range = { start, end: start + 1 }
+    if ('cell' in target) setTableCellText(target.cell, '\n', { range, newlines: 'break' })
+    else setShapeText(target.shape, '\n', { range, newlines: 'break' })
+  }
 }
 
 function runToSpecs(run: RichRun, base: ResolvedContent, resolver: ThemeResolver, fonts: Set<string>): ParagraphSpec['runs'] {
@@ -367,6 +415,10 @@ function applyTextBodyProps(
   else if (vertical === 'bottom') setShapeTextAnchor(shape, 'bottom')
   else setShapeTextAnchor(shape, 'top')
   if (!base.wrap) setShapeTextWrap(shape, 'none')
+  if (base.padding) {
+    const [top, right, bottom, left] = base.padding.map((v) => Math.round(v * PX_TO_EMU))
+    setShapeTextMargins(shape, { top, right, bottom, left })
+  }
   if (base.textDirection === 'vertical') {
     try {
       setShapeTextDirection(shape, 'eaVert')
@@ -394,20 +446,11 @@ function applyFill(
     if (color === undefined) { ctx.warnings.push(`${where}：solid 填充缺 color`); return }
     setShapeFill(shape, color)
   } else if (type === 'gradient') {
-    const stops = Array.isArray(fill.stops) ? fill.stops : []
-    const mapped = stops
-      .map((stop) => {
-        const s = stop as { position?: unknown; color?: unknown }
-        const color = resolver.color(s.color)
-        return typeof s.position === 'number' && color !== undefined ? { offset: s.position, color } : null
-      })
-      .filter((s): s is { offset: number; color: Color } => s !== null)
-    if (mapped.length < 2) { ctx.warnings.push(`${where}：gradient 填充至少需要 2 个色标`); return }
+    const options = gradientOptionsOf(fill, resolver)
+    if (!options) { ctx.warnings.push(`${where}：gradient 填充至少需要 2 个色标`); return }
     if (fill.gradientType === 'radial') {
       ctx.warnings.push(`${where}：径向渐变（radial）暂不支持，已按线性渐变处理`)
     }
-    const angle = typeof fill.angle === 'number' ? fill.angle : 0
-    const options: GradientFillOptions = { stops: mapped, angleDeg: angle }
     setShapeGradientFill(shape, options)
   } else if (type === 'image') {
     // Synchronous fill application can't await — media bytes are preloaded by the caller.
@@ -422,11 +465,35 @@ function applyFill(
   }
 }
 
+/** PPTD GradientFill → 库的渐变参数；有效色标不足 2 个时返回 null。 */
+function gradientOptionsOf(fill: Record<string, unknown>, resolver: ThemeResolver): GradientFillOptions | null {
+  const stops = Array.isArray(fill.stops) ? fill.stops : []
+  const mapped = stops
+    .map((stop) => {
+      const s = stop as { position?: unknown; color?: unknown }
+      const color = resolver.color(s.color)
+      if (typeof s.position !== 'number' || color === undefined) return null
+      // HEX8 的末两位是透明度：库的色标把颜色与 opacity 分开传。
+      const hex8 = /^#([0-9A-Fa-f]{6})([0-9A-Fa-f]{2})$/.exec(color)
+      return hex8
+        ? { offset: s.position, color: `#${hex8[1]}` as Color, opacity: parseInt(hex8[2], 16) / 255 }
+        : { offset: s.position, color }
+    })
+    .filter((s): s is { offset: number; color: Color; opacity?: number } => s !== null)
+  if (mapped.length < 2) return null
+  return { stops: mapped, angleDeg: typeof fill.angle === 'number' ? fill.angle : 0 }
+}
+
 function applyBorder(shape: SlideShapeData, border: Record<string, unknown> | undefined, resolver: ThemeResolver): void {
   if (border === undefined) return
   const color = resolver.color(border.color) ?? ('#000000' as Color)
   const width = typeof border.width === 'number' ? border.width : 1
-  setShapeStroke(shape, { color, widthEmu: toEmu(width) as unknown as number })
+  const gradient = border.gradient && typeof border.gradient === 'object'
+    ? gradientOptionsOf(border.gradient as Record<string, unknown>, resolver)
+    : null
+  setShapeStroke(shape, gradient
+    ? { widthEmu: toEmu(width) as unknown as number, fill: { kind: 'gradient', ...gradient } }
+    : { color, widthEmu: toEmu(width) as unknown as number })
   const style = border.style
   if (style === 'dash') setShapeStrokeDash(shape, 'dash')
   else if (style === 'dot') setShapeStrokeDash(shape, 'sysDot')
@@ -434,7 +501,10 @@ function applyBorder(shape: SlideShapeData, border: Record<string, unknown> | un
 
 function applyShadow(shape: SlideShapeData, shadow: Record<string, unknown> | undefined, resolver: ThemeResolver): void {
   if (shadow === undefined) return
-  const color = resolver.color(shadow.color) ?? ('#000000' as Color)
+  const resolved = String(resolver.color(shadow.color) ?? '#000000')
+  // HEX8 carries the shadow's alpha; the library takes colour and opacity apart.
+  const hex8 = /^#([0-9A-Fa-f]{6})([0-9A-Fa-f]{2})$/.exec(resolved)
+  const color = (hex8 ? `#${hex8[1]}` : resolved) as Color
   const blur = typeof shadow.blur === 'number' ? shadow.blur : 0
   const offset = Array.isArray(shadow.offset) ? (shadow.offset as number[]) : [0, 0]
   const [ox, oy] = [offset[0] ?? 0, offset[1] ?? 0]
@@ -442,9 +512,11 @@ function applyShadow(shape: SlideShapeData, shadow: Record<string, unknown> | un
   const angle = dist === 0 ? 0 : (Math.atan2(oy, ox) * 180) / Math.PI
   setShapeShadow(shape, {
     color,
+    ...(hex8 ? { opacity: parseInt(hex8[2], 16) / 255 } : {}),
     blurEmu: toEmu(blur) as unknown as number,
     offsetEmu: toEmu(dist) as unknown as number,
-    angleDeg: Math.round(angle)
+    angleDeg: Math.round(angle),
+    alignment: 'ctr'
   })
 }
 
@@ -584,6 +656,7 @@ function buildText(
     }
   }
   setShapeParagraphs(shape, specs)
+  writeLineBreaks({ shape }, specs)
   applyParagraphMetrics(shape, parsed.paragraphs, base)
   applyParagraphBullets(shape, parsed.paragraphs)
   // marginTop → per-paragraph space-before is not exposed by the library's
@@ -624,9 +697,24 @@ function buildShape(
       ctx.warnings.push(`${where}：custom 形状缺 viewBox/path，已按 rect 处理`)
     }
   } else if (Array.isArray(element.adjustments) && element.adjustments.length > 0) {
-    // Preset adjust values (<a:avLst>) are not exposed by the library's write
-    // API; shapes render at preset defaults. Degrade loudly, never silently.
-    ctx.warnings.push(`${where}：形状 adjustments 暂不支持，按预设默认值绘制`)
+    // PPTD adjustments 按 OOXML 参数序；guide 名（adj / adj1… / hf、vf…）取自预设定义表。
+    const names = PRESET_ADJUST_GUIDES[shapeName]?.map(([name]) => name)
+    if (!names) {
+      ctx.warnings.push(`${where}：形状 ${shapeName} 没有可调参数，adjustments 已忽略`)
+    } else {
+      const values: Record<string, number> = {}
+      element.adjustments.slice(0, names.length).forEach((v, i) => {
+        if (typeof v === 'number' && Number.isFinite(v)) values[names[i]] = Math.round(v)
+      })
+      if (element.adjustments.length > names.length) {
+        ctx.warnings.push(`${where}：形状 ${shapeName} 只有 ${names.length} 个调整值，多余的已忽略`)
+      }
+      try {
+        setShapeAdjustValues(shape, values)
+      } catch (err) {
+        ctx.warnings.push(`${where}：调整值写入失败：${(err as Error).message}`)
+      }
+    }
   }
 
   applyFill(shape, element.fill as Record<string, unknown> | undefined, resolver, ctx, where)
@@ -969,6 +1057,7 @@ function applyTableCells(
     const parsed = parseRichText(text)
     const specs = richRunsToSpecs(parsed.paragraphs, content, resolver, fonts)
     setTableCellParagraphs(handle, specs)
+    writeLineBreaks({ cell: handle }, specs)
     applyParagraphBullets(handle, parsed.paragraphs)
     const anchor = (content.align[1] ?? 'middle') as string
     setTableCellAnchor(handle, anchor === 'top' ? 'top' : anchor === 'bottom' ? 'bottom' : 'center')
@@ -1250,6 +1339,8 @@ function numOrNull(value: number | string | null | undefined): number | null {
  * SVG path → CustomGeometryInput (custom shapes, spec §5 Shape.custom)
  * ------------------------------------------------------------------ */
 
+const PATH_SCALE = 1000
+
 function svgPathToCustomGeometry(
   path: string,
   viewBox: [number, number],
@@ -1275,8 +1366,17 @@ function svgPathToCustomGeometry(
   const pushLine = (x: number, y: number) => commands.push({ kind: 'lnTo', pt: { x, y } })
   const pushCubic = (x1: number, y1: number, x2: number, y2: number, x: number, y: number) =>
     commands.push({ kind: 'cubicBezTo', pts: [{ x: x1, y: y1 }, { x: x2, y: y2 }, { x, y }] })
+  // DrawingML 路径坐标是整数：按 PATH_SCALE 放大 viewBox 与全部点，保住小数精度。
+  const scalePt = (p: { x: number; y: number }) => ({ x: Math.round(p.x * PATH_SCALE), y: Math.round(p.y * PATH_SCALE) })
   const flush = () => {
-    if (commands.length > 0) paths.push({ w: viewBox[0], h: viewBox[1], commands })
+    if (commands.length > 0) {
+      const scaled = commands.map((c): GeomCommand => {
+        if (c.kind === 'moveTo' || c.kind === 'lnTo') return { kind: c.kind, pt: scalePt(c.pt) }
+        if (c.kind === 'cubicBezTo') return { kind: 'cubicBezTo', pts: [scalePt(c.pts[0]), scalePt(c.pts[1]), scalePt(c.pts[2])] }
+        return c
+      })
+      paths.push({ w: Math.round(viewBox[0] * PATH_SCALE), h: Math.round(viewBox[1] * PATH_SCALE), commands: scaled })
+    }
     commands = []
   }
 
@@ -1302,7 +1402,8 @@ function svgPathToCustomGeometry(
         const y = num()
         cx = rel ? cx + x : x
         cy = rel ? cy + y : y
-        if (commands.length > 0) flush() // new subpath starts here
+        // Subpaths stay in one <a:path>: DrawingML fills a path's subpaths with the
+        // even-odd rule, so an inner ring cuts a hole as it does in the icon source.
         pushMove(cx, cy)
         startX = cx
         startY = cy
@@ -1765,64 +1866,48 @@ export function createOfficeKitEngine(): DeckEngine {
       const resolver = new ThemeResolver(deck.theme)
 
       const size = Array.isArray(deck.size) ? deck.size : [960, 540]
-      // createPresentation only offers 16:9 / 4:3 canvases; we immediately
-      // override with the exact deck size via setSlideSize.
-      const ratio = size[0] / (size[1] || 1)
-      const pres: PresentationData = createPresentation({ size: Math.abs(ratio - 4 / 3) < 0.01 ? '4:3' : '16:9' })
-      setSlideSize(pres, { width: toEmu(size[0]), height: toEmu(size[1]) })
-      applyDeckTheme(pres, deck.theme, warnings)
-
       const exportCfg = deck.export ?? {}
       const transitionMode = exportCfg.transition ?? 'fade'
       const animationsMode = exportCfg.animations ?? 'auto'
       const profile = deck.profile ?? 'generate'
 
-      const slides: SlideData[] = []
-      const shapesPerPage = new Map<number, Map<string, unknown>>()
-
-      // 逆向保真（spec §10.4）：逆向工程自导入后零编辑时，整份 deck 从
-      // source/original.pptx 逐页 importSlide 恢复——chart / custGeom /
-      // connector / SmartArt 等 PPTD 承载不了的部件原样回来。
-      // 任何一页内容与导入时页指纹不符或存档校验不过，整份回退逐页重建，
-      // 永不部分恢复（避免页序/依赖错位）。
+      // 逆向保真（spec §10.4）：存档可用时以 source/original.pptx 为骨架——
+      // 主题、母版、版式与字体表原样沿用；指纹未变的页直接沿用源页，其余页
+      // 挂回源页版式后按 PPTD 重建。存档不可用时从空白文档重建。
       const restore = await planSourceRestore(deck, pages, ctx.projectDir)
       for (const note of restore.notes) warnings.push(note)
-      const restoreAll = restore.archiveReady && restore.restorePage.every(Boolean)
-      if (restoreAll && restore.bytes) {
-        const srcPres = await loadPresentation(restore.bytes)
-        const srcSlides = getSlides(srcPres)
-        if (srcSlides.length !== pages.length) {
-          warnings.push(`源存档页数异常（${srcSlides.length}），回退逐页重建`)
-        } else {
-          for (let i = 0; i < srcSlides.length; i++) {
-            const slide = importSlide(pres, srcSlides[i])
-            slides.push(slide)
-            shapesPerPage.set(i, new Map())
-          }
-          // 页序与导入时一致（planSourceRestore 已校验页数），直接收尾返回。
-          // 主题/字体：恢复页自带原始部件，不重设；字体用字表从存档读。
-          try {
-            const srcFonts = getPresentationFonts(srcPres)
-            if (srcFonts) {
-              for (const f of [srcFonts.majorLatin, srcFonts.majorEastAsian, srcFonts.majorComplexScript,
-                srcFonts.minorLatin, srcFonts.minorEastAsian, srcFonts.minorComplexScript]) {
-                if (f) fonts.add(f)
-              }
+      const archive = restore.archiveReady && restore.bytes ? restore.bytes : null
+
+      let pres: PresentationData
+      let archiveSlides: SlideData[] = []
+      const layoutByPart = new Map<string, SlideLayoutData>()
+      if (archive) {
+        pres = await loadPresentation(archive)
+        archiveSlides = [...getSlides(pres)]
+        for (const layout of getSlideLayouts(pres)) layoutByPart.set(getSlideLayoutPartName(layout), layout)
+        try {
+          const srcFonts = getPresentationFonts(pres)
+          if (srcFonts) {
+            for (const f of [srcFonts.majorLatin, srcFonts.majorEastAsian, srcFonts.majorComplexScript,
+              srcFonts.minorLatin, srcFonts.minorEastAsian, srcFonts.minorComplexScript]) {
+              if (f) fonts.add(f)
             }
-          } catch {
-            // 字体清单缺失不阻断恢复。
           }
-          warnings.push(`整份 deck 自导入后零编辑：${srcSlides.length} 页全部从源存档恢复（chart/custGeom/connector 等部件原样保留）`)
-          return {
-            native: pres,
-            slides,
-            shapes: shapesPerPage,
-            warnings,
-            fontsUsed: [...fonts]
-          }
+        } catch {
+          // 字体表缺失不阻断导出。
         }
+      } else {
+        // createPresentation only offers 16:9 / 4:3 canvases; we immediately
+        // override with the exact deck size via setSlideSize.
+        const ratio = size[0] / (size[1] || 1)
+        pres = createPresentation({ size: Math.abs(ratio - 4 / 3) < 0.01 ? '4:3' : '16:9' })
+        setSlideSize(pres, { width: toEmu(size[0]), height: toEmu(size[1]) })
+        applyDeckTheme(pres, deck.theme, warnings)
       }
 
+      const slides: SlideData[] = []
+      const shapesPerPage = new Map<number, Map<string, unknown>>()
+      const reused = new Set<SlideData>()
       const stats = {
         transitionPages: 0,
         animationsWritten: 0,
@@ -1830,7 +1915,7 @@ export function createOfficeKitEngine(): DeckEngine {
       }
 
       // 母版/版式轨（§3.4）：页循环之前建好，页侧按 layoutRef.name 挂接。
-      // 仅生成方言；逆向工程走源存档整页恢复（§10.4），不重建母版。
+      // 仅生成方言；逆向工程的母版与版式来自源存档骨架。
       const layoutByName =
         profile === 'generate' && Array.isArray(deck.masters) && deck.masters.length > 0
           ? buildMasters(pres, deck.masters, resolver, ctx)
@@ -1840,8 +1925,18 @@ export function createOfficeKitEngine(): DeckEngine {
         const page = pages[pageIndex]
         const pageLabel = `第 ${pageIndex + 1} 页`
 
+        // 指纹未变的页：直接沿用存档里的源页（同一文档内，无需复制）。
+        const from = restore.restoreFrom[pageIndex]
+        if (archive && from !== null && from !== undefined && archiveSlides[from]) {
+          const slide = archiveSlides[from]
+          reused.add(slide)
+          slides.push(slide)
+          shapesPerPage.set(pageIndex, new Map())
+          continue
+        }
+
         // svg 页：整页经 vendored 编译器编成单页 pptx，再 importSlide 并入主 deck。
-        // 按页序处理时 importSlide 的尾部追加天然落在正确位置，无需 moveSlide。
+        // 新页一律追加在末尾，页循环结束后统一按 PPTD 页序排列。
         // fail-closed：编译失败/产物异常直接抛错，不产空白占位页。
         if (page.pageType === SVG_PAGE_TYPE) {
           const svgRef = page.svgSource?.ref
@@ -1894,6 +1989,12 @@ export function createOfficeKitEngine(): DeckEngine {
           const layout = layoutByName.get(page.layoutRef.name)
           if (!layout) throw new Error(`${pageLabel}：未知版式 ${page.layoutRef.name}（deck.masters 里没有）`)
           setSlideLayout(slide, layout)
+        }
+        // 逆向重建页挂回源页所用的存档版式，母版与版式装饰随之回来。
+        if (archive && page.layoutRef?.partName) {
+          const layout = layoutByPart.get(page.layoutRef.partName)
+          if (layout) setSlideLayout(slide, layout)
+          else warnings.push(`${pageLabel}：源存档里没有版式 ${page.layoutRef.partName}，按默认版式重建`)
         }
         clearSlideShapes(slide)
         slides.push(slide)
@@ -1981,6 +2082,20 @@ export function createOfficeKitEngine(): DeckEngine {
         const anim = applyAnimations(slide, page, shapeMap, animationsMode, ctx, pageLabel)
         stats.animationsWritten += anim.written
         stats.animationsSkipped += anim.skipped
+      }
+
+      if (archive) {
+        // 未被沿用的源页移除，其余按 PPTD 页序排列。
+        for (const slide of archiveSlides) if (!reused.has(slide)) removeSlide(pres, slide)
+        slides.forEach((slide, index) => {
+          if (getSlideIndex(pres, slide) !== index) moveSlide(pres, slide, index)
+        })
+        const kept = reused.size
+        warnings.push(
+          kept === pages.length
+            ? `全部 ${kept} 页内容自导入后未变，直接沿用源存档页（图表、SmartArt、动画等原样保留）`
+            : `沿用源存档：${kept} 页原样保留，${pages.length - kept} 页按 PPTD 重建（主题、母版与版式来自源文件）`
+        )
       }
 
       return {

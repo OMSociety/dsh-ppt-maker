@@ -15,7 +15,7 @@
  * rotation 单位为度，绕元素中心旋转。
  */
 import * as React from 'react'
-import { backgroundToCss, borderToCss, fillToCss, resolveTextStyle, type ThemeLike } from '../render/resolve'
+import { backgroundToCss, borderToCss, fillToCss, resolveColor, resolveTextStyle, type ThemeLike } from '../render/resolve'
 import { pathFromPoints } from '../render/points'
 import { fitCanvas, type CanvasFit } from '../render/canvas-fit'
 import { sanitizeHtml } from '../render/sanitize'
@@ -314,7 +314,7 @@ function ShapeView({
       {custom ? (
         <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
           <clipPath id={clipId} clipPathUnits="objectBoundingBox">
-            <path d={custom.d} transform={`scale(${1 / custom.w} ${1 / custom.h})`} />
+            <path d={custom.d} clipRule="evenodd" transform={`scale(${1 / custom.w} ${1 / custom.h})`} />
           </clipPath>
         </svg>
       ) : null}
@@ -361,6 +361,8 @@ function LineView({
   const borderCss = borderToCss(el.border, theme) ?? '1px solid #1A1A1A'
   // borderToCss 产物 "Wpx style color" → stroke 属性拆开用
   const borderMatch = borderCss.match(/^([\d.]+)px\s+(\S+)\s+(.+)$/)
+  const gradientId = `pptd-stroke-${React.useId().replace(/[^A-Za-z0-9_-]/g, '')}`
+  const gradient = strokeGradientOf(el.border, viewBox, theme)
 
   return (
     <svg
@@ -370,13 +372,50 @@ function LineView({
       preserveAspectRatio="none"
       fill="none"
     >
+      {gradient ? (
+        <defs>
+          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={gradient.x1} y1={gradient.y1} x2={gradient.x2} y2={gradient.y2}>
+            {gradient.stops.map((s, i) => (
+              <stop key={i} offset={s.offset} stopColor={s.color} />
+            ))}
+          </linearGradient>
+        </defs>
+      ) : null}
       <path
         d={d}
-        stroke={borderMatch ? borderMatch[3] : '#1A1A1A'}
+        stroke={gradient ? `url(#${gradientId})` : borderMatch ? borderMatch[3] : '#1A1A1A'}
         strokeWidth={borderMatch ? Number(borderMatch[1]) : 1}
       />
     </svg>
   )
+}
+
+/**
+ * border.gradient → SVG 线性渐变参数。用 viewBox 坐标（userSpaceOnUse）：
+ * 竖直或水平的线包围盒宽或高为 0，objectBoundingBox 下渐变不绘制。
+ * angle 0 = 左→右，顺时针。
+ */
+function strokeGradientOf(
+  border: unknown,
+  viewBox: number[],
+  theme?: ThemeLike | null,
+): { x1: number; y1: number; x2: number; y2: number; stops: { offset: number; color: string }[] } | null {
+  if (!border || typeof border !== 'object') return null
+  const g = (border as Record<string, unknown>).gradient as Record<string, unknown> | undefined
+  if (!g || !Array.isArray(g.stops)) return null
+  const stops = g.stops
+    .map((s) => {
+      const st = s as Record<string, unknown>
+      const color = resolveColor(st.color, theme)
+      return color && typeof st.position === 'number' ? { offset: st.position, color } : null
+    })
+    .filter((s): s is { offset: number; color: string } => s !== null)
+  if (stops.length < 2) return null
+  const rad = ((typeof g.angle === 'number' ? g.angle : 0) * Math.PI) / 180
+  const [w, h] = viewBox
+  const dx = (Math.cos(rad) * w) / 2
+  const dy = (Math.sin(rad) * h) / 2
+  return { x1: w / 2 - dx, y1: h / 2 - dy, x2: w / 2 + dx, y2: h / 2 + dy, stops }
 }
 
 /**
@@ -440,6 +479,10 @@ function textStyleToCss(
     overflow: 'hidden',
     whiteSpace: wrap === false ? 'nowrap' : 'pre-wrap',
     wordBreak: 'break-word',
+    // 与 PPTX 文本框内边距一致：未写 padding 取 Office 默认 [3.6, 7.2, 3.6, 7.2]。
+    padding: (Array.isArray(st.padding) && st.padding.length === 4 ? (st.padding as number[]) : [3.6, 7.2, 3.6, 7.2])
+      .map((v) => `${v}px`)
+      .join(' '),
   }
   // 垂直对齐（flex）：显式 align[1] 优先，否则用 defaultV（文本框默认顶、形状内文本默认中）。
   const v = align[1]
@@ -448,7 +491,11 @@ function textStyleToCss(
   else css.justifyContent = defaultV
   // 水平对齐由富文本 <p style="text-align"> 决定；元素级 align[0] 作为兜底 textAlign。
   const h = align[0]
-  if (h === 'center' || h === 'right' || h === 'left') css.textAlign = h as React.CSSProperties['textAlign']
+  if (h === 'center' || h === 'right' || h === 'left' || h === 'justify') css.textAlign = h as React.CSSProperties['textAlign']
+  else if (h === 'distributed') {
+    css.textAlign = 'justify'
+    css.textAlignLast = 'justify'
+  }
   return css
 }
 

@@ -599,6 +599,7 @@ interface Border {
   style?: LineStyle;   // 默认 "solid"
   width?: number;      // 默认 1
   color?: Color;       // 默认 "#000000"
+  gradient?: GradientFill;  // 渐变线条；给出时线条按渐变绘制，color 作为不支持渐变线条的环境的回落色
 }
 
 /**
@@ -738,6 +739,7 @@ interface TextContent {
   marginTop?: number;                    // 段前间距（px）
   textDirection?: "horizontal" | "vertical";   // 默认 "horizontal"
   wrap?: boolean;                        // 默认 true；false 则文字溢出框外不换行
+  padding?: [number, number, number, number];  // 文字到框边的内边距 [上, 右, 下, 左]（px）；默认 [3.6, 7.2, 3.6, 7.2]
   align?: Alignment;                     // 默认 [left, top]
   gradient?: GradientFill;               // 文字渐变填充（与 color 互斥，gradient 优先）
   shadow?: Shadow;
@@ -822,7 +824,7 @@ interface Shape extends ElementBase {
 约束与惯例：
 
 - **shape 不支持内嵌文本**：要带文字的形状 = 一个 Shape + 一个叠放的 Text。
-- **custom 路径**：`path` 支持指令 `M L H V C S Q A Z`；镂空（挖洞）= 外轮廓顺时针（sweep=1）+ 内轮廓逆时针（sweep=0）。
+- **custom 路径**：`path` 支持指令 `M L H V C S Q A Z`；一个 `path` 里的全部子路径（每个 `M` 起一段）按奇偶规则（even-odd）合成一个填充区域，内轮廓落在外轮廓里即成镂空，方向不限。
 - **viewBox 独立拉伸**：`viewBox` 是路径自己的坐标系，绘制时拉伸到 `bounds`；要保持不变形需等比，即 `viewBoxW : viewBoxH = bounds.w : bounds.h`。
 
 常用形状与默认 adjustments：
@@ -2103,6 +2105,10 @@ type DegradedFeature =
   | "image.artisticEffect" | "image.biLevel" | "image.compressionState"
   | "text.bodyRotation" | "text.columns" | "text.autoFit"
   | "background.patternFill"     // 图案填充降级为最接近的 solid/gradient 字面量（§4.1）
+  | "shape.patternFill"          // 形状图案填充降级为前景与背景按图案浓度混合的 solid
+  | "text.gradientFill"          // 渐变/图案文字填充降级为轴起点色标（或前景色）的纯色
+  | "text.letterSpacing"         // 各 run 字间距不一致，按出现最多的值写入元素级 letterSpacing
+  | "shape.scene3d"              // 正交相机三维旋转，按投影压扁包围盒落盘
   | "table.styleId"              // 内置表格样式：id 记入 builtinStyle（§6.8），派生样式不还原
   | "notes.richText"             // 备注富文本降级为纯文本
   | "hyperlink.clickAction"      // 单击动作超链接不建模
@@ -2151,7 +2157,7 @@ interface ImportReport {
 
 报告与工程同寿命：增量重导时按 `sourceRef` 对账重写；它是「这份工程相对源文件丢了什么」的唯一权威清单。
 
-### 10.4 源存档与未改页整页恢复
+### 10.4 源存档与逐页沿用
 
 逆向导入把原始 pptx 字节原样落到 `source/original.pptx`，导入完成时每页内容的指纹落到 `source/page-fingerprints.json`（`{ pages: string[] }`，按 `deck.pages` 顺序；指纹 = 按键排序、去掉 undefined 字段的页 JSON 的 sha1），`deck.source` 同时记账：
 
@@ -2163,15 +2169,15 @@ interface DeckSource {
 }
 ```
 
-**为什么需要它**：§10.1 的 dropped 条目（chart / SmartArt / OLE 等）在 PPTD 里只有占位，若导出时一律按 PPTD 元素重建，这些部件就永远丢了。源存档让「没动过的页」有机会把原始部件整页带回来。
+**为什么需要它**：逆向方言只把页面自身的形状落成元素；主题、母版与版式上的装饰图形，以及 §10.1 的 dropped 部件（chart / SmartArt / OLE 等）都不在 PPTD 里。源存档让导出时这些内容仍然在场。
 
-**导出行为**（fail-closed，永不部分恢复）：
+**导出行为**（`deck.profile === "reverse"` 且 `archive` / `originalSha1` 齐全时启用）：
 
-1. `deck.profile === "reverse"` 且 `archive` / `originalSha1` 齐全时才启用本轨；
-2. 存档文件必须存在、sha1 与 `originalSha1` 一致、页数与 `deck.pages` 一致，页指纹文件存在且项数相同；
-3. 「未改」判定：该页当前内容的指纹与导入时记录的指纹一致。元素增删、任何字段改动（含删空整页）都会改变指纹；
-4. **全部页**均判定未改 → 整份 deck 从存档逐页 `importSlide` 恢复（chart/workbook/notes/media/未知部件原样保留），导出 warnings 记一条恢复说明；
-5. 任一条件不满足 → **整份**回退逐页按 PPTD 重建（占位仍是占位，报告已如实记账），warnings 说明回退原因。
+1. **存档骨架**：存档文件存在且 sha1 与 `originalSha1` 一致 → 以存档为底稿构建 deck：主题、母版、版式、字体表原样沿用；
+2. **逐页沿用**：某页当前内容的指纹与某张源页导入时的指纹相同 → 该页直接沿用源页（chart / workbook / notes / media / 动画 / 未知部件原样保留）。按指纹匹配，页可以重排、删除或复制；同一张源页最多被沿用一次；
+3. **逐页重建**：其余页按 PPTD 元素重建，并挂回 `Page.layoutRef.partName` 指向的存档版式，母版与版式上的装饰随之显示；存档里找不到该版式时按默认版式重建并记 warning；
+4. 未被沿用的源页从结果中移除，最终页序与 `deck.pages` 一致；导出 warnings 记一条「沿用 N 页 / 重建 M 页」说明；
+5. 存档缺失、越界或 sha1 不符 → 整份按 PPTD 从空白文档重建（主题与母版装饰不在场），warnings 说明原因；页指纹文件缺失 → 仍用存档骨架，但全部页重建。
 
 存档与页指纹不参与 `manifest.checksum`，不随编辑变化；`originalSha1` 永远指向「整轮导入」那一刻的源文件。
 

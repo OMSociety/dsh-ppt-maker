@@ -1,19 +1,19 @@
 /**
- * 未改页整页恢复（spec §10.4）——逆向工程的导出保真轨。
+ * 源存档导出轨（spec §10.4）——逆向工程的导出保真。
  *
- * 逆向导入将 PPTD 未建模部件记录为 dropped + 占位，把原始 pptx 存档至
- * source/original.pptx（deck.source.archive / originalSha1），并把导入完成时
- * 每页内容的指纹写进 source/page-fingerprints.json。全部页未改时，导出从
- * 存档整份逐页恢复；任一页有改动时，整份按 PPTD 元素重建，占位与报告保留。
+ * 逆向导入把原始 pptx 存档至 source/original.pptx（deck.source.archive /
+ * originalSha1），并把导入完成时每页内容的指纹写进
+ * source/page-fingerprints.json。导出时：
  *
- * 「未改」的判定（fail-closed）：
- *   1. deck.profile === 'reverse' 且 deck.source.archive/originalSha1 齐全；
- *   2. 存档文件存在、sha1 与 originalSha1 一致（存档本身没被换过）；
- *   3. 页数与导入时一致；
- *   4. 每页当前内容的指纹（pageFingerprint：按键排序的规范 JSON 的 sha1）
- *      与导入时记录的指纹一致——元素增删、字段改动、删空整页都会改变指纹。
- * 任何一条不满足即回退逐页重建，并在 notes 里说明原因（永不静默）。
- * 调用方按整份 deck 二选一：archiveReady 且 restorePage 全 true 才整页恢复。
+ *   - 存档可用（存在且 sha1 与 originalSha1 一致）→ 以存档为骨架构建：主题、
+ *     母版、版式、字体表原样沿用，重建页挂回源页所用的版式（Page.layoutRef）；
+ *   - 某页当前内容的指纹与某张源页导入时的指纹相同 → 该页直接沿用源页
+ *     （图表、SmartArt、动画、备注等全部原样）；页可以重排、删除、复制，
+ *     按指纹逐页匹配，同一张源页最多被沿用一次；
+ *   - 其余页按 PPTD 元素重建。
+ *
+ * 存档不可用时 archiveReady=false，整份按 PPTD 从空白文档重建，并在 notes 里
+ * 说明原因（永不静默）。
  */
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -24,11 +24,11 @@ import type { Page, Presentation } from '../pptd/schema.js'
 export const PAGE_FINGERPRINTS_FILE = 'page-fingerprints.json'
 
 export interface RestoreDecision {
-  /** 整页恢复是否可用（存档级门槛）。 */
+  /** 存档骨架是否可用。 */
   archiveReady: boolean
-  /** 逐页判定结果：true = 整页恢复；false = 逐页重建。 */
-  restorePage: boolean[]
-  /** 人读说明（为什么回退重建），进导出 warnings。 */
+  /** 逐页判定：源页序号（0 起）= 沿用该源页；null = 按 PPTD 重建。 */
+  restoreFrom: (number | null)[]
+  /** 人读说明（存档不可用的原因、指纹缺失等），进导出 warnings。 */
   notes: string[]
   /** 存档字节（archiveReady 时非空）。 */
   bytes: Uint8Array | null
@@ -72,7 +72,7 @@ export async function planSourceRestore(
 ): Promise<RestoreDecision> {
   const none = (notes: string[]): RestoreDecision => ({
     archiveReady: false,
-    restorePage: pages.map(() => false),
+    restoreFrom: pages.map(() => null),
     notes,
     bytes: null,
   })
@@ -83,31 +83,35 @@ export async function planSourceRestore(
 
   const archiveAbs = path.resolve(projectDir, source.archive)
   const rel = path.relative(path.resolve(projectDir), archiveAbs)
-  if (rel.startsWith('..') || path.isAbsolute(rel)) return none(['源存档路径越界，忽略整页恢复'])
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return none(['源存档路径越界，整份按 PPTD 从空白文档重建'])
 
   let bytes: Uint8Array
   try {
     bytes = new Uint8Array(await readFile(archiveAbs))
   } catch {
-    return none(['源存档 source/original.pptx 读不到，全部页按 PPTD 重建'])
+    return none(['源存档 source/original.pptx 读不到，整份按 PPTD 从空白文档重建（母版与版式装饰不会带回）'])
   }
   if (sha1Of(bytes) !== source.originalSha1) {
-    return none(['源存档指纹与 originalSha1 不一致（存档被替换？），全部页按 PPTD 重建'])
+    return none(['源存档指纹与 originalSha1 不一致（存档被替换？），整份按 PPTD 从空白文档重建'])
   }
-  if (source.slideCount !== pages.length) {
-    return none([`页数与源文件不一致（源 ${source.slideCount} 页 / 现 ${pages.length} 页），全部页按 PPTD 重建`])
-  }
+
   const fingerprints = await readFingerprints(archiveAbs)
-  if (!fingerprints || fingerprints.length !== pages.length) {
-    return none([`页指纹 source/${PAGE_FINGERPRINTS_FILE} 缺失或页数不符，全部页按 PPTD 重建`])
+  if (!fingerprints) {
+    return {
+      archiveReady: true,
+      restoreFrom: pages.map(() => null),
+      notes: [`页指纹 source/${PAGE_FINGERPRINTS_FILE} 缺失，全部页按 PPTD 重建（沿用源存档的母版与版式）`],
+      bytes,
+    }
   }
 
-  const notes: string[] = []
-  const restorePage = pages.map((page, i) => {
-    const untouched = pageFingerprint(page) === fingerprints[i]
-    if (!untouched) notes.push(`第 ${i + 1} 页内容与导入时不同，按 PPTD 重建`)
-    return untouched
+  // 指纹 → 尚未被沿用的源页序号队列（同内容的源页可能不止一张）。
+  const pool = new Map<string, number[]>()
+  fingerprints.forEach((fp, i) => {
+    const queue = pool.get(fp)
+    if (queue) queue.push(i)
+    else pool.set(fp, [i])
   })
-
-  return { archiveReady: true, restorePage, notes, bytes }
+  const restoreFrom = pages.map((page) => pool.get(pageFingerprint(page))?.shift() ?? null)
+  return { archiveReady: true, restoreFrom, notes: [], bytes }
 }

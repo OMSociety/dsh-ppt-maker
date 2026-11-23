@@ -49,6 +49,10 @@ export interface ReportDegradedEntry {
     | 'text.columns'
     | 'text.autoFit'
     | 'background.patternFill'
+    | 'shape.patternFill'
+    | 'text.gradientFill'
+    | 'text.letterSpacing'
+    | 'shape.scene3d'
     | 'table.styleId'
     | 'notes.richText'
     | 'hyperlink.clickAction'
@@ -105,6 +109,11 @@ export interface ReverseShapeRecord {
   raw: unknown
   /** True when this record came from flattening a parent group. */
   fromGroup: boolean
+  /**
+   * Solid fill of the nearest enclosing group (`<p:grpSpPr>`), resolved to
+   * `#RRGGBB`. Children filled with `<a:grpFill/>` paint with it.
+   */
+  groupFill?: string
 }
 
 export interface ReverseSlideRecord {
