@@ -50,6 +50,7 @@ export interface ReportDegradedEntry {
     | 'text.autoFit'
     | 'background.patternFill'
     | 'text.gradientFill'
+    | 'text.effects'
     | 'text.letterSpacing'
     | 'shape.scene3d'
     | 'smartArt.expanded'

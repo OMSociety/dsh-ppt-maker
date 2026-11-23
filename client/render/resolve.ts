@@ -224,3 +224,15 @@ function blendCss(fg: string, bg: string, t: number): string {
   const mix = a.map((v, i) => Math.round(v * t + b[i] * (1 - t)))
   return `#${mix.map((v) => v.toString(16).padStart(2, '0')).join('')}`
 }
+
+/** PPTD Shadow → CSS shadow value "x y blur color" (drop-shadow / text-shadow syntax). */
+export function shadowToCss(shadow: unknown, theme?: ThemeLike | null): string | undefined {
+  if (!shadow || typeof shadow !== 'object') return undefined
+  const s = shadow as { blur?: unknown; color?: unknown; offset?: unknown }
+  const color = resolveColor(s.color, theme) ?? '#00000080'
+  const blur = typeof s.blur === 'number' ? s.blur : 0
+  const offset = Array.isArray(s.offset) ? s.offset : [0, 0]
+  const ox = typeof offset[0] === 'number' ? offset[0] : 0
+  const oy = typeof offset[1] === 'number' ? offset[1] : 0
+  return `${ox}px ${oy}px ${blur}px ${color}`
+}

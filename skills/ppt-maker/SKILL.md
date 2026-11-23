@@ -107,7 +107,7 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 
 这些是最常让页面「写了却不显示」或被质检拦下的地方：
 
-- **文本样式写在 `content` 里**：`content: {text, fontSize, color, bold, fontFamily, align, lineHeight, letterSpacing, padding}`；元素顶层只放 `elementId`、`elementType`、`bounds`、`rotation`、`opacity` 等几何属性。
+- **文本样式写在 `content` 里**：`content: {text, fontSize, color, bold, fontFamily, align, lineHeight, letterSpacing, padding, outline, shadow}`；元素顶层只放 `elementId`、`elementType`、`bounds`、`rotation`、`opacity` 等几何属性。
 - **文本框高度给足**：单行高度约为 `fontSize × 1.3`，再留几像素余量；多行按行数乘。框太矮会报溢出 blocker。大字号标题尤其要留够高度。
 - **形状不能内嵌文字**：带字的色块 = 一个 `shape` + 一个叠在上面的 `text`。
 - **填充写成对象**：`fill: {type: "solid", color: "#d0021b"}`；渐变要 ≥2 个停靠点。写成字符串会被拒。
@@ -127,6 +127,7 @@ description: 生成/编辑/逆向/导出 PPT 与演示文稿。工具优先：�
 - **字间距 `letterSpacing` 与分散对齐 `align: "distributed"`：排版的质感**。全大写英文标签、章节编号、小号说明文字，加一点字间距（约为字号的 5%–15%）会更通透、更有设计感。中文正文不要加。`distributed` 让一行文字撑满整个框宽，适合竖排标签旁的短标题、证书式标题、几个等宽标签需要两端对齐的场合；长段落不要用。
 - **形状调整值 `adjustments`：一个形状，多种性格**。圆角矩形的圆角大小、箭头的箭杆粗细和箭头长度、弧形的起止角度、星形的内径，都由调整值控制。参数顺序和默认值见 `reference/shapes.md`。与其用 `custom` 路径硬画，不如先看看预设形状加调整值能不能做到；成品里用户还能拖黄色手柄继续调。
 - **渐变描边 `border.gradient`：克制使用的点睛之笔**。连接线从实色渐隐到透明（停靠点颜色写 `#RRGGBB00`），能让流程线、引导线有方向感，也能让分隔线收得更轻。很多设计系统明确禁止装饰性渐变，先看所选设计系统允不允许；一页里用上一两处就够。
+- **文字描边与阴影 `content.outline` / `content.shadow`：让字压得住图**。文字压在照片或复杂底纹上时，细描边（`{width: 1, color}`）或柔和投影（`{blur: 6, color: "#00000066", offset: [0, 2]}`）能保住可读性；干净底色上不需要它们，加了反而显廉价。形状与图片的投影写在元素顶层 `shadow`。
 ## 五、SVG 页面轨
 
 整页的视觉复杂到 PPTD 元素难以表达时（精细渐变、自由曲线、多层叠加的封面或章节页），把这一页画成一份 SVG：

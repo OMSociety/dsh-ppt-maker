@@ -304,6 +304,9 @@ interface RichParagraph {
   bulletKind: 'bullet' | 'number' | null
   /** 各文字 run 的字间距（spc，1/100 pt），未写为 null */
   spacings: Array<number | null>
+  /** 各文字 run 的文字描边与外阴影（PPTD 形态，JSON 串；没有为 null） */
+  outlines: Array<string | null>
+  shadows: Array<string | null>
   /** 段落是否读过 run 级格式（用于 degraded 判定） */
   runsRead: boolean
 }
@@ -353,6 +356,8 @@ function readRichParagraphs(
     const parts: string[] = []
     let runsRead = false
     const spacings: Array<number | null> = []
+    const outlines: Array<string | null> = []
+    const shadows: Array<string | null> = []
     const els = elements[p] ?? []
     let runIndex = -1 // effective format 的索引只数常规 run（d.ts: numeric indices count only regular runs）
     for (const el of els) {
@@ -374,6 +379,10 @@ function readRichParagraphs(
         if (el.format) runsRead = true
       }
       spacings.push(typeof fmt.spc === 'number' ? fmt.spc : null)
+      const outline = textOutlineOf(fmt.outline)
+      outlines.push(outline ? JSON.stringify(outline) : null)
+      const shadow = shadowOf(fmt.shadow)
+      shadows.push(shadow ? JSON.stringify(shadow) : null)
       parts.push(
         runToHtml(text, {
           font: typeof fmt.font === 'string' ? fmt.font : undefined,
@@ -433,7 +442,7 @@ function readRichParagraphs(
     } catch {
       /* inherit */
     }
-    out.push({ html: parts.join(''), align, lineSpacingPct, lineSpacingPts, spaceBeforePts, bulletKind, spacings, runsRead })
+    out.push({ html: parts.join(''), align, lineSpacingPct, lineSpacingPts, spaceBeforePts, bulletKind, spacings, outlines, shadows, runsRead })
   }
   return out
 }
@@ -602,6 +611,27 @@ function mapText(
         originalValue: [...new Set(spacings.map((v) => v ?? 0))].join(','),
         fallbackValue: String(content.letterSpacing),
         detail: '各段字间距不一致，PPTD 字间距为元素级，按出现最多的值统一'
+      })
+    }
+  }
+  // 文字描边与外阴影在 PPTD 里同样是元素级（content.outline / content.shadow）。
+  for (const [key, values] of [
+    ['outline', (rich ?? []).flatMap((p) => p.outlines)],
+    ['shadow', (rich ?? []).flatMap((p) => p.shadows)]
+  ] as const) {
+    const present = values.filter((v): v is string => v !== null)
+    if (present.length === 0) continue
+    const counts = new Map<string, number>()
+    for (const v of present) counts.set(v, (counts.get(v) ?? 0) + 1)
+    const [dominant] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+    content[key] = JSON.parse(dominant)
+    if (counts.size > 1 || present.length < values.length) {
+      report.degraded.push({
+        page: rec.slideIndex,
+        elementId,
+        feature: 'text.effects',
+        originalValue: key,
+        detail: `各段文字的${key === 'outline' ? '描边' : '阴影'}不一致，PPTD 中为元素级，按出现最多的一种统一`
       })
     }
   }
@@ -975,6 +1005,34 @@ function orthographicSquash(shape: SlideShapeData): { sx: number; sy: number; ra
   const sx = Math.abs(Math.cos((lon * Math.PI) / 180))
   if (sx < 0.05 || sy < 0.05) return null
   return { sx, sy, raw: `${camera[1]} lat=${fmtNum(lat)} lon=${fmtNum(lon)}` }
+}
+
+/** A run's text outline (`<a:ln>` in rPr) as a PPTD TextOutline; gradient outlines keep their first stop colour. */
+function textOutlineOf(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as { color?: string; widthEmu?: number; fill?: { kind?: string; stops?: Array<{ offset?: number; color?: string }> } }
+  let color = typeof o.color === 'string' ? o.color : undefined
+  if (!color && o.fill?.kind === 'gradient' && Array.isArray(o.fill.stops)) {
+    color = [...o.fill.stops].sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0))[0]?.color
+  }
+  if (!color && o.fill?.kind !== 'solid') return null
+  const width = emuToPx(typeof o.widthEmu === 'number' ? o.widthEmu : 9525)
+  if (!(width > 0)) return null
+  return { width: Math.round(width * 100) / 100, color: asLiteralColor(color ?? '#000000') }
+}
+
+/** A run's outer shadow as a PPTD Shadow (same conversion as shape shadows). */
+function shadowOf(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null
+  const s = raw as { color?: string; blurEmu?: number; offsetEmu?: number; angleDeg?: number; opacity?: number }
+  const rad = ((s.angleDeg ?? 45) * Math.PI) / 180
+  const dist = emuToPx(s.offsetEmu ?? 38100)
+  const round = (n: number): number => Math.round(n * 100) / 100
+  return {
+    blur: emuToPx(s.blurEmu ?? 50800),
+    color: withAlpha(asLiteralColor(s.color ?? '#000000'), s.opacity),
+    ...(dist > 0 ? { offset: [round(Math.cos(rad) * dist), round(Math.sin(rad) * dist)] } : {})
+  }
 }
 
 /** First outer shadow the shape paints (own effects or theme effect style), as a PPTD Shadow. */

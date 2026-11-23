@@ -115,7 +115,9 @@ import {
   type SlideLayoutData,
   type SlideShapeData,
   type TableCellData,
+  type ShadowOptions,
   type TextFormat,
+  type TextOutline,
   type TransitionOptions
 } from '@office-kit/pptx'
 import { PRESET_ADJUST_GUIDES } from './preset-adjust-guides.js'
@@ -310,7 +312,8 @@ interface ResolvedContent {
   textDirection?: string
   padding?: [number, number, number, number]
   gradient?: GradientFillOptions
-  shadow?: unknown
+  shadow?: ShadowOptions
+  outline?: TextOutline
 }
 
 const ALIGN_MAP: Record<string, 'left' | 'center' | 'right' | 'justify' | 'distribute'> = {
@@ -368,7 +371,17 @@ function resolveContent(
     else warnings.push(`${where}：文字渐变（gradient）至少需要 2 个色标，按纯色处理`)
   }
   const shadow = content.shadow ?? styleRef.shadow
-  if (shadow !== undefined) out.shadow = shadow
+  if (shadow && typeof shadow === 'object') out.shadow = shadowOptionsOf(shadow as Record<string, unknown>, resolver)
+  const outline = content.outline ?? styleRef.outline
+  if (outline && typeof outline === 'object') {
+    const o = outline as Record<string, unknown>
+    const color = resolver.color(o.color)
+    if (typeof o.width === 'number' && o.width > 0 && color !== undefined) {
+      out.outline = { color: String(color) as Color, widthEmu: toEmu(o.width) as unknown as number }
+    } else {
+      warnings.push(`${where}：文字描边（outline）需要正数 width 与 color，已忽略`)
+    }
+  }
   if (content.textDirection === 'vertical') {
     // handled by caller via setShapeTextDirection
   }
@@ -615,8 +628,12 @@ function applyBorder(shape: SlideShapeData, border: Record<string, unknown> | un
 
 function applyShadow(shape: SlideShapeData, shadow: Record<string, unknown> | undefined, resolver: ThemeResolver): void {
   if (shadow === undefined) return
+  setShapeShadow(shape, { ...shadowOptionsOf(shadow, resolver), alignment: 'ctr' })
+}
+
+/** PPTD Shadow → library ShadowOptions: HEX8 alpha splits into opacity, offset into distance and angle. */
+function shadowOptionsOf(shadow: Record<string, unknown>, resolver: ThemeResolver): ShadowOptions {
   const resolved = String(resolver.color(shadow.color) ?? '#000000')
-  // HEX8 carries the shadow's alpha; the library takes colour and opacity apart.
   const hex8 = /^#([0-9A-Fa-f]{6})([0-9A-Fa-f]{2})$/.exec(resolved)
   const color = (hex8 ? `#${hex8[1]}` : resolved) as Color
   const blur = typeof shadow.blur === 'number' ? shadow.blur : 0
@@ -624,14 +641,13 @@ function applyShadow(shape: SlideShapeData, shadow: Record<string, unknown> | un
   const [ox, oy] = [offset[0] ?? 0, offset[1] ?? 0]
   const dist = Math.sqrt(ox * ox + oy * oy)
   const angle = dist === 0 ? 0 : (Math.atan2(oy, ox) * 180) / Math.PI
-  setShapeShadow(shape, {
+  return {
     color,
     ...(hex8 ? { opacity: parseInt(hex8[2], 16) / 255 } : {}),
     blurEmu: toEmu(blur) as unknown as number,
     offsetEmu: toEmu(dist) as unknown as number,
-    angleDeg: Math.round(angle),
-    alignment: 'ctr'
-  })
+    angleDeg: Math.round(angle)
+  }
 }
 
 /** Common element geometry: bounds (required), rotation, flip, opacity. */
@@ -722,6 +738,16 @@ function applyRunGradient(specs: ParagraphSpec[], gradient: GradientFillOptions)
   }
 }
 
+/** Element-level text outline and outer shadow apply to every run (spec §5 TextContent.outline / shadow). */
+function applyRunEffects(specs: ParagraphSpec[], outline: TextOutline | undefined, shadow: ShadowOptions | undefined): void {
+  for (const spec of specs) {
+    for (const run of spec.runs) {
+      const format = (run.format ?? {}) as TextFormat
+      ;(run as { format?: TextFormat }).format = { ...format, ...(outline ? { outline } : {}), ...(shadow ? { shadow } : {}) }
+    }
+  }
+}
+
 function applyRunOpacity(specs: ParagraphSpec[], opacity: number): number {
   let uncoloured = 0
   for (const spec of specs) {
@@ -774,6 +800,7 @@ function buildText(
   const shape = addSlideTextBox(slide, { x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h), text: '' })
   const specs = richRunsToSpecs(parsed.paragraphs, base, resolver, fonts)
   if (base.gradient) applyRunGradient(specs, base.gradient)
+  if (base.outline || base.shadow) applyRunEffects(specs, base.outline, base.shadow)
   if (typeof element.opacity === 'number' && element.opacity < 1) {
     const uncoloured = applyRunOpacity(specs, Math.max(0, element.opacity))
     if (uncoloured > 0) {

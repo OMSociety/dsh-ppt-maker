@@ -103,6 +103,12 @@ export function validateElementFields(element: Record<string, unknown>, path: st
       issues.push(blocker(ERROR_CODES.SchemaError, 'content.gradient 须为 GradientFill（type: gradient，至少 2 个 stops）', `${path}#content.gradient`))
     }
   }
+  if (isRecord(content) && content.outline !== undefined) {
+    const o = content.outline
+    if (!isRecord(o) || typeof o.width !== 'number' || !(o.width > 0) || typeof o.color !== 'string' || o.color === '') {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'content.outline 须为 { width: 正数（px）, color }', `${path}#content.outline`))
+    }
+  }
   if (element.group !== undefined) {
     const g = element.group
     if (!Array.isArray(g) || g.length === 0 || g.some((id) => typeof id !== 'string' || id === '')) {

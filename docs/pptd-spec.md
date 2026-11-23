@@ -612,6 +612,11 @@ interface Border {
  */
 type BorderSpec = null | Border | [Border | null, Border | null] | [Border | null, Border | null, Border | null, Border | null];
 
+interface TextOutline {
+  width: number;                // 描边线宽（px），> 0
+  color: Color;
+}
+
 interface Shadow {
   blur: number;                 // 模糊半径（px）
   color: Color;
@@ -754,7 +759,8 @@ interface TextContent {
   padding?: [number, number, number, number];  // 文字到框边的内边距 [上, 右, 下, 左]（px）；默认 [3.6, 7.2, 3.6, 7.2]
   align?: Alignment;                     // 默认 [left, top]
   gradient?: GradientFill;               // 文字渐变填充：整段文字共用同一渐变，优先于 color；color 作为不支持渐变处的回落色
-  shadow?: Shadow;
+  outline?: TextOutline;                 // 文字描边（字形轮廓线）
+  shadow?: Shadow;                       // 文字外阴影
 }
 ```
 
@@ -2118,6 +2124,7 @@ type DegradedFeature =
   | "text.bodyRotation" | "text.columns" | "text.autoFit"
   | "background.patternFill"     // 图案填充降级为最接近的 solid/gradient 字面量（§4.1）
   | "text.gradientFill"          // 图案文字填充，或各段文字渐变不同，降级为轴起点色标（或前景色）的纯色
+  | "text.effects"              // 各段文字的描边或阴影不一致，按出现最多的一种写成元素级
   | "text.letterSpacing"         // 各 run 字间距不一致，按出现最多的值写入元素级 letterSpacing
   | "shape.scene3d"              // 正交相机三维旋转，按投影压扁包围盒落盘
   | "smartArt.expanded"          // SmartArt 按绘图缓存展开为形状组合（§10.6）

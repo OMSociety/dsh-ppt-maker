@@ -15,7 +15,7 @@
  * rotation 单位为度，绕元素中心旋转。
  */
 import * as React from 'react'
-import { backgroundToCss, borderToCss, fillToCss, resolveColor, resolveTextStyle, type ThemeLike } from '../render/resolve'
+import { backgroundToCss, borderToCss, fillToCss, resolveColor, resolveTextStyle, shadowToCss, type ThemeLike } from '../render/resolve'
 import { pathFromPoints } from '../render/points'
 import { fitCanvas, type CanvasFit } from '../render/canvas-fit'
 import { sanitizeHtml } from '../render/sanitize'
@@ -197,6 +197,9 @@ function ElementView({
     transform: transforms.length ? transforms.join(' ') : undefined,
     opacity: typeof el.opacity === 'number' ? el.opacity : undefined,
   }
+  // 元素外阴影按绘制出的轮廓投影（形状、线条、图片均适用）。
+  const dropShadow = shadowToCss(el.shadow, theme)
+  if (dropShadow) style.filter = `drop-shadow(${dropShadow})`
 
   const type = el.elementType ?? 'text'
   switch (type) {
@@ -255,6 +258,13 @@ function TextView({
   const align = Array.isArray(content.align) ? (content.align as string[]) : []
   const wrap = typeof content.wrap === 'boolean' ? content.wrap : undefined
   const css = textStyleToCss(st, align, wrap)
+  const textShadow = shadowToCss(content.shadow, theme)
+  if (textShadow) css.textShadow = textShadow
+  const outline = content.outline as { width?: unknown; color?: unknown } | undefined
+  const outlineColor = outline ? resolveColor(outline.color, theme) : undefined
+  if (outline && typeof outline.width === 'number' && outline.width > 0 && outlineColor) {
+    css.WebkitTextStroke = `${outline.width}px ${outlineColor}`
+  }
   // 文字渐变：渐变铺在文字容器上并裁到字形，run 内联色（导出时的回落色）在此让位。
   const gradient = content.gradient ? fillToCss(content.gradient, theme) : undefined
   const inner: React.CSSProperties | undefined = gradient

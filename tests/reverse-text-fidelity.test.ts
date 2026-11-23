@@ -40,7 +40,7 @@ afterEach(async () => {
 })
 
 type AnyElement = Page['elements'][number] & {
-  content?: { text?: string; padding?: number[]; letterSpacing?: number; gradient?: { stops: { position: number; color: string }[]; angle?: number } }
+  content?: { text?: string; padding?: number[]; letterSpacing?: number; outline?: unknown; shadow?: { blur: number; color: string; offset?: number[] }; gradient?: { stops: { position: number; color: string }[]; angle?: number } }
   fill?: { type?: string; preset?: string; foreground?: string; background?: string }
   shapeName?: string
   adjustments?: number[]
@@ -50,7 +50,7 @@ async function sourceDeck(): Promise<Uint8Array> {
   const pres = createPresentation({ size: '16:9' })
   const slide = addBlankSlide(pres)
   const flush = addSlideTextBox(slide, { x: emu(60 * PT), y: emu(40 * PT), w: emu(300 * PT), h: emu(40 * PT), text: '' })
-  setShapeParagraphs(flush, [{ runs: [{ text: 'THIS IS DECORATIVE', format: { size: 18, spc: 300 } }] }])
+  setShapeParagraphs(flush, [{ runs: [{ text: 'THIS IS DECORATIVE', format: { size: 18, spc: 300, outline: { color: '#1F4E79', widthEmu: 12700 }, shadow: { color: '#000000', opacity: 0.5, blurEmu: 50800, offsetEmu: 38100, angleDeg: 45 } } }] }])
   setShapeTextMargins(flush, { left: 0, top: 0, right: 0, bottom: 0 })
   setParagraphAlignment(flush, 0, 'distribute')
   const big = addSlideTextBox(slide, { x: emu(400 * PT), y: emu(40 * PT), w: emu(300 * PT), h: emu(200 * PT), text: '' })
@@ -94,6 +94,10 @@ describe('reverse：文本与形状细节保真', () => {
     expect(flush.content?.padding).toEqual([0, 0, 0, 0])
     expect(flush.content?.letterSpacing).toBe(3)
     expect(flush.content?.text).toContain('text-align:distributed')
+    expect(flush.content?.outline).toEqual({ width: 1, color: '#1F4E79' })
+    expect(flush.content?.shadow?.blur).toBe(4)
+    expect(flush.content?.shadow?.offset).toEqual([2.12, 2.12])
+    expect(flush.content?.shadow?.color.toUpperCase()).toBe('#00000080')
 
     const big = elements.find((e) => e.content?.text?.includes('>01<') || e.content?.text === '01')!
     expect(big.content?.text?.toLowerCase()).toContain('#f39800')
@@ -129,6 +133,8 @@ describe('reverse：文本与形状细节保真', () => {
       .join('\n')
     expect(xml).toMatch(/lIns="0"/)
     expect(xml).toMatch(/spc="300"/)
+    expect(xml).toMatch(/spc="300"[^>]*>(?:(?!<\/a:rPr>)[\s\S])*<a:ln w="12700"><a:solidFill><a:srgbClr val="1F4E79"\/>/)
+    expect(xml).toMatch(/spc="300"[^>]*>(?:(?!<\/a:rPr>)[\s\S])*<a:outerShdw blurRad="50800" dist="380\d\d" dir="2700000"/)
     expect(xml).toMatch(/algn="dist"/)
     expect(xml).toMatch(/<a:pattFill prst="dkUpDiag"><a:fgClr><a:srgbClr val="1F4E79"\/><\/a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"\/>/)
     expect(xml).toMatch(/sz="12000"[^>]*>(?:(?!<\/a:rPr>)[\s\S])*<a:gradFill/)
