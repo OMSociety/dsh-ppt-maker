@@ -53,6 +53,7 @@ export interface ReportDegradedEntry {
     | 'text.gradientFill'
     | 'text.letterSpacing'
     | 'shape.scene3d'
+    | 'smartArt.expanded'
     | 'table.styleId'
     | 'notes.richText'
     | 'hyperlink.clickAction'

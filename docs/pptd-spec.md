@@ -2083,7 +2083,7 @@ interface ReportDroppedEntry {
 
 type DroppedOriginalType =
   | "chart"      // 无法映射为 chart 元素的原生图表（散点、雷达、股价、曲面、三维等，见 §10.5）
-  | "smartArt"   // SmartArt 图示
+  | "smartArt"   // 缺少绘图缓存、无法展开的 SmartArt 图示（§10.6）
   | "group"      // 组合（子形状展平见 §6.8；展平失败/空组合时容器落此类）
   | "media"      // 音频/视频
   | "ole"        // OLE 嵌入对象
@@ -2111,6 +2111,7 @@ type DegradedFeature =
   | "text.gradientFill"          // 渐变/图案文字填充降级为轴起点色标（或前景色）的纯色
   | "text.letterSpacing"         // 各 run 字间距不一致，按出现最多的值写入元素级 letterSpacing
   | "shape.scene3d"              // 正交相机三维旋转，按投影压扁包围盒落盘
+  | "smartArt.expanded"          // SmartArt 按绘图缓存展开为形状组合（§10.6）
   | "table.styleId"              // 内置表格样式：id 记入 builtinStyle（§6.8），派生样式不还原
   | "notes.richText"             // 备注富文本降级为纯文本
   | "hyperlink.clickAction"      // 单击动作超链接不建模
@@ -2199,6 +2200,16 @@ interface DeckSource {
 7. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
 
 图表的字体、网格线样式、坐标轴格式、数据表与趋势线等细节不进入 PPTD；所在页未改动时整页沿用源存档（§10.4），这些细节随之保留。落 placeholder 的图表在所在页重建时按占位直通拷回原件。
+
+### 10.6 SmartArt 展开
+
+SmartArt 图示的外观由 PowerPoint 同步保存在绘图缓存部件（`ppt/diagrams/drawingN.xml`）里。逆向导入时：
+
+1. 带绘图缓存的 SmartArt 按缓存里的形状展开为普通元素，形状几何、填充、描边与文字照常映射，可逐个编辑；
+2. 展开出的元素同属一个组合，`group` 首项为 `g-{slideIndex}-{SmartArt 的 shapeId}`（§6.0），导出后仍是一个整体；
+3. 每个展开的图示记一条 degraded（feature `smartArt.expanded`），说明展开出的形状数量；图示的数据模型与自动布局规则不再生效，增删节点即增删形状；
+4. 没有绘图缓存的 SmartArt 按 §10.2 落占位框（originalType `smartArt`），导出时按 §10.4 第4条从源存档拷回原件；
+5. 源存档保存的是展开前的原始文件，未改动的页按 §10.4 沿用源页，其中的 SmartArt 保持原样。
 
 ## 11. 错误码表
 

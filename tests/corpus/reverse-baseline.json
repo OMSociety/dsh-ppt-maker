@@ -79,9 +79,9 @@
     "sourcePictures": 1,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
-    "degraded": 2,
-    "placeholders": 1
+    "dropped": 0,
+    "degraded": 8,
+    "placeholders": 0
   },
   "syn-academic-v2.pptx": {
     "pages": 8,
@@ -107,9 +107,9 @@
     "sourcePictures": 1,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
-    "degraded": 2,
-    "placeholders": 1
+    "dropped": 0,
+    "degraded": 8,
+    "placeholders": 0
   },
   "syn-consulting-v2.pptx": {
     "pages": 8,

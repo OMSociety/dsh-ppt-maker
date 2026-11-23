@@ -12,6 +12,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import { expandSmartArt } from './smartart.js'
 import { loadReverseModel } from './read.js'
 import { mapReverseModel } from './map.js'
 import { writeReverseProject } from './writeProject.js'
@@ -58,9 +59,11 @@ export async function reverseImport(options: ImportOptions): Promise<ReverseWrit
   const { bytes, path: sourceAbs } = await sourceBytes(options.cwd, options.source)
   const sha1 = createHash('sha1').update(bytes).digest('hex')
 
+  // SmartArt 按绘图缓存展开为普通形状组合后再映射；源存档仍是原始字节（spec §10.6）。
+  const smartArt = expandSmartArt(bytes)
   let read: Awaited<ReturnType<typeof loadReverseModel>>
   try {
-    read = await loadReverseModel(bytes)
+    read = await loadReverseModel(smartArt.bytes)
   } catch (err) {
     throw new ReverseImportError(
       'ParseFailed',
@@ -72,6 +75,18 @@ export async function reverseImport(options: ImportOptions): Promise<ReverseWrit
   const mapped = mapReverseModel(read, { sourcePath: sourceAbs, sourceSha1: sha1 })
   // 原始字节随映射结果一起走：writeProject 原样落 source/original.pptx（spec §10 源存档）。
   mapped.sourceBytes = bytes
+  for (const item of smartArt.expanded) {
+    const groupId = `g-${item.slideIndex}-${item.shapeId}`
+    const first = mapped.pages[item.slideIndex - 1]?.elements.find((e) => Array.isArray(e.group) && (e.group as unknown[]).includes(groupId))
+    mapped.report.degraded.push({
+      page: item.slideIndex,
+      elementId: first?.elementId ?? null,
+      feature: 'smartArt.expanded',
+      detail: `SmartArt「${item.name}」按绘图缓存展开为 ${item.shapeCount} 个形状（组合 ${groupId}），图示的数据模型与布局规则不再生效`,
+      originalValue: 'SmartArt'
+    })
+  }
+  mapped.report.summary.degraded = mapped.report.degraded.length
 
   return writeReverseProject(mapped, {
     cwd: options.cwd,
