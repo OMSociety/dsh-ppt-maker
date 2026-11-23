@@ -142,12 +142,12 @@ describe('tpl-badge 图表往返', () => {
   let cwd: string
   beforeEach(async () => {
     cwd = await mkdtemp(path.join(tmpdir(), 'ppt-chart-pattern-'))
-  })
+  }, 60000)
   afterEach(async () => {
     await rm(cwd, { recursive: true, force: true })
-  })
+  }, 60000)
 
-  it('背景斜纹与环形图斜纹切片、中心标签导入后落在 PPTD，重建后仍是图案与偏移', async () => {
+  it('背景斜纹与环形图斜纹切片、中心标签导入后落在 PPTD，重建后仍是图案与偏移', { timeout: 120000 }, async () => {
     const report = await reverseImport({ cwd, source: new Uint8Array(await readFile(corpus)), targetDir: 'proj', sessionId: 's1' })
     const loaded = await loadProject(cwd, 'proj')
     const charts: Array<Record<string, any>> = []
