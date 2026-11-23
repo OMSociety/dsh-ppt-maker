@@ -2,8 +2,9 @@
  * `/ppt-maker/api/*` HTTP 路由：浏览器侧唯一的读写入口。
  *
  * 安全边界（浏览器与文件系统之间唯一的一道门）：
- *   1. **统一访问检查**：每个请求先交给 `ctx.connection.requestRejection`，由宿主完成
- *      Host/Origin 与浏览器登录态认证；401/403 立即结束，之后才解析路由、会话与请求体。
+ *   1. **统一访问检查**：宿主已完成 Host/Origin 与登录态认证。有 `ctx.connection.requestRejection`
+ *      （旧宿主）时先交给它；没有时 handler 第三参 Peer 的 `principal.kind` 必须是 `owner`。
+ *      拒绝即 401/403 结束，之后才解析路由、会话与请求体。
  *   2. **同源校验**：统一访问检查通过后，sameOrigin 再拒缺失或无法解析的 Host、
  *      `sec-fetch-site: cross-site`、`Origin: null` 与 Origin/Host 不匹配；绑定地址（环路或
  *      局域网 IP）由宿主 webServer 配置决定。写方法要求 `content-type: application/json`（415）。
@@ -233,7 +234,7 @@ function projectOf(ss, sessionId, cwd, key) {
 /**
  * @param {{
  *   resolveCwd: (sessionId: string) => string | null,
- *   requestRejection: (req: object) => 401 | 403 | undefined,
+ *   requestRejection?: (req: object) => 401 | 403 | undefined,  // 仅旧宿主提供；缺省时按 handler 第三参 Peer 判 owner
  *   log?: (msg: string) => void,
  *   core: CoreSurface,
  *   nativeCommand?: { canOpenNativePath(): boolean, nativeFileApplications(p: string, s?: AbortSignal): Promise<Array<{ id: string, name: string, default: boolean, icon: string | null }>>, openNativeAssociatedPath(p: string, s?: AbortSignal): Promise<unknown>, openNativeFileApplication(p: string, app: string, s?: AbortSignal): Promise<unknown>, revealNativePath(p: string, s?: AbortSignal): Promise<unknown> },
@@ -260,11 +261,6 @@ const REQUIRED_CORE = [
 ]
 
 export function createApiHandler({ resolveCwd, requestRejection, log = () => {}, core, nativeCommand: nativeOverride, sessionStore: storeOverride } = {}) {
-  if (typeof requestRejection !== 'function') {
-    const err = new Error('createApiHandler 需要 deps.requestRejection（ctx.connection.requestRejection）')
-    err.status = 500
-    throw err
-  }
   if (!core || typeof core !== 'object') {
     const err = new Error(`createApiHandler 需要 deps.core（${REQUIRED_CORE.join(', ')}）`)
     err.status = 500
@@ -333,12 +329,18 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
     return { sessionId, cwd }
   }
 
-  return async function handle(req, res) {
-    const rejection = requestRejection(req)
-    if (rejection !== undefined) {
-      res.statusCode = rejection
-      res.end()
-      return
+  return async function handle(req, res, peer) {
+    if (typeof requestRejection === 'function') {
+      // 旧宿主（@deepseek-ai/dsh-client-connection <= 0.2.2-rc.5）：WebServer 不传 Peer。
+      // 失效条件：DSH 0.2.3 出 rc 版后删除本分支（见 AGENTS.md 待办）。
+      const rejection = requestRejection(req)
+      if (rejection !== undefined) {
+        res.statusCode = rejection
+        res.end()
+        return
+      }
+    } else if (peer?.principal?.kind !== 'owner') {
+      return fail(res, 403, 'forbidden')
     }
     if (!sameOrigin(req)) return fail(res, 403, '拒绝跨站请求')
     const url = new URL(req.url || '/', 'http://localhost')

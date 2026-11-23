@@ -61,7 +61,7 @@ Windows PowerShell 里先设环境变量，再跑第二句：`$env:NODE_OPTIONS=
 
 - `src/index.ts` 的 `apply()` 做三件事：注册技能、懒展开注册 12 个工具、起 webServer 前缀路由。
 - 工具链：`src/tools/*.ts`（raw JSON-Schema 注册）→ `src/core/project/store.ts`（PPTD 工程读写）→ `src/core/engine/officekit.ts`（引擎实现）→ 产物。
-- 工作台链：浏览器每 3s 轮询 `/ppt-maker/api/*` → `plugin/host/routes.mjs` → 经 `deps.core` 注入的同一批 `src/core` 函数（路由侧不 import `lib/`）。每个请求先经 `ctx.connection.requestRejection` 完成宿主统一访问检查，401/403 立即结束；通过后再执行 `sameOrigin` 纵深校验与业务处理。
+- 工作台链：浏览器每 3s 轮询 `/ppt-maker/api/*` → `plugin/host/routes.mjs` → 经 `deps.core` 注入的同一批 `src/core` 函数（路由侧不 import `lib/`）。每个请求先过宿主准入：`ctx.connection.requestRejection` 存在（宿主 <= 0.2.2-rc.5，WebServer 不传 Peer）时调用它，不存在（>= 0.2.3-alpha.1）时要求 handler 第三参 Peer 的 `principal.kind` 为 `owner`，否则 403；通过后再执行 `sameOrigin` 纵深校验与业务处理。
 - 引擎隔离：`src/core/engine/types.ts` 是接口层，换引擎只动 `officekit.ts`。新增引擎能力先扩接口，再在 `officekit.ts` 实现，其它模块只依赖 `types.ts`。
 - 客户端 bundle 只允许 require 平台种子表里的 9 个模块（react 系 + cordis + dsh-client-*），种子表逐字写在 [tests/client-bundle.guard.test.ts](tests/client-bundle.guard.test.ts)。
 
@@ -104,7 +104,7 @@ Windows PowerShell 里先设环境变量，再跑第二句：`$env:NODE_OPTIONS=
 ## 禁止操作
 
 - 禁止把 `llm` / `attachments` 加进 `src/index.ts` 的 `inject`。原因：Cordis 对「声明注入但服务缺席」会让 `apply()` 无限期挂起且全程静默，实测症状是技能在目录里看得见、12 个工具与 webServer 路由全部消失。二者只能经 `ctx.get()` 调用时懒取，缺席时由 `src/core/review/ai.ts` 自行降级。
-- `connection` 必须保留在 `src/index.ts` 的 `inject`，并接入 `createApiHandler` 的 `requestRejection`。原因：所有 `/ppt-maker/api/*` 请求都先由宿主统一认证；缺失或拒绝时不得解析会话、读取请求体或进入业务读写。
+- `connection` 必须保留在 `src/index.ts` 的 `inject`；`requestRejection` 存在时接入 `createApiHandler`，不存在时由 handler 按 Peer 判 owner。原因：所有 `/ppt-maker/api/*` 请求都先由宿主统一认证；拒绝时不得解析会话、读取请求体或进入业务读写。
 - 禁止在 `src/` 里回落 `process.cwd()`。原因：会话 cwd 只能取 `exec.agent.session.id` → `ctx.sessions.get(id).header.cwd`，回落会把工程写进宿主进程目录；取不到就报错。
 - 禁止手改 `lib/index.js`、`lib/client.js`。原因：二者是 tsup / esbuild 产物，且 EOL 由 `.gitattributes` 钉死为 `lf`，重新落盘别转成 CRLF；要改先改 `src/` 或 `client/` 再 `npm run build`。
 - 禁止在 `client/` 里 import `@deepseek-ai/*` 宿主包。原因：浏览器模块表只有 9 项平台种子，多一个依赖整块面板不加载（守卫测试会红）。
@@ -172,3 +172,7 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 
 本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与依赖版本、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。PPTD 格式契约全量自包含于 [docs/pptd-spec.md](docs/pptd-spec.md)，本仓格式以它为准。
 本文件写的是约定与边界，发现与代码不符时先判断哪边过时：约定过时改本文件，代码违规改代码。
+
+## 待办（有触发条件）
+
+- **移除旧宿主兼容分支**：DSH 0.2.3 发布 rc 版后，删除 `src/index.ts` 的 `requestRejection` 传参与类型、`plugin/host/routes.mjs` 的 `requestRejection` 分支，以及 `tests/` 中依赖 `requestRejection` 的用例（改传 owner Peer）；CHANGELOG 在 Removed 章节记录。

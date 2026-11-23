@@ -95,7 +95,7 @@ interface ApplyCtx {
     register(spec: { kind: 'prefix'; path: string; handler: unknown }): () => void
   }
   connection?: {
-    requestRejection(req: unknown): 401 | 403 | undefined
+    requestRejection?(req: unknown): 401 | 403 | undefined
   }
   logger?: { warn?: (message: string) => void }
   effect?: (fn: () => void | (() => void)) => void
@@ -126,7 +126,7 @@ interface HostRoutesModule {
   API_PREFIX: string
   createApiHandler(deps: {
     resolveCwd(sessionId: string): string | null
-    requestRejection(req: unknown): 401 | 403 | undefined
+    requestRejection?: (req: unknown) => 401 | 403 | undefined
     log?: (message: string) => void
     core: {
       loadProject: typeof loadProject
@@ -144,7 +144,7 @@ interface HostRoutesModule {
       ProjectError: typeof ProjectError
     }
     sessionStore?: HostStoreModule
-  }): (req: unknown, res: unknown) => Promise<void>
+  }): (req: unknown, res: unknown, peer?: { principal?: { kind?: string } }) => Promise<void>
 }
 
 let hostModulesPromise: Promise<{ routes: HostRoutesModule; store: HostStoreModule }> | null = null
@@ -192,12 +192,12 @@ function registerRoutes(ctx: ApplyCtx): () => void {
         if (cancelled) return
         const handler = routes.createApiHandler({
           resolveCwd,
-          // `connection` 是必需注入；缺失时拒绝请求，不回落到仅同源检查。
-          requestRejection: (req) => {
-            const connection = ctx.connection
-            if (!connection || typeof connection.requestRejection !== 'function') return 403
-            return connection.requestRejection(req)
-          },
+          // 旧宿主（<= 0.2.2-rc.5）提供 requestRejection；新宿主没有，handler 改按 Peer 判 owner。
+          // 失效条件：DSH 0.2.3 出 rc 版后删除（见 AGENTS.md 待办）。
+          requestRejection:
+            typeof ctx.connection?.requestRejection === 'function'
+              ? (req) => ctx.connection!.requestRejection!(req)
+              : undefined,
           log: (message) => ctx.logger?.warn?.(`[dsh-ppt-maker] ${message}`),
           core: {
             loadProject,

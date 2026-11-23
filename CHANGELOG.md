@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-11-24
+
+### 修复
+
+- **右侧栏面板在 DSH 0.2.3-alpha.1 及之后的宿主上恢复可用。** 新宿主的 `connection` 不再提供 `requestRejection`，此前所有 `/ppt-maker/api/*` 请求被一律拒绝（403）。现在有 `requestRejection` 的宿主沿用它；没有时，路由按 handler 第三参 Peer 判定，仅 `principal.kind` 为 `owner` 的请求放行，其余 403。
+
+### Fixed
+
+- **The right-sidebar panel works again on DSH 0.2.3-alpha.1 and later.** The newer host's `connection` no longer provides `requestRejection`, so every `/ppt-maker/api/*` request was refused with 403. Hosts that provide `requestRejection` keep using it; otherwise the route checks the handler's third argument (Peer) and admits only `principal.kind === 'owner'`, answering 403 for everything else.
 ## [2.0.3] - 2026-11-24
 
 ### 修复

@@ -137,6 +137,38 @@ describe('宿主入口', () => {
     expect(req.on).not.toHaveBeenCalled()
   })
 
+  it('新宿主无 requestRejection：非 owner 的 Peer 回 403，不进入业务', async () => {
+    const { ctx } = makeCtx(cwd)
+    let handler: ((req: unknown, res: unknown, peer?: unknown) => Promise<void>) | undefined
+    apply({
+      ...ctx,
+      connection: {},
+      webServer: {
+        register: (spec: { kind: 'prefix'; path: string; handler: typeof handler }) => {
+          handler = spec.handler
+          return () => {}
+        },
+      },
+    })
+    await vi.waitFor(() => expect(handler).toBeTypeOf('function'))
+
+    const mk = () => ({
+      req: {
+        method: 'GET',
+        url: '/ppt-maker/api/state?sessionId=s-e2e',
+        headers: { host: '127.0.0.1:17507' },
+        on: vi.fn(),
+      },
+      res: { statusCode: 200, end: vi.fn(), writeHead: vi.fn(), setHeader: vi.fn() },
+    })
+    for (const peer of [undefined, { principal: { kind: 'guest' } }]) {
+      const { req, res } = mk()
+      await handler!(req, res, peer)
+      expect(res.statusCode === 403 || res.writeHead.mock.calls[0]?.[0] === 403).toBe(true)
+      expect(req.on).not.toHaveBeenCalled()
+    }
+  })
+
   it('ctx.get 在场或缺席都不影响注册（llm/attachments 走调用时懒取）', () => {
     // 带 get 的宿主：llm/attachments 在注册期与展开后执行前都不得被读
     // （getter 必须懒）；sessions 的读是懒展开扫描的合法行为，不在此限。
