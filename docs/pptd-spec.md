@@ -1095,8 +1095,8 @@ interface LegendConfig extends TextStyle {
 
 | 类型 | 默认 |
 |---|---|
-| bar / line / area / scatter / bubble / candlestick / pie / radar | `true` |
-| waterfall | `false` |
+| bar / line / area / scatter / bubble / pie / radar | `true` |
+| candlestick / waterfall | `false`（K 线的开高低收是数据通道，只有显式写 `legend` 才显示） |
 | treemap / sunburst / sankey | `false`（名称与数值已直接画在图上） |
 | heatmap | 不使用 `chart.legend`（由 series.colorbar 控制） |
 

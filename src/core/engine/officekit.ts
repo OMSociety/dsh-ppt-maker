@@ -1652,6 +1652,8 @@ function stockChartSpecOf(
     spec.upDownBars = { ...(up ? { upColor: up } : {}), ...(down ? { downColor: down } : {}) }
   }
   applyCartesianChartOptions(spec, element, series, false, resolver)
+  // 股价图的系列是开高低收四个数据通道，默认图例只会列出其中一项，只有显式写 legend 才显示。
+  if (element.legend === undefined) spec.legend = { position: null }
   return spec
 }
 

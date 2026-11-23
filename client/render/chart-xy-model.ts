@@ -450,7 +450,8 @@ function xyModelOf(content: Rec, theme: ThemeLike | null | undefined, size: Char
   const maxSize = Math.max(0, ...raws.flatMap((raw) => raw.rows.map((row) => row.size ?? 0)))
   const defaultRange: [number, number] = [0, Math.max(8, Math.round(short * 0.12))]
   const ranges = raws.map((raw) => sizeRangeOf(raw.spec.sizeRange) ?? defaultRange)
-  const rMax = kind === 'bubble' ? Math.max(0, ...ranges.map((range) => range[1])) : 0
+  const markerMax = Math.max(0, ...raws.map((raw) => { const s = recOf(raw.spec.marker).size; return typeof s === 'number' && s > 0 ? s : Math.max(6, Math.min(12, Math.round(short * 0.03))) }))
+  const rMax = kind === 'bubble' ? Math.max(0, ...ranges.map((range) => range[1])) : markerMax / 2 + 1
 
   const xAxisRaw = axisOf(content.xAxis)
   const yAxisRaw = axisOf(content.yAxis)
@@ -759,8 +760,8 @@ export function radarModelOf(content: Rec, theme: ThemeLike | null | undefined, 
         const { dx, dy } = direction(index)
         return `${round2(cx + dx * r)},${round2(cy + dy * r)}`
       }).join(' '),
-      labelX: cx + 3,
-      labelY: cy - r - 2,
+      labelX: cx + 4,
+      labelY: cy - r + 11,
     }
   })
 

@@ -363,3 +363,19 @@ describe('ChartView · candlestick', () => {
     expect(chartSvg(content)).not.toContain('<rect')
   })
 })
+describe('ChartView · 散点留白', () => {
+  it('两端点离绘图区边缘不小于标记半径', () => {
+    const m = scatterModelOf({
+      type: 'scatter',
+      data: { cols: ['x', 'y'], rows: [[1, 1], [2, 5], [3, 3]] },
+      series: [{ type: 'scatter', encode: { x: 'x', y: 'y' } }],
+    }, null, { width: 400, height: 240 })!
+    const r = m.series[0].marker!.size / 2
+    const xs = m.series[0].points.map((p) => p.px)
+    const ys = m.series[0].points.map((p) => p.py)
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(m.plot.left + r - 1e-6)
+    expect(Math.max(...xs)).toBeLessThanOrEqual(m.plot.left + m.plot.width - r + 1e-6)
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(m.plot.top + r - 1e-6)
+    expect(Math.max(...ys)).toBeLessThanOrEqual(m.plot.top + m.plot.height - r + 1e-6)
+  })
+})
