@@ -1,10 +1,10 @@
 <p align="center"><a href="README.md">中文</a> · <strong>English</strong></p>
 
 <div align="center">
-<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT Maker"><br>PPT Maker (dsh-ppt-maker)</h1>
+<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT Maker"><br>PPT Maker dsh-ppt-maker</h1>
 
-  <p>A DeepSeek Harness plugin for creating, editing, reverse-engineering, checking and exporting presentations — a local, pure-TypeScript engine builds the final .pptx directly.</p>
-  <p>The model works through twelve <code>ppt_*</code> tools while you follow along and edit in the right-hand workbench — double-click to edit text in place, drag to reorder pages, and open the exported file with one click.</p>
+  <p>A presentation plugin for DeepSeek Harness: the model designs, builds, and reworks decks while you review and edit alongside it in the right sidebar.</p>
+  <p>The result is a locally built .pptx where every word, shape, and chart stays editable in PowerPoint.</p>
 
   <p>
     <a href="https://www.npmjs.com/package/dsh-ppt-maker"><img src="https://img.shields.io/npm/v/dsh-ppt-maker?color=4f6ef7&label=version" alt="Version"></a>
@@ -13,145 +13,131 @@
     <a href="https://github.com/OMSociety/dsh-ppt-maker/stargazers"><img src="https://img.shields.io/github/stars/OMSociety/dsh-ppt-maker?color=4f6ef7" alt="Stars"></a>
     <a href="https://github.com/OMSociety/dsh-ppt-maker/issues"><img src="https://img.shields.io/github/issues/OMSociety/dsh-ppt-maker?color=4f6ef7" alt="Issues"></a>
   </p>
-
-<a href="#what-this-is">What This Is</a> • <a href="#key-features">Key Features</a> • <a href="#in-action">In Action</a> • <a href="#installation">Installation</a> • <a href="#model-tools">Model Tools</a> • <a href="#the-workbench">The Workbench</a> • <a href="#development">Development</a> • <a href="#changelog">Changelog</a> • <a href="#support--acknowledgements">Support &amp; Acknowledgements</a> • <a href="#license--author">License &amp; Author</a>
 </div>
 
-## What This Is
+## What it is
 
-**PPT Maker** is a presentation toolchain that lives inside DeepSeek Harness: the model creates, edits, reverse-engineers, checks and exports decks through twelve `ppt_*` tools, while you work alongside it in the right-hand workbench — panel and model read and write the same PPTD project.
+**PPT Maker** splits deck-making into a workflow that both the model and you can pick up at any point. The model uses twelve `ppt_*` tools to create a project, write pages, render the real output to check its own work, run quality checks, and export. You see the same project in the "PPT 工作台" (PPT Workbench) tab of the right sidebar, where you can double-click to edit text, drag pages into a new order, or swap images at any time; the model continues from your changes.
 
-The intermediate format is **PPTD**, a self-defined contract in YAML (`deck.pptd` + `pages/*.page`): self-contained per page and WYSIWYG, with two dialects (generate / reverse superset). The full spec is in [`docs/pptd-spec.md`](docs/pptd-spec.md) (fully self-contained).
+Pages are written in **PPTD**, a YAML project format (`deck.pptd` plus one `pages/*.page` per slide) that people can read and models can write. The full specification is in [`docs/pptd-spec.md`](docs/pptd-spec.md). On export the plugin builds the final .pptx locally with [@office-kit/pptx](https://www.npmjs.com/package/@office-kit/pptx) and embeds the fonts it uses, so the deck displays correctly on machines that do not have those fonts installed.
 
-## Key Features
+The plugin also ships the `ppt-maker` skill, with 30 design systems across five families (academic, consulting, finance, promotion, and workplace) and guidance on writing pages. The model reads it when needed.
 
-| Feature | Description |
-|---|---|
-| **Twelve model tools** | Registered with raw JSON-Schema: create / themes / edit / undo / redo / render / check / export / import / open / surgical patch / SVG. The engine `@office-kit/pptx@0.24.0` builds the final .pptx locally in pure TypeScript — no Python in the main pipeline |
-| **SVG page track** | Pages with `pageType: svg` compile a whole SVG page into native DrawingML (text boxes / freeform shapes, element-editable in PowerPoint — not a pasted image), built, checked and exported through the same pipeline as native pages; `ppt_svg` writes and compiles, with artifacts cached by content + converter version + theme hash. The converter is vendored from ppt-master (MIT); prepare its environment with `node scripts/prepare-vendor-env.mjs` |
-| **Masters & layouts** | `deck.masters` declares real OOXML masters/layouts (shared decorations + placeholder frames); pages attach via `layoutRef`, so shared decorations across a multi-page deck are declared once |
-| **Two-way workflow** | `ppt_import` reverse-engineers an existing .pptx into a PPTD project and archives the source file; a deck with zero edits since import is restored wholesale from the source archive on export (charts / SmartArt / connectors survive), and any content edit falls the whole deck back to a rebuild; `ppt_patch` performs surgical edits on a .pptx (text / image / page order) without a PPTD round-trip |
-| **PPTD contract** | A YAML DSL (`deck.pptd` + `pages/*.page`), self-contained per page and WYSIWYG; generate / reverse dialects, editable by hand and by machine |
-| **Right-hand workbench** | A custom three-pane editor (thumbnails + canvas + inspector): double-click to edit text in place, drag to reorder pages, one-click image replacement, live table/chart rendering, whole-page SVG preview, undo / redo, version history with live snapshot preview and one-click restore, 409 conflict protection and a "modified externally" banner |
-| **Layered QA** | Rule layer (text overflow measured with real glyph widths / out-of-bounds / overlap / per-run contrast / structure / missing fonts) blocks export; AI layer on demand (`ppt_check ai:true`) sends rendered page PNGs to a multimodal model to review color and layout — suggestions only, never blocking; results are recorded in `manifest.qaReport`, fingerprint-bound to deck + pages + media + checker and converter versions — a stale or partially-covering report refuses export |
-| **Unified release pipeline** | Model export and panel export share one release pipeline: QA gate → build + font embedding → postflight re-read (ZIP re-parse + library validation) → SHA-256 ledger |
-| **Font embedding** | Export embeds the fonts actually used (EOT-wrapped `fntdata` + `embeddedFontLst`), so machines without the fonts installed render without falling back; subset / whole-font / off tiers (`export.fontEmbed`), with a per-font fsType license gate |
-| **Transitions & animations** | Page-level transitions (fade by default / none / auto curated rotation) and 95 element animation presets, written natively by the local pipeline |
-| **Revisions & snapshots** | Single-writer manifest + append-only snapshots (the cursor model makes undo/redo natural) + baseRevision optimistic locking (409) |
-| **Design system** | Five preset theme families with 30 themes — academic / consulting / finance / promotion / work; machine-readable `theme.yml` (colors / fonts) is written into `deck.theme` on selection, keeping the whole deck's layout, color and hierarchy consistent |
-| **Locally rendered preview** | The canvas and thumbnails render PPTD pages directly to the DOM (vector, instant, same coordinate system as the selection boxes); PNG previews for export and QA rasterize the final pptx via `@deepseek-ai/libreoffice-kit`, written to the project's `.previews/page-NN.png` and overwritten on each render; `ppt_render` lists each page image's absolute path for `read_image` |
+## Preview
 
-## In Action
+### Light workbench · cover page
 
-### Light workbench · Cover
+![The PPT Workbench in the DSH light theme: the PPT 工作台 tab at the top, three page thumbnails on the left, the cover page in the center](docs/workbench-light.png)
 
-![PPT Maker in the DSH light theme: the PPT Maker tab above the workbench, three page thumbnails on the left, and a native cover on the canvas](docs/workbench-light.png)
+### Dark workbench · native chart and table
 
-### Dark workbench · Native chart and table
+![The PPT Workbench in the DSH dark theme: the canvas shows an editable native bar chart and table](docs/workbench-dark.png)
 
-![PPT Maker in the DSH dark theme: the PPT Maker tab above the workbench and native chart and table elements rendered directly on the canvas](docs/workbench-dark.png)
+### Actual export · SVG page
 
-### Actual export · SVG page track
+![The actual exported rendering of the project's third page: an SVG flow page compiled into editable text and shapes](docs/export-svg.png)
 
-![Actual rendered export of the third page from the same project: the SVG flow page retains editable text and shapes after DrawingML compilation](docs/export-svg.png)
+Both workbench images render the real workbench components, styles, and the actual three-page project data, with only the network requests replaced by local data. [`docs/preview/workbench.html`](docs/preview/workbench.html) is the same page and opens offline; switch the theme and page with `#theme=light&page=0` and `#theme=dark&page=1`. The third image is the actual rendering of the same project's third page after export to .pptx.
 
-Both workbench images render the production client components, styles and real three-page PPTD data, replacing only network transport with a local fixture. [`docs/preview/workbench.html`](docs/preview/workbench.html) is self-contained and opens offline; use `#theme=light&page=0` or `#theme=dark&page=1` to select the theme and page. The third image is an actual render of the final PPTX for page three of the same project.
+## Quick start
 
-## Installation
+Stop the running DSH, install with `dsh plugin --profile <profile> add "dsh-ppt-maker"`, then start DSH again.
 
-**Install from npm**
+> **Tip**: After installing, refresh the browser page so the "PPT 工作台" tab appears in the right sidebar. The workbench interface is loaded with the page, so restarting the host alone is not enough.
 
-```powershell
-# Stop the running DSH first (a running service locks dependencies; start it again afterwards)
-dsh plugin --profile <profile> add "dsh-ppt-maker"
-```
+1. Ask in chat for a deck about a topic, or hand the model an existing .pptx and describe the changes you want.
+2. Once the model creates or imports a project, the workbench opens in the right sidebar automatically.
+3. The model renders the real output of each page as it works to check itself; you can edit in the workbench at any time, and the model reads your changes on its next step.
+4. When you are satisfied, ask the model to export, or click "导出 .pptx" (Export .pptx) in the workbench. A full-deck quality check runs first and lists any blocking issues.
+5. "打开" (Open) in the footer status bar opens the result in the system's associated app; you can also choose "显示文件位置" (Show file location).
 
-> **Tip:** after installing, refresh the browser page and open the "PPT 工作台" tab from the right-hand rail — restarting the host alone is not enough, the client bundle is fetched when the page loads.
+> **Dependencies**: [@deepseek-ai/libreoffice-kit](https://www.npmjs.com/package/@deepseek-ai/libreoffice-kit), used for rendering and quality checks, installs with the plugin (about 183MB per platform). Python 3.10+ is needed only for SVG pages: on first use, run `node scripts/prepare-vendor-env.mjs` once (from the plugin package root) to create a virtual environment and install its dependencies. pip uses the Tsinghua mirror by default; set `PIP_INDEX` to change the index and `PYTHON` to choose the interpreter.
 
-> **Dependencies:** the main pipeline is pure TypeScript with no Python; `@deepseek-ai/libreoffice-kit@0.1.2`, used by `ppt_render` and QA, is a hard dependency (about 183MB per platform, installed with the package). Only the SVG page track (`ppt_svg`) needs Python 3.10+: run `node scripts/prepare-vendor-env.mjs` once (the script ships with the package, at the plugin package root) to create the virtual environment and install the pinned dependencies (pip uses the Tsinghua mirror by default; override with the `PIP_INDEX` environment variable, and pick the interpreter with `PYTHON`). The Python scripts under `skills/ppt-maker/scripts/` are an escape hatch only — see the "Python escape hatch" section in SKILL.md.
+> **Platforms**: Windows and macOS (x64/arm64) use the native rendering engine; Linux has no native package, so rendering and quality checks use the WASM engine. CI runs the same test suite on `windows-latest` and `ubuntu-latest`; macOS has no CI coverage yet.
 
-> **Platforms:** the engine ships per platform. Windows (x64/arm64) and macOS (x64/arm64) get native packages; Linux has none (no `libreoffice-kit-linux-*` on npm), so rendering and QA fall back to WASM. CI runs the same suite on `windows-latest` and `ubuntu-latest` (minus the font-embedding assertions) and both pass; exports are produced by the same code path, without a cross-platform byte comparison. macOS has no CI coverage yet.
+## Building a new deck
 
-**Getting started**
+Once the model picks a design system, `ppt_create` writes its colors, fonts, and text styles into the project's theme table. Pages reference them as `$primary`, `$title`, and so on, so recoloring the whole deck means editing only the theme table. Shared brand bars, footers, and corner marks go into masters and layouts that each page attaches to.
 
-1. Say "make me a presentation" in the chat (or explicitly invoke the `ppt-maker` skill) → the twelve `ppt_*` tools come in
-2. The model creates a project with `ppt_create`, or reverse-engineers an existing .pptx into a project with `ppt_import` → the workbench pops open in the right-hand rail
-3. Double-click to edit text in the panel, drag to reorder pages, click "Export .pptx" → the plugin runs a full-deck rule check on the spot, then saves `<project>-r<version>.pptx` under the project's `export/`
-4. Have the model run `ppt_check` for QA and `ppt_render` for per-page PNGs; if the model edits the same project in another session, the panel shows a 409 conflict banner instead of overwriting your edits
-5. Click "Open" in the footer status bar → open the result with the system associated app, or choose "Show in folder"
+Page elements include text, shapes (177 preset shapes with adjustment values, or custom paths), lines, images, tables, and native charts (bar, column, line, area, pie, doughnut, and more, with data still editable in PowerPoint after export). Text supports gradients, outlines, shadows, letter spacing, distributed alignment, and exact insets; shapes support gradient and pattern fills, gradient outlines, and drop shadows. Elements can be grouped and move as one group in PowerPoint after export.
 
-## Model Tools
+When a page is too complex for these elements (fine gradients, freeform curves, layered cover art), the whole page can be drawn as an SVG. On export that page compiles into native PowerPoint text boxes and shapes rather than a single picture, so each piece remains selectable and editable.
 
-| Tool | What it does | Key parameters |
+After every round of edits the model can call `ppt_render` to render real images of the final .pptx, not mockups. `ppt_export` can also write a PDF alongside the .pptx.
+
+## Editing an existing deck
+
+- **Changing a few words, swapping an image, or reordering pages**: `ppt_patch` edits the original file directly and keeps everything it does not touch, including parts the plugin does not model, such as SmartArt and embedded spreadsheets.
+- **Major edits or a redesign**: `ppt_import` turns the .pptx into a PPTD project. Common native charts become editable chart elements, SmartArt expands into a group of editable shapes, and groups, text effects, and gradient and pattern fills are preserved. The import report lists objects that could not be converted (such as OLE objects, media, and less common chart types, each left as a placeholder in place) and properties that lost detail in conversion; the model reports these to you as they are.
+- **Export uses the original file as the skeleton**: unchanged pages are kept as they are; edited pages are rebuilt from the project on their original layouts, and unconverted objects on those pages are copied back from the original file in place. Theme and masters come from the original file.
+
+## PPT Workbench
+
+The "PPT 工作台" tab in the right sidebar is a three-pane editor: page thumbnails on the left, the canvas in the center, and the properties panel on the right.
+
+- **Instant view**: the canvas and thumbnails draw pages directly as web elements without waiting for a rendering engine to start. Tables, charts, and SVG pages show as they really look; objects that could not be converted on import show their preview image when one exists, or a placeholder box otherwise.
+- **Direct editing**: double-click to edit text in place, drag pages to reorder them, duplicate, delete, or add pages, replace images, and set exact position and size in the properties panel.
+- **Undo and history**: undo and redo are always at hand; the "历史" (History) drawer previews any version and restores it with one click.
+- **No overwrites**: every write carries a version number. When the model changes the same project elsewhere, the workbench shows a conflict notice instead of overwriting your edits.
+- **Export**: "导出 .pptx" runs a full-deck quality check first, then saves the result under the project's `export/` folder as `<project name>-r<version>.pptx`.
+
+## Model tools
+
+| Tool | Purpose | Key parameters |
 |---|---|---|
-| `ppt_create` | Create a new PPTD project (selected theme written into `deck.theme`) | `dir` · `title` · `size` · `designSystem` · `theme` |
-| `ppt_themes` | List design systems and themes (five families, 30 themes) | `designSystem` (optional) |
-| `ppt_edit` | Atomic editing: an ops array of page/element additions, removals and updates (incl. `update_svg_source`), with baseRevision optimistic locking | `dir` · `ops` · `baseRevision` |
-| `ppt_undo` / `ppt_redo` | Undo / redo (cursor moves; consecutive edits within the merge window count as one step) | `dir` · `steps` (1–20, default 1) |
-| `ppt_render` | Render per-page PNG previews (rasterization of the final pptx; the result lists each page image's absolute path) | `dir` · `pages` · `dpi` (default 96) |
-| `ppt_check` | Rule-based QA (default) + AI visual QA (suggestions only, never blocking) | `dir` · `pages` · `ai` |
-| `ppt_export` | Export .pptx (QA fingerprint gate + postflight re-read; `skipCheck` bypasses) | `dir` · `out` · `skipCheck` |
-| `ppt_import` | .pptx → full PPTD reverse engineering (dropped / degraded two-level report + source archive) | `source` · `targetDir` · `mode` (`full` / `surgical`) · `open` |
-| `ppt_open` | Have the right-hand workbench open a project | `dir` |
-| `ppt_patch` | Surgical edits on a .pptx: set_text / replace_image / move_page | `source` · `ops` · `out` |
-| `ppt_svg` | SVG page track: write SVG source (`put`) / compile to a native DrawingML single page (`compile`) | `dir` · `action` · `name` · `svg` · `page` |
+| `ppt_create` | Create a project and write the chosen design system into the theme table | `dir` · `title` · `size` · `designSystem` · `theme` |
+| `ppt_themes` | List the built-in design systems | `designSystem` (optional) |
+| `ppt_edit` | Atomic batch edits to pages and elements; if any operation fails, nothing is saved | `dir` · `ops` · `baseRevision` |
+| `ppt_undo` / `ppt_redo` | Undo / redo | `dir` · `baseRevision` · `steps` |
+| `ppt_svg` | Write an SVG page source and attach it to a page, or compile it right away to check it | `dir` · `action` · `name` · `svg` · `page` |
+| `ppt_render` | Build the final .pptx and render each page to PNG, returning each image's absolute path | `dir` · `pages` · `dpi` |
+| `ppt_check` | Rule-based quality check; `ai: true` adds multimodal visual suggestions | `dir` · `pages` · `ai` |
+| `ppt_export` | Export the .pptx, optionally with a PDF | `dir` · `out` · `pdf` · `skipCheck` |
+| `ppt_import` | Turn a .pptx into a PPTD project with an import report | `source` · `targetDir` · `mode` · `open` |
+| `ppt_patch` | Light edits to a .pptx: change text, swap images, reorder pages | `source` · `ops` · `out` |
+| `ppt_open` | Open a project in the right-sidebar workbench | `dir` |
 
-The model's standard sequence is **`ppt_create` (or `ppt_import`) → `ppt_edit` iterations (`ppt_svg` for complex visual pages) → `ppt_check` → `ppt_export`**; the `ppt-maker` skill (registered with the plugin) documents the design-system selection and editing discipline, which the model reads on demand. For light edits to an existing .pptx (text / image / page order), use `ppt_patch` — no PPTD round-trip involved.
+The rule-based check measures text with the real glyphs of the project's actual fonts and looks for text overflow, out-of-canvas elements, overlaps, contrast, structure, and missing fonts; overflow, out-of-canvas elements, and broken structure block export. Check results are tied to the project content, so any change after a check requires checking again before export. On export the plugin embeds fonts (subset, full, or off, decided per font by its license) and then re-parses and validates the result, refusing to write the file if validation fails.
 
-> **Tip:** when export is blocked by a rule blocker, fix the `issues` returned by `ppt_check` one by one, or force it with `skipCheck:true` (not recommended). If `ppt_check ai:true` returns `ai.performed:false` plus a list of PNG paths, the current route's model doesn't accept image input — the main model can review those PNGs itself with `read_image`.
-
-## The Workbench
-
-The "PPT 工作台" tab in the right-hand rail is a three-pane editor: thumbnail strip + canvas + inspector.
-
-- **The canvas is the DOM**: the canvas and thumbnails render the PPTD page AST directly to the DOM (`client/components/PptdView.tsx`) — instant, no libreoffice cold start; elements, selection boxes and the in-place editor share one coordinate system and stay aligned. Tables and charts render as real DOM/SVG; SVG pages preview as a full-page backdrop; elements that can't render yet (icon / SmartArt) show gray placeholders.
-- **Collapsible side panes**: the left page list is expanded by default and can be collapsed; the right inspector only expands when an element is selected. Collapsed panes leave only an edge handle.
-- **Edit in place**: double-click to edit text / drag to reorder pages / duplicate, delete and add pages / replace images / "Export .pptx" runs the rule check automatically and saves `<project>-r<version>.pptx` under the project's `export/`.
-- **Version history**: the "History" drawer renders any snapshot live on the canvas and restores it with one click.
-- **Footer status bar**: "Saving…" and operation feedback (export destination, failure reasons) live in a permanent bottom bar that doesn't eat canvas height.
-- **Conflict protection**: every write carries `baseRevision`; if the model edits the same project in another session the server returns 409 — the panel only shows a conflict banner and never overwrites your edits; the "modified externally" banner works the same way.
-- **Polling and focus**: state is polled every 3s to watch manifest.revision; after the model finishes `ppt_open` / `ppt_import`, the panel focuses the corresponding project automatically.
+> **Tip**: With `ai: true`, if the current model does not accept image input, `ppt_check` returns the list of page image paths so the main model can review them itself.
 
 ## Development
 
 ```powershell
-npm install          # install dependencies
-npm test             # full regression suite (set a 12GB heap and run serially, see below)
-npm run typecheck    # two tsconfigs: src/ and client/
-npm run build        # rebuild lib/index.js and lib/client.js (required after touching src/ or client/; commit the artifacts)
-npm run build:preview # rebuild the self-contained preview HTML from production workbench components and docs/preview/fixture.json
-npm run check:build  # verify lib/ matches git
-npm run check:mounts # mount declaration check
-npm run check:pack   # package file-list check
+npm install           # install dependencies
+npm run typecheck     # the src/ and client/ tsconfigs
+npm run build         # rebuild lib/index.js and lib/client.js (required after editing src/ or client/; commit the output)
+npm run build:preview # rebuild the self-contained preview page docs/preview/workbench.html from the real workbench components
+npm run check:build   # confirm lib/ matches git
+npm run check:mounts  # verify mount declarations
+npm run check:pack    # verify the published file list
 ```
 
-> **Tip:** the full test suite needs a large heap and serial execution (the default heap runs out of memory): set `$env:NODE_OPTIONS='--max-old-space-size=12288'` first, then `npx vitest run --no-file-parallelism`. The full acceptance criteria and the don'ts are in [`AGENTS.md`](AGENTS.md).
-
-Directories and where to make changes:
+> **Tip**: Run the full test suite serially with a large heap: first `$env:NODE_OPTIONS='--max-old-space-size=12288'`, then `npx vitest run --no-file-parallelism`. See [`AGENTS.md`](AGENTS.md) for the full acceptance criteria and development conventions.
 
 ```text
-src/index.ts       host entry: registers the skill + lazily expands the 12 tools + webServer prefix routes
-src/core/          engine: pptd contract / officekit builder / project store & snapshots / reverse / QA / font embedding / release pipeline / svg compile bridge
-src/tools/         raw JSON-Schema contracts of the 12 tools
-client/            right-hand workbench source (TSX → esbuild bundles lib/client.js)
-plugin/            loading shell + host routes (plain JS, core injected via deps.core)
-skills/ppt-maker/  the ppt-maker skill: design-system reference and generation discipline (the model reads it on demand); vendor/ holds the SVG converter and its Python environment
-tests/             host contract / tool e2e / reverse / fonts / bundle guards (20 anonymized corpus .pptx files are committed; sensitive-words.txt is not)
-docs/              PPTD spec (fully self-contained) / decision log / fallback font table
-lib/               build artifacts (committed; dsh plugin add installs without building)
+src/index.ts       host entry: registers the skill, the twelve tools, and the workbench webServer routes
+src/core/          engine: PPTD contract, .pptx build, project storage and version snapshots, import, quality checks, font embedding, release pipeline, SVG compilation
+src/tools/         JSON Schema contracts for the twelve tools
+client/            workbench source (TSX, built into lib/client.js)
+plugin/            loader shell and the workbench host routes
+skills/ppt-maker/  the ppt-maker skill: design systems and page-writing guidance; vendor/ holds the SVG converter and its Python dependencies
+tests/             host contract, tool end-to-end, import, fonts, and build-output guards; ships 20 anonymized .pptx corpus files
+docs/              PPTD specification, design decisions, fallback font table, preview page
+lib/               build output (committed; installs do not build)
 ```
 
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
 
-## Support & Acknowledgements
+## Support and acknowledgements
 
-- If this plugin helps you, a star is much appreciated; for questions and suggestions please open an [Issue](https://github.com/OMSociety/dsh-ppt-maker/issues) or a [Pull Request](https://github.com/OMSociety/dsh-ppt-maker/pulls). Development conventions are in [`AGENTS.md`](AGENTS.md).
-- Built on the [DeepSeek Harness](https://github.com/deepseek-ai/dsh) plugin / skill system.
-- Engine [@office-kit/pptx](https://www.npmjs.com/package/@office-kit/pptx) (pinned at 0.24.0) and preview [@office-kit/pptx-preview](https://www.npmjs.com/package/@office-kit/pptx-preview); rasterization via [@deepseek-ai/libreoffice-kit](https://www.npmjs.com/package/@deepseek-ai/libreoffice-kit) (MPL-2.0 — its API / CLI is invoked only, no source linking or modification).
-- The SVG → DrawingML converter is vendored from [ppt-master](https://github.com/hugohe3/ppt-master) (MIT, © 2025-2026 Hugo He). Third-party license details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- If this plugin helps you, a Star is welcome; please send questions and suggestions as an [Issue](https://github.com/OMSociety/dsh-ppt-maker/issues) or [Pull Request](https://github.com/OMSociety/dsh-ppt-maker/pulls).
+- Built on the [DeepSeek Harness](https://github.com/deepseek-ai/dsh) plugin and skill system.
+- .pptx building uses [@office-kit/pptx](https://www.npmjs.com/package/@office-kit/pptx), text measurement uses [@office-kit/pptx-preview](https://www.npmjs.com/package/@office-kit/pptx-preview), and rendering uses [@deepseek-ai/libreoffice-kit](https://www.npmjs.com/package/@deepseek-ai/libreoffice-kit) (MPL-2.0; only its API is called and its source is not modified).
+- The SVG converter derives from [ppt-master](https://github.com/hugohe3/ppt-master) (MIT, © 2025-2026 Hugo He) and is maintained independently in this repository; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party license details.
 
-## License & Author
+## License and author
 
 [MIT](LICENSE). © 2026 [OMSociety](https://github.com/OMSociety).
