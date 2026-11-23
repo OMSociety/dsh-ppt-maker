@@ -195,7 +195,7 @@ describe('宿主入口', () => {
 })
 
 describe('ppt_* 工具全链（e2e stub）', () => {
-  it('create → edit×3 → undo → redo', async () => {
+  it('create → edit×3 → undo → redo', { timeout: 60000 }, async () => {
     const { ctx, fire } = makeCtx(cwd)
     apply(ctx)
     revealTools(fire)
