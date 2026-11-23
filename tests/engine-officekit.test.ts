@@ -103,7 +103,7 @@ describe('officekit 引擎', () => {
     )
     const fadeBack = await loadPresentation(await engine.saveDeck(withFade.native))
     expect(getSlideTransition(getSlides(fadeBack)[0])?.effect).toBe('fade')
-    expect(getSlideTransition(getSlides(fadeBack)[0])?.speed).toBe('fast')
+    expect(getSlideTransition(getSlides(fadeBack)[0])?.durationMs).toBe(700)
 
     const noTransition = await engine.buildDeck(
       { deck: deck({ export: { fontEmbed: 'off', transition: 'none', animations: 'off' } }), pages: [page] },

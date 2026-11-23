@@ -390,7 +390,7 @@ export type ExportAnimations = 'auto' | 'off'
 export interface ExportConfig {
   fontEmbed?: ExportFontEmbed
   transition?: ExportTransition
-  /** 转场时长（毫秒，> 0）；缺省时 `morph` 为 2000，其余转场为 `fast`（500）。 */
+  /** 转场时长（毫秒，> 0）；缺省时 `morph` 为 2000，其余转场为 700。 */
   transitionMs?: number
   animations?: ExportAnimations
 }
