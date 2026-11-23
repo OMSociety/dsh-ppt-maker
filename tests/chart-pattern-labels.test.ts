@@ -96,13 +96,12 @@ describe('图表图案填充与逐点标签', () => {
   })
 
   it('柱状图系列图案写入系列 spPr 并保留线条', async () => {
-    const hatched = { ...hatch }
     const bars = {
       elementId: 'bars',
       elementType: 'chart',
       bounds: [80, 60, 400, 300],
       data: { cols: ['月', '额'], rows: [['一', 3], ['二', 5]] },
-      series: [{ type: 'bar', name: '额', encode: { x: '月', y: '额' }, fill: hatched }]
+      series: [{ type: 'bar', name: '额', encode: { x: '月', y: '额' }, fill: hatch }]
     } as unknown as ElementBase
     const { bytes } = await exported(bars)
     const [xml] = chartXmls(bytes)
