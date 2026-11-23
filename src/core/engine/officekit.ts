@@ -1408,6 +1408,17 @@ function applyCartesianChartOptions(
     spec.gapWidthPct = Math.round((1 - barWidth) / barWidth * 100)
   }
 
+  const plotLayout = chartRecordOf(element.plotLayout)
+  if (['x', 'y', 'w', 'h'].every((k) => typeof plotLayout[k] === 'number')) {
+    spec.plotAreaLayout = {
+      x: plotLayout.x as number,
+      y: plotLayout.y as number,
+      w: plotLayout.w as number,
+      h: plotLayout.h as number,
+      ...(plotLayout.target === 'inner' || plotLayout.target === 'outer' ? { target: plotLayout.target } : {})
+    }
+  }
+
   const dataLabels = chartDataLabelsOf(element.dataLabels, undefined, resolver)
   if (dataLabels) spec.dataLabels = dataLabels
 }

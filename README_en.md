@@ -1,7 +1,7 @@
 <p align="center"><a href="README.md">中文</a> · <strong>English</strong></p>
 
 <div align="center">
-<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT Maker"><br>PPT Maker dsh-ppt-maker</h1>
+<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="DSH PPT Maker"><br>DSH PPT Maker</h1>
 
   <p>A presentation plugin for DeepSeek Harness: the model designs, builds, and reworks decks while you review and edit alongside it in the right sidebar.</p>
   <p>The result is a locally built .pptx where every word, shape, and chart stays editable in PowerPoint.</p>
@@ -17,7 +17,7 @@
 
 ## What it is
 
-**PPT Maker** splits deck-making into a workflow that both the model and you can pick up at any point. The model uses twelve `ppt_*` tools to create a project, write pages, render the real output to check its own work, run quality checks, and export. You see the same project in the "PPT 工作台" (PPT Workbench) tab of the right sidebar, where you can double-click to edit text, drag pages into a new order, or swap images at any time; the model continues from your changes.
+**DSH PPT Maker** splits deck-making into a workflow that both the model and you can pick up at any point. The model uses twelve `ppt_*` tools to create a project, write pages, render the real output to check its own work, run quality checks, and export. You see the same project in the "PPT 工作台" (PPT Workbench) tab of the right sidebar, where you can double-click to edit text, drag pages into a new order, or swap images at any time; the model continues from your changes.
 
 Pages are written in **PPTD**, a YAML project format (`deck.pptd` plus one `pages/*.page` per slide) that people can read and models can write. The full specification is in [`docs/pptd-spec.md`](docs/pptd-spec.md). On export the plugin builds the final .pptx locally with [@office-kit/pptx](https://www.npmjs.com/package/@office-kit/pptx) and embeds the fonts it uses, so the deck displays correctly on machines that do not have those fonts installed.
 

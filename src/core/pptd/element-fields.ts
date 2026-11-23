@@ -224,6 +224,17 @@ export function validateChartData(element: Record<string, unknown>, path: string
   if (!Array.isArray(series) || series.length === 0) {
     issues.push(blocker(ERROR_CODES.SchemaError, 'chart.series 必填，且至少 1 个系列', `${path}#series`))
   }
+  if (element.plotLayout !== undefined) {
+    const layout = element.plotLayout
+    const frac = (v: unknown, min: number): boolean => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= 1
+    const ok =
+      isRecord(layout) &&
+      frac(layout.x, 0) && frac(layout.y, 0) && frac(layout.w, Number.MIN_VALUE) && frac(layout.h, Number.MIN_VALUE) &&
+      (layout.target === undefined || layout.target === 'inner' || layout.target === 'outer')
+    if (!ok) {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'chart.plotLayout 须为 { x, y, w, h }（0..1 的比例，w / h > 0），target 可选 inner 或 outer', `${path}#plotLayout`))
+    }
+  }
 
   const cols = data.cols as unknown[]
   const seen = new Set<string>()

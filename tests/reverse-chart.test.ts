@@ -40,6 +40,7 @@ async function sourceDeck(): Promise<Uint8Array> {
       categories: ['甲', '乙', '丙'],
       grouping: 'stacked',
       legend: { position: 'b' },
+      plotAreaLayout: { x: 0.1, y: 0.15, w: 0.8, h: 0.7, target: 'inner' },
       series: [
         { name: '一季', values: [3, 5, 2], color: 'C00000' },
         { name: '二季', values: [1, null, 4], color: '0070C0' }
@@ -75,6 +76,7 @@ describe('reverse：原生图表', () => {
     expect(bar.series[0]).toMatchObject({ type: 'bar', stack: 'value', encode: { x: '一季', y: '类别' } })
     expect(String(bar.series[0].fill).toUpperCase()).toBe('#C00000')
     expect(bar.legend).toBe(true)
+    expect(bar.plotLayout).toEqual({ x: 0.1, y: 0.15, w: 0.8, h: 0.7, target: 'inner' })
 
     const [ring] = chartsOf('pages/02.page')
     expect(ring.legend).toBe(false)
@@ -87,6 +89,7 @@ describe('reverse：原生图表', () => {
     const pres = await loadPresentation(bytes)
     const specs = getSlides(pres).flatMap((slide) => getSlideCharts(slide).map((c) => c.spec))
     expect(specs.map((s) => s?.kind)).toEqual(['bar', 'doughnut'])
+    expect(specs[0]?.plotAreaLayout).toMatchObject({ x: 0.1, y: 0.15, w: 0.8, h: 0.7, target: 'inner' })
     expect(specs[1]?.series[0].pointColors?.map((c) => c?.toUpperCase())).toEqual(['#FF0000', '#00FF00'])
   })
 })

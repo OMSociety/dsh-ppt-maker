@@ -1449,6 +1449,7 @@ function mapChart(
     valueAxisHidden?: boolean
     categoryAxisHidden?: boolean
     valueAxisMajorGridlines?: boolean
+    plotAreaLayout?: { x: number; y: number; w: number; h: number; target?: 'inner' | 'outer' }
   }
   if (s.view3D) return null
   const src = spec
@@ -1564,6 +1565,16 @@ function mapChart(
       element.barWidth = fmtNum(Math.min(1, 100 / (100 + s.gapWidthPct)))
     }
   }
+  const plot = s.plotAreaLayout
+  if (plot && [plot.x, plot.y, plot.w, plot.h].every((v) => Number.isFinite(v))) {
+    element.plotLayout = {
+      x: fmtNum4(plot.x),
+      y: fmtNum4(plot.y),
+      w: fmtNum4(plot.w),
+      h: fmtNum4(plot.h),
+      ...(plot.target ? { target: plot.target } : {})
+    }
+  }
   if (src.title) element.title = src.title
   element.legend = s.legend ? s.legend.position !== null : false
   if (src.series.some((series) => series.secondaryAxis)) {
@@ -1579,6 +1590,10 @@ function mapChart(
 
 function fmtNum(v: number): number {
   return Math.round(v * 100) / 100
+}
+
+function fmtNum4(v: number): number {
+  return Math.round(v * 10000) / 10000
 }
 
 /* ------------------------------------------------------------------ *

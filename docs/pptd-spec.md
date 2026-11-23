@@ -982,6 +982,14 @@ PPTD 的 chart 元素采用 ECharts 式建模：**图表顶层没有 `type` 字�
 #### 6.7.1 顶层结构与数据方言
 
 ```ts
+interface PlotLayout {
+  x: number;                           // 必填；[0, 1]，绘图区左边缘 / 图表宽
+  y: number;                           // 必填；[0, 1]，绘图区上边缘 / 图表高
+  w: number;                           // 必填；(0, 1]，绘图区宽 / 图表宽
+  h: number;                           // 必填；(0, 1]，绘图区高 / 图表高
+  target?: "inner" | "outer";          // 默认 "outer"；inner 只框绘图区本身，outer 连刻度标签与轴标题一并框入
+}
+
 interface Chart extends ElementBase {
   elementType: "chart";
 
@@ -995,6 +1003,7 @@ interface Chart extends ElementBase {
   barWidth?: number;                   // 默认自适应；(0, 1]，柱宽 / 类目槽宽比
   barGap?: number;                     // 默认 0（贴紧）；[0, 1)，多柱并列时的柱间距
   categoryGap?: number;                // 默认 0.2；[0, 1)，类目槽之间的空白占比
+  plotLayout?: PlotLayout;             // 默认由渲染器自动排版；绘图区的手动位置
 
   // —— 雷达坐标系（仅 radar 系列）——
   spokeAxis?: SpokeAxisConfig;         // 默认按数据自适应；辐条轴 + 蛛网网格
@@ -2210,7 +2219,7 @@ interface DeckSource {
 1. `data.cols` 首列固定为 `类别`，其后每个系列一列，列名取系列名（空名为 `系列N`，重名追加序号）；缺失值写 `null`；
 2. 条形图（横向）写 `yAxis.type: "category"`，系列 `encode.x` 为数值列、`encode.y` 为 `类别`；其余直角坐标图 `encode.x` 为 `类别`；
 3. 分组 `stacked` → 柱 / 面积系列 `stack: "value"`，`percentStacked` → `stack: "percent"`；折线不堆叠；
-4. 系列色与逐点色从图表部件解析（主题色与亮度变换、图案填充按浓度混合、渐变取首个色标）→ 柱的 `fill`、折线与面积的 `lineColor`；坐标轴隐藏 → `show: false`，数值轴无主网格线 → `gridLine: false`；平滑折线 → `smooth: true`；数值轴的 min / max 原样写入；分类间距 `gapWidth` 换算为 `barWidth = 100 / (100 + gapWidth)`；
+4. 系列色与逐点色从图表部件解析（主题色与亮度变换、图案填充按浓度混合、渐变取首个色标）→ 柱的 `fill`、折线与面积的 `lineColor`；坐标轴隐藏 → `show: false`，数值轴无主网格线 → `gridLine: false`；平滑折线 → `smooth: true`；数值轴的 min / max 原样写入；绘图区手动位置 → `plotLayout`；分类间距 `gapWidth` 换算为 `barWidth = 100 / (100 + gapWidth)`；
 5. 饼图 → `pie` 系列；环形图另写 `innerRadius = holeSize / 100`（限定在 [0.1, 0.9]）；首扇区角度 → `startAngle`；逐点颜色齐全时 → `fill` 数组；
 6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入；存在逐点隐藏的标签时整图不写标签并记 degraded）；
 7. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。

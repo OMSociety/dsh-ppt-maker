@@ -1,7 +1,7 @@
 <p align="center"><strong>中文</strong> · <a href="README_en.md">English</a></p>
 
 <div align="center">
-<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT 创客"><br>PPT 创客 dsh-ppt-maker</h1>
+<h1><img src="https://raw.githubusercontent.com/OMSociety/dsh-ppt-maker/main/docs/logo.png" width="192" alt="PPT 创客 DSH PPT Maker"><br>PPT 创客 DSH PPT Maker</h1>
 
   <p>DeepSeek Harness 的演示文稿插件：模型设计、生成、重做 PPT，你在右侧栏和它一起看、一起改。</p>
   <p>成品是本地构建的 .pptx，每个字、每个形状、每张图表都能在 PowerPoint 里直接编辑。</p>
