@@ -1,0 +1,12 @@
+profile: generate
+schema: 2
+title: 构成主义 · 功能演示
+size: [960, 540]
+export:
+  fontEmbed: subset
+  transition: morph
+  animations: auto
+pages:
+  - pages/01.page
+  - pages/02.page
+  - pages/03.page

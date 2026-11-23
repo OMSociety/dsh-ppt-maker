@@ -1,0 +1,287 @@
+pageType: content
+elements:
+  - elementId: bg
+    elementType: shape
+    shapeName: rect
+    bounds: [0, 0, 960, 540]
+    fill:
+      type: solid
+      color: "#ede6d6"
+  - elementId: panel
+    elementType: shape
+    shapeName: rect
+    bounds: [0, 0, 300, 540]
+    fill:
+      type: solid
+      color: "#121212"
+  - elementId: panel-label
+    elementType: text
+    bounds: [40, 38, 240, 26]
+    content:
+      text: 02 / TOOLKIT
+      fontFamily: Noto Sans SC
+      fontSize: 11
+      bold: true
+      letterSpacing: 4
+      color: "#ede6d6"
+  - elementId: big-number
+    elementType: text
+    bounds: [28, 78, 262, 298]
+    content:
+      text: "12"
+      fontFamily: Noto Sans SC
+      fontSize: 180
+      bold: true
+      color: "#d0021b"
+  - elementId: panel-title
+    elementType: text
+    bounds: [40, 300, 250, 38]
+    content:
+      text: 个 ppt_* 工具
+      fontFamily: Noto Sans SC
+      fontSize: 22
+      bold: true
+      color: "#ede6d6"
+  - elementId: panel-sub
+    elementType: text
+    bounds: [40, 342, 250, 26]
+    content:
+      text: 创作 7　质量 3　交付 2
+      fontFamily: Noto Sans SC
+      fontSize: 13
+      color: "#b5ad9e"
+  - elementId: wedge
+    elementType: shape
+    shapeName: rect
+    bounds: [214, 492, 210, 12]
+    rotation: 20
+    fill:
+      type: solid
+      color: "#d0021b"
+  - elementId: title
+    elementType: text
+    bounds: [340, 30, 580, 60]
+    content:
+      text: 三段分工，一条管线
+      fontFamily: Noto Sans SC
+      fontSize: 32
+      bold: true
+      color: "#121212"
+  - elementId: subtitle
+    elementType: text
+    bounds: [342, 88, 580, 26]
+    content:
+      text: 创作编辑、质量门、发布交付；图表与表格都是原生可编辑对象。
+      fontFamily: Noto Sans SC
+      fontSize: 13
+      color: "#5f594f"
+  - elementId: chart-label
+    elementType: text
+    bounds: [340, 126, 240, 24]
+    content:
+      text: 01 / 工具分布
+      fontFamily: Noto Sans SC
+      fontSize: 11
+      bold: true
+      letterSpacing: 2
+      color: "#121212"
+  - elementId: chart
+    elementType: chart
+    bounds: [340, 150, 560, 140]
+    fontFamily: Noto Sans SC
+    barWidth: 0.62
+    data:
+      cols:
+        - 环节
+        - 创作
+        - 质量
+        - 交付
+      rows:
+        - - 创作
+          - 7
+          - null
+          - null
+        - - 质量
+          - null
+          - 3
+          - null
+        - - 交付
+          - null
+          - null
+          - 2
+    legend:
+      show: false
+    series:
+      - name: 创作
+        type: bar
+        stack: value
+        encode:
+          x: 创作
+          y: 环节
+        fill: "#d0021b"
+        dataLabels:
+          show: true
+          color: "#ffffff"
+          fontSize: 12
+      - name: 质量
+        type: bar
+        stack: value
+        encode:
+          x: 质量
+          y: 环节
+        fill: "#121212"
+        dataLabels:
+          show: true
+          color: "#ffffff"
+          fontSize: 12
+      - name: 交付
+        type: bar
+        stack: value
+        encode:
+          x: 交付
+          y: 环节
+        fill:
+          type: pattern
+          preset: ltUpDiag
+          foreground: "#7d766a"
+          background: "#ede6d6"
+        dataLabels:
+          show: true
+          color: "#121212"
+          fontSize: 12
+    xAxis:
+      type: value
+      min: 0
+      max: 9
+      axisLine: false
+      gridLine: false
+      label: false
+    yAxis:
+      type: category
+      axisLine: false
+      gridLine: false
+      label:
+        color: "#121212"
+        fontFamily: Noto Sans SC
+        fontSize: 12
+  - elementId: divider
+    elementType: shape
+    shapeName: rect
+    bounds: [340, 300, 580, 2]
+    fill:
+      type: solid
+      color: "#121212"
+  - elementId: table
+    elementType: table
+    bounds: [340, 316, 580, 160]
+    columnWidths: [0.2, 0.4, 0.4]
+    rowHeights: [0.2, 0.2, 0.2, 0.2, 0.2]
+    rows:
+      - - text: 阶段
+          bold: true
+          color: "#ede6d6"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+          fill:
+            type: solid
+            color: "#121212"
+        - text: 工具
+          bold: true
+          color: "#ede6d6"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+          fill:
+            type: solid
+            color: "#121212"
+        - text: 职责
+          bold: true
+          color: "#ede6d6"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+          fill:
+            type: solid
+            color: "#121212"
+      - - text: 创作
+          bold: true
+          color: "#d0021b"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: ppt_edit
+          bold: true
+          color: "#121212"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: 批量编辑
+          color: "#5f594f"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+      - - text: 创作
+          bold: true
+          color: "#d0021b"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: ppt_svg
+          bold: true
+          color: "#121212"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: 复杂视觉
+          color: "#5f594f"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+      - - text: 质量
+          bold: true
+          color: "#121212"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: ppt_check
+          bold: true
+          color: "#121212"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: 统一质检
+          color: "#5f594f"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+      - - text: 交付
+          bold: true
+          color: "#7d766a"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: ppt_export
+          bold: true
+          color: "#121212"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+        - text: 发布交付
+          color: "#5f594f"
+          fontFamily: Noto Sans SC
+          fontSize: 11
+    style:
+      bodyStyles:
+        - fill:
+            type: solid
+            color: "#ede6d6"
+      cellStyle:
+        align:
+          - left
+          - middle
+        border:
+          - null
+          - null
+          - color: "#c4bcab"
+            style: solid
+            width: 1
+          - null
+  - elementId: folio
+    elementType: text
+    bounds: [800, 496, 120, 22]
+    content:
+      text: 02 — 03
+      fontFamily: Noto Sans SC
+      fontSize: 10
+      letterSpacing: 1
+      color: "#5f594f"
+      align:
+        - right
+        - top

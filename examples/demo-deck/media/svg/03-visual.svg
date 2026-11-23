@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect x="0" y="0" width="960" height="540" fill="#ede6d6"/>
+  <path d="M745.7 0 L960 0 L960 187.3 A150 150 0 0 1 745.7 0 Z" fill="#d0021b"/>
+  <polygon points="0,512 960,352 960,414 204,540 0,540" fill="#121212"/>
+  <polygon points="276,540 960,426 960,436 336,540" fill="#d0021b"/>
+  <rect x="64" y="66" width="14" height="14" fill="#121212"/>
+  <text x="90" y="77.4" font-family="Noto Sans SC" font-size="12" font-weight="700" letter-spacing="4" fill="#121212">03 / SVG TRACK</text>
+  <text x="62" y="148" font-family="Noto Sans SC" font-size="48" font-weight="700" fill="#121212">SVG 页面轨</text>
+  <rect x="64" y="166" width="72" height="8" fill="#d0021b"/>
+  <text x="64" y="204" font-family="Noto Sans SC" font-size="15" fill="#5f594f">整页矢量编译为原生 DrawingML，每个元素都能在 PowerPoint 里改。</text>
+  <rect x="64" y="238" width="240" height="116" fill="#ede6d6" stroke="#121212" stroke-width="3"/>
+  <text x="84" y="282" font-family="Noto Sans SC" font-size="34" font-weight="700" fill="#d0021b">01</text>
+  <text x="84" y="314" font-family="Noto Sans SC" font-size="20" font-weight="700" fill="#121212">SVG</text>
+  <text x="84" y="338" font-family="Noto Sans SC" font-size="12" fill="#5f594f">受约束的整页矢量</text>
+  <polygon points="316,280 340,296 316,312" fill="#d0021b"/>
+  <rect x="352" y="238" width="240" height="116" fill="#121212"/>
+  <text x="372" y="282" font-family="Noto Sans SC" font-size="34" font-weight="700" fill="#d0021b">02</text>
+  <text x="372" y="314" font-family="Noto Sans SC" font-size="20" font-weight="700" fill="#ede6d6">DrawingML</text>
+  <text x="372" y="338" font-family="Noto Sans SC" font-size="12" fill="#b5ad9e">文本框 · 自选图形</text>
+  <polygon points="604,280 628,296 604,312" fill="#d0021b"/>
+  <rect x="640" y="238" width="240" height="116" fill="#d0021b"/>
+  <text x="660" y="282" font-family="Noto Sans SC" font-size="34" font-weight="700" fill="#121212">03</text>
+  <text x="660" y="314" font-family="Noto Sans SC" font-size="20" font-weight="700" fill="#ede6d6">PPTX</text>
+  <text x="660" y="338" font-family="Noto Sans SC" font-size="12" fill="#f3d6d0">逐元素可编辑</text>
+  <text x="896" y="512" font-family="Noto Sans SC" font-size="10" letter-spacing="1" fill="#5f594f" text-anchor="end">03 — 03</text>
+</svg>

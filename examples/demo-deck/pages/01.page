@@ -1,0 +1,128 @@
+pageType: title
+elements:
+  - elementId: bg
+    elementType: shape
+    shapeName: rect
+    bounds: [0, 0, 960, 540]
+    fill:
+      type: solid
+      color: "#ede6d6"
+  - elementId: sun
+    elementType: shape
+    shapeName: ellipse
+    bounds: [606, 92, 290, 290]
+    fill:
+      type: solid
+      color: "#d0021b"
+  - elementId: ray
+    elementType: shape
+    shapeName: custom
+    bounds: [556, 72, 340, 372]
+    viewBox: [340, 372]
+    path: M336 0 L340 4 L4 372 L0 368 Z
+    fill:
+      type: solid
+      color: "#121212"
+  - elementId: slab
+    elementType: shape
+    shapeName: rect
+    bounds: [560, 330, 336, 56]
+    fill:
+      type: solid
+      color: "#121212"
+  - elementId: slab-text
+    elementType: text
+    bounds: [580, 330, 306, 56]
+    content:
+      text: 12 个 ppt_* 工具  /  PPTD → PPTX
+      fontFamily: Noto Sans SC
+      fontSize: 14
+      bold: true
+      letterSpacing: 1
+      color: "#ede6d6"
+      align:
+        - left
+        - middle
+  - elementId: mark
+    elementType: shape
+    shapeName: rect
+    bounds: [64, 66, 14, 14]
+    fill:
+      type: solid
+      color: "#d0021b"
+  - elementId: label
+    elementType: text
+    bounds: [90, 59, 420, 28]
+    content:
+      text: DSH PPT MAKER  ·  2.0
+      fontFamily: Noto Sans SC
+      fontSize: 12
+      bold: true
+      letterSpacing: 4
+      color: "#121212"
+      align:
+        - left
+        - middle
+  - elementId: title
+    elementType: text
+    bounds: [56, 150, 480, 156]
+    content:
+      text: PPT 创客
+      fontFamily: Noto Sans SC
+      fontSize: 96
+      bold: true
+      color: "#121212"
+  - elementId: accent
+    elementType: shape
+    shapeName: rect
+    bounds: [64, 302, 72, 8]
+    fill:
+      type: solid
+      color: "#d0021b"
+  - elementId: subtitle
+    elementType: text
+    bounds: [62, 320, 440, 44]
+    content:
+      text: 生成 · 编辑 · 逆向 · 导出
+      fontFamily: Noto Sans SC
+      fontSize: 24
+      bold: true
+      color: "#121212"
+  - elementId: desc
+    elementType: text
+    bounds: [64, 368, 400, 54]
+    content:
+      text: |-
+        在对话里描述想法，
+        本地构建可逐元素编辑的 PowerPoint。
+      fontFamily: Noto Sans SC
+      fontSize: 15
+      color: "#5f594f"
+  - elementId: rule
+    elementType: shape
+    shapeName: rect
+    bounds: [64, 470, 832, 1]
+    fill:
+      type: solid
+      color: "#121212"
+  - elementId: footer
+    elementType: text
+    bounds: [64, 482, 480, 24]
+    content:
+      text: github.com/OMSociety/dsh-ppt-maker
+      fontFamily: Noto Sans SC
+      fontSize: 10
+      letterSpacing: 1
+      color: "#5f594f"
+  - elementId: folio
+    elementType: text
+    bounds: [776, 482, 120, 24]
+    content:
+      text: 01 — 03
+      fontFamily: Noto Sans SC
+      fontSize: 10
+      letterSpacing: 1
+      color: "#5f594f"
+      align:
+        - right
+        - top
