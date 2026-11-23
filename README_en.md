@@ -37,8 +37,6 @@ The plugin also ships the `ppt-maker` skill, with 30 design systems across five 
 
 ![The actual exported rendering of the project's third page: an SVG flow page compiled into editable text and shapes](docs/export-svg.png)
 
-Both workbench images render the real workbench components, styles, and the actual three-page project data, with only the network requests replaced by local data. [`docs/preview/workbench.html`](docs/preview/workbench.html) is the same page and opens offline; switch the theme and page with `#theme=light&page=0` and `#theme=dark&page=1`. The third image is the actual rendering of the same project's third page after export to .pptx.
-
 ## Quick start
 
 Stop the running DSH, install with `dsh plugin --profile <profile> add "dsh-ppt-maker"`, then start DSH again.

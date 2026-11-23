@@ -39,8 +39,6 @@
 
 ![同一工程第三页的实际导出渲染：SVG 绘制的流程页编译为可编辑的文本与形状](docs/export-svg.png)
 
-两张工作台图由正式的工作台组件、样式和真实的三页工程数据直接渲染，只把网络请求换成了本地数据；[`docs/preview/workbench.html`](docs/preview/workbench.html) 是可以离线打开的同一份页面，用 `#theme=light&page=0`、`#theme=dark&page=1` 切换主题和页码。第三张是同一工程第三页导出成 .pptx 之后的实际渲染。
-
 ## 快速开始
 
 先停掉正在运行的 DSH，执行 `dsh plugin --profile <profile> add "dsh-ppt-maker"` 安装，再启动 DSH。
