@@ -121,7 +121,7 @@ client/            workbench source (TSX, built into lib/client.js)
 plugin/            loader shell and the workbench host routes
 skills/ppt-maker/  the ppt-maker skill: design systems and page-writing guidance; vendor/ holds the SVG converter and its Python dependencies
 tests/             host contract, tool end-to-end, import, fonts, and build-output guards; ships 20 anonymized .pptx corpus files
-docs/              PPTD specification, design decisions, fallback font table, preview page
+docs/              PPTD specification, fallback font table, preview page
 lib/               build output (committed; installs do not build)
 ```
 

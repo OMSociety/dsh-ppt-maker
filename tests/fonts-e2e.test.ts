@@ -10,7 +10,7 @@
  *  3) 解包断言 fntdata / Content_Types Override / rels / presentation.xml 标记全在
  *  4) 产物能被 @office-kit/pptx 回读
  *
- * PowerPoint 的 t2embed 字体接收验证结论见 docs/DECISIONS.md；本测试只守结构面。
+ * PowerPoint 的 t2embed 字体接收约束见 src/core/fonts/eot.ts 文件头注释；本测试只守结构面。
  */
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'

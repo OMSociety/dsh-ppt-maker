@@ -123,7 +123,7 @@ client/            工作台源码（TSX，构建为 lib/client.js）
 plugin/            装载壳与工作台的宿主路由
 skills/ppt-maker/  ppt-maker 技能：设计系统、写页面的要点；vendor/ 下是 SVG 转换器与它的 Python 依赖
 tests/             宿主契约、工具端到端、逆向导入、字体、构建产物守卫；附 20 份脱敏语料 .pptx
-docs/              PPTD 规格、设计决策、兜底字体表、预览页
+docs/              PPTD 规格、兜底字体表、预览页
 lib/               构建产物（入库，安装时不再构建）
 ```
 

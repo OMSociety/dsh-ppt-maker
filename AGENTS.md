@@ -19,7 +19,6 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 
 文档索引（按读序）：
 
-- [docs/DECISIONS.md](docs/DECISIONS.md) — 设计决策与风险登记：14 条决策、风险对策与验证结论（「为什么这么选」的出处）
 - [docs/pptd-spec.md](docs/pptd-spec.md) — PPTD 格式契约（改格式前必读）
 - [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) — 技能正文，模型侧用法
 
@@ -65,6 +64,17 @@ Windows PowerShell 里先设环境变量，再跑第二句：`$env:NODE_OPTIONS=
 - 工作台链：浏览器每 3s 轮询 `/ppt-maker/api/*` → `plugin/host/routes.mjs` → 经 `deps.core` 注入的同一批 `src/core` 函数（路由侧不 import `lib/`）。每个请求先经 `ctx.connection.requestRejection` 完成宿主统一访问检查，401/403 立即结束；通过后再执行 `sameOrigin` 纵深校验与业务处理。
 - 引擎隔离：`src/core/engine/types.ts` 是接口层，换引擎只动 `officekit.ts`。新增引擎能力先扩接口，再在 `officekit.ts` 实现，其它模块只依赖 `types.ts`。
 - 客户端 bundle 只允许 require 平台种子表里的 9 个模块（react 系 + cordis + dsh-client-*），种子表逐字写在 [tests/client-bundle.guard.test.ts](tests/client-bundle.guard.test.ts)。
+
+### 设计取舍（改动前先看它们在守什么）
+
+- **`store.ts` 是工程的唯一写者**：页面、deck、plan、brief、manifest 的变更都经它；`baseRevision` 乐观锁挡并发覆盖，合并窗口内的连续保存合成一个历史版本；所有写入集中在 store，快照与 manifest 因此保持一致。
+- **撤销/重做是游标模型**：`history/` 只追加快照，manifest 存当前游标；撤销只移游标，新编辑截断被放弃的分支，`r0000` 是永久锚点。
+- **服务端持有权威状态**：工作台画面来自服务端快照；轮询失败时保留最后一次有效画面并提示。
+- **主线全 TypeScript，SVG 页轨例外**：SVG 页由 vendored 的 ppt-master Python 转换器经子进程编译，产物仍进同一套 PPTX 工程与发布管线。
+- **质检两层**：规则层（溢出/出界/重叠/对比度/结构/字体）阻断导出；AI 视觉层按需只给建议。对比度按每个 run 实测。
+- **字体嵌入是 OOXML 后处理**：fsType 许可、子集化、EOT 封装、关系与 content type 都在导出后段完成；预览与质检渲染未嵌字体的裸字节。
+- **导出只有一条发布管线**：`ppt_export` 与面板导出共用它，QA 指纹不一致返回 409 `StaleQaReport`，覆盖不全返回 `QaCoverageIncomplete`。
+- **预览图来自正式组件**：`npm run build:preview` 把真实 client 组件与 CSS 连同真实工程 fixture 打成自包含页面，只把网络传输换成本地数据，README 的工作台图由它截取。
 
 ## 关键目录
 
@@ -114,7 +124,9 @@ npm run check:pack
 NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ```
 
-全量 46 个测试文件 / 350 个用例，约 1 分钟。CI 在 windows-latest 与 ubuntu-latest 上跑全量：ubuntu 先装 `fonts-noto-cjk fonts-wqy-zenhei fonts-dejavu-core`，两端都先执行 `node scripts/prepare-vendor-env.mjs` 备好 SVG 转换器环境；依赖真实字体或 Python 环境的用例在缺件时按 `tests/__fixtures__/venv.ts` 与字体候选表跳过并打印缺项。`npm run check:build` 按内容比对 `lib/index.js`、`lib/client.js` 与 HEAD 的哈希（构建是确定性的）。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
+全量测试约 2 分钟。CI 在 windows-latest 与 ubuntu-latest 上跑全量：ubuntu 先装 `fonts-noto-cjk fonts-wqy-zenhei fonts-dejavu-core`，两端都先执行 `node scripts/prepare-vendor-env.mjs` 备好 SVG 转换器环境；依赖真实字体或 Python 环境的用例在缺件时按 `tests/__fixtures__/venv.ts` 与字体候选表跳过并打印缺项。`npm run check:build` 按内容比对 `lib/index.js`、`lib/client.js` 与 HEAD 的哈希（构建是确定性的）。`npm ci` 要能用默认配置直接跑通——锁文件里出现非 `registry.npmjs.org` 的解析地址时，安装会失败。
+
+视觉改动要两条渲染链分别看：工作台 DOM 显示，与导出的 PPTX → PDF → PDFium 渲染图；两者一致才算通过。
 
 面板与工作台的改动另有一步机器测不了的验收：在宿主里跑一遍——侧栏出现「PPT 工作台」页签、新会话 invoke `ppt-maker` 技能后 12 个工具进场、`ppt_import` 导入一份 `tests/corpus/` 的 pptx 后可翻页/点选/改字、导出的产物能在 PowerPoint 打开。
 
@@ -137,6 +149,10 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 | `src/core/reverse/map.ts` | 逆向保真覆盖富文本、graphicFrame 分类与背景继承，自动化只有合成 fixture | 跑 `tests/reverse-import.test.ts`；真实语料没有逆向回归落点，改动后人工 `ppt_import` 一份 `tests/corpus/` 文件复核 |
 | `src/core/fonts/embed.ts` | 重打包字节的确定性靠固定 ZIP 条目时间戳（`ZIP_EPOCH`）；已嵌槽位跳过保证幂等 | 改重打包或嵌入登记逻辑后跑 `tests/fonts-embed.test.ts`（含「同输入字节确定」「已嵌产物原样返回」两条断言） |
 | `src/core/export-pipeline.ts` | 预览/质检必须渲染**未嵌字体**的裸字节：LibreOffice 会误用嵌入的子集 EOT，出现字形张冠李戴（「0」渲染成「A」） | 别把渲染源换成嵌字体后的字节；字体嵌入的真实效果只能靠 PowerPoint/WPS 人工核对 |
+| `src/core/export-pipeline.ts` 的 `renderPptxImages` | libreoffice-kit 直接光栅化 Office 文件受 Windows 125% 缩放影响，成图被放大 1.25 倍而右/下裁切 | 渲染固定走 PPTX → PDF → PDFium PNG |
+| `src/core/svg/compiler.ts` 的 `SVG_COMPILER_VERSION` | 编译缓存键与 QA 指纹都含它；`skills/ppt-maker/vendor/ppt-master/` 变更而版本号不变时，缓存与 QA 结论仍沿用旧值 | 改转换器代码必须同时升这个版本号 |
+| `src/core/engine/officekit.ts` 的 SVG 页导入 | SVG 编译产物用 CSS px（9525 EMU），主 deck 用 pt（12700 EMU），未适配的 SVG 页只占画布 75% | 导入前先 `setSlideSize(..., { content: 'fit' })` 适配主画布；4:3 与 16:9 都有 `tests/svg-page.test.ts` 守着 |
+| `src/core/engine/chart-patch.ts` | 引擎库不支持图案填充与逐点标签框的 XML 字段，靠保存后的 zip 内 chart XML 后处理补上；`c15:layout` 的扩展 URI 与 `c:extLst` 包裹写错时，渲染无任何变化也不报错（LibreOffice 实测） | 改后跑 `tests/chart-pattern-labels.test.ts`，并渲染含图案/环形图的语料页人工比对 |
 
 ## 出错怎么办
 
@@ -155,4 +171,4 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 ## 维护
 
 本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与依赖版本、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。PPTD 格式契约全量自包含于 [docs/pptd-spec.md](docs/pptd-spec.md)，本仓格式以它为准。
-本文件写的是约定与边界，发现与代码不符时先判断哪边过时：约定过时改本文件，代码违规改代码。`docs/DECISIONS.md` 记的是决策依据，与现状冲突时以代码和测试为准。
+本文件写的是约定与边界，发现与代码不符时先判断哪边过时：约定过时改本文件，代码违规改代码。
