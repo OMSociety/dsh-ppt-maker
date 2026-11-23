@@ -107,7 +107,8 @@
     "dsh": "*"
   },
   "allowScripts": {
-    "esbuild": true
+    "esbuild": true,
+    "koffi": false
   },
   "overrides": {
     "@deepseek-ai/libreoffice-kit": {
