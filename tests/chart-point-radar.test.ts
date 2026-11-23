@@ -1,4 +1,4 @@
-/** 散点 / 气泡 / 雷达图：生成、校验、导出后逆向导入的往返。 */
+/** 散点 / 气泡 / 雷达 / K 线图：生成、校验、导出后逆向导入的往返。 */
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -150,6 +150,54 @@ describe('散点 / 气泡 / 雷达生成', () => {
   })
 })
 
+function candle(withOpen: boolean): ElementBase {
+  const rows = [['周一', 10, 14, 9, 12], ['周二', 12, 16, 11, 15], ['周三', 15, 17, 12, 13]]
+  const cols = ['日', '开', '高', '低', '收']
+  return {
+    elementId: 'kl',
+    elementType: 'chart',
+    bounds: [60, 60, 420, 300],
+    data: { cols: withOpen ? cols : ['日', '高', '低', '收'], rows: rows.map((r) => (withOpen ? r : [r[0], r[2], r[3], r[4]])) },
+    series: [
+      {
+        type: 'candlestick',
+        name: 'K',
+        encode: withOpen ? { x: '日', open: '开', high: '高', low: '低', close: '收' } : { x: '日', high: '高', low: '低', close: '收' },
+        upBars: { fill: '#d93a2b' },
+        downBars: { fill: '#2a9d5c' }
+      }
+    ]
+  } as unknown as ElementBase
+}
+
+describe('K 线生成', () => {
+  it('提供 open 时写成开高低收四个系列并带涨跌柱颜色', async () => {
+    const { bytes, warnings } = await exported(candle(true))
+    expect(warnings).toEqual([])
+    const xml = chartXml(bytes)
+    expect(xml).toContain('<c:stockChart>')
+    expect(xml).toContain('<c:upDownBars>')
+    expect(xml).toMatch(/<c:upBars>[\s\S]*?D93A2B/i)
+    expect(xml).toMatch(/<c:downBars>[\s\S]*?2A9D5C/i)
+    const spec = await specOf(bytes)
+    expect(spec.series.map((s: any) => s.name)).toEqual(['开', '高', '低', '收'])
+  })
+
+  it('省略 open 时写成高低收三个系列，没有涨跌柱', async () => {
+    const { bytes } = await exported(candle(false))
+    const xml = chartXml(bytes)
+    expect(xml).toContain('<c:stockChart>')
+    expect(xml).not.toContain('<c:upDownBars>')
+    expect((await specOf(bytes)).series).toHaveLength(3)
+  })
+
+  it('与其他系列类型混排时落占位', async () => {
+    const el = candle(true) as unknown as Record<string, any>
+    el.series.push({ type: 'line', name: 'MA', encode: { x: '日', y: '收' } })
+    const { warnings } = await exported(el as unknown as ElementBase)
+    expect(warnings.some((w) => w.includes('混排'))).toBe(true)
+  })
+})
 describe('散点 / 气泡 / 雷达逆向往返', () => {
   let cwd: string
   beforeEach(async () => {
@@ -185,6 +233,20 @@ describe('散点 / 气泡 / 雷达逆向往返', () => {
     expect(chart.series[0]).toMatchObject({ type: 'bubble', sizeScale: 'linear', encode: { x: '规模 X', y: '规模', size: '规模 大小' } })
   })
 
+  it('K 线：开高低收列与涨跌柱颜色回到 candlestick 系列', { timeout: 120000 }, async () => {
+    const chart = await reversed(candle(true))
+    expect(chart.series).toHaveLength(1)
+    expect(chart.series[0]).toMatchObject({ type: 'candlestick', encode: { x: '类别', open: '开', high: '高', low: '低', close: '收' } })
+    expect(chart.series[0].upBars.fill.toLowerCase()).toBe('#d93a2b')
+    expect(chart.series[0].downBars.fill.toLowerCase()).toBe('#2a9d5c')
+    expect(chart.data.rows[1]).toEqual(['周二', 12, 16, 11, 15])
+  })
+
+  it('高低收三个系列的 K 线不带 open', { timeout: 120000 }, async () => {
+    const chart = await reversed(candle(false))
+    expect(chart.series[0].encode.open).toBeUndefined()
+    expect(chart.series[0].encode.close).toBe('收')
+  })
   it('雷达：辐条列、填充与仅轮廓、spokeAxis 范围回到 PPTD', { timeout: 120000 }, async () => {
     const chart = await reversed(radar())
     expect(chart.data.cols[0]).toBe('类别')

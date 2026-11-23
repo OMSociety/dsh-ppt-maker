@@ -31,7 +31,7 @@ export interface ChartSize {
 export type XYKind = 'scatter' | 'bubble'
 
 /** 图表族：纯 scatter / 纯 bubble / 纯 radar / 其余（bar、line、area、pie…）/ 含 scatter·bubble·radar 的不支持混排。 */
-export type ChartKind = XYKind | 'radar' | 'classic' | 'mixed'
+export type ChartKind = XYKind | 'radar' | 'candlestick' | 'classic' | 'mixed'
 
 export function chartKindOf(content: Rec): ChartKind {
   const specs = Array.isArray(content.series) ? content.series : []
@@ -39,7 +39,7 @@ export function chartKindOf(content: Rec): ChartKind {
   for (const raw of specs) {
     if (raw && typeof raw === 'object') types.add(typeof (raw as Rec).type === 'string' ? (raw as Rec).type as string : 'bar')
   }
-  const special = ['scatter', 'bubble', 'radar'].filter((type) => types.has(type))
+  const special = ['scatter', 'bubble', 'radar', 'candlestick'].filter((type) => types.has(type))
   if (!special.length) return 'classic'
   return types.size === 1 ? special[0] as ChartKind : 'mixed'
 }
@@ -845,5 +845,93 @@ export function radarModelOf(content: Rec, theme: ThemeLike | null | undefined, 
     series,
     ...(frame.title ? { title: frame.title } : {}),
     ...(frame.legend ? { legend: frame.legend } : {}),
+  }
+}
+
+
+// ---------------------------------------------------------------- candlestick（K 线）
+
+export interface CandlestickBarModel {
+  label: string
+  /** 类目中心 x。 */
+  cx: number
+  highY: number
+  lowY: number
+  closeY: number
+  openY?: number
+  /** 实体矩形（仅 OHLC）。 */
+  body?: { x: number; y: number; width: number; height: number }
+  /** HLC 模式收盘短横的两端 x。 */
+  tickX1?: number
+  tickX2?: number
+  up?: boolean
+  color: string
+}
+
+export interface CandlestickChartModel {
+  width: number
+  height: number
+  plot: PlotRect
+  ohlc: boolean
+  xLabels: Array<{ text: string; x: number }>
+  yAxis: { min: number; max: number; ticks: Array<{ value: number; pos: number }> }
+  bars: CandlestickBarModel[]
+  wick: ChartLineModel
+  upBorder?: ChartLineModel
+  downBorder?: ChartLineModel
+  title?: ChartTitleModel
+}
+
+export function candlestickModelOf(content: Rec, theme: ThemeLike | null | undefined, size: ChartSize): CandlestickChartModel | null {
+  if (chartKindOf(content) !== 'candlestick') return null
+  const table = tableOf(content)
+  const specs = Array.isArray(content.series) ? content.series : []
+  const raw = specs.find((s) => s && typeof s === 'object') as Rec | undefined
+  if (!raw) return null
+  const spec = withDefaults(content, raw)
+  const encode = recOf(spec.encode)
+  const xi = columnIndex(table.cols, encode.x, 0)
+  const hi = columnIndex(table.cols, encode.high, 1)
+  const li = columnIndex(table.cols, encode.low, 2)
+  const ci = columnIndex(table.cols, encode.close, 3)
+  const ohlc = encode.open !== undefined
+  const oi = ohlc ? columnIndex(table.cols, encode.open, 4) : -1
+  const rows = filteredRows(table, spec).flatMap((row) => {
+    const high = numberOf(row[hi]); const low = numberOf(row[li]); const close = numberOf(row[ci])
+    const open = ohlc ? numberOf(row[oi]) : undefined
+    if (high === undefined || low === undefined || close === undefined || (ohlc && open === undefined)) return []
+    return [{ label: String(row[xi] ?? ''), high, low, close, open }]
+  })
+  if (!rows.length) return null
+  const frame = chartFrameOf(content, size, [], { left: 44, right: 14, top: 14, bottom: 30 }, theme)
+  const { plot } = frame
+  const axis = axisOf(content.yAxis)
+  const scale = niceScale(rows.flatMap((r) => [r.high, r.low]), numberOf(axis.min), numberOf(axis.max), true)
+  const span = scale.max - scale.min || 1
+  const yPos = (v: number) => plot.top + plot.height - (v - scale.min) / span * plot.height
+  const slot = plot.width / rows.length
+  const bodyW = slot * 0.5
+  const upFill = resolveColor(recOf(spec.upBars).fill, theme) ?? '#d93a2b'
+  const downFill = resolveColor(recOf(spec.downBars).fill, theme) ?? '#2a9d5c'
+  const bars = rows.map((r, i): CandlestickBarModel => {
+    const cx = plot.left + slot * (i + 0.5)
+    const up = ohlc ? r.close > r.open! : true
+    const color = ohlc ? (up ? upFill : downFill) : (resolveColor(recOf(spec.wickStyle).color, theme) ?? '#555555')
+    const base = { label: r.label, cx, highY: yPos(r.high), lowY: yPos(r.low), closeY: yPos(r.close), up, color }
+    if (!ohlc) return { ...base, tickX1: cx - bodyW / 2, tickX2: cx + bodyW / 2 }
+    const top = yPos(Math.max(r.open!, r.close))
+    const bottom = yPos(Math.min(r.open!, r.close))
+    return { ...base, openY: yPos(r.open!), body: { x: cx - bodyW / 2, y: top, width: bodyW, height: Math.max(1, bottom - top) } }
+  })
+  const step = Math.max(1, Math.ceil(rows.length / Math.max(1, Math.floor(plot.width / 48))))
+  return {
+    width: size.width, height: size.height, plot, ohlc,
+    xLabels: bars.filter((_, i) => i % step === 0).map((b) => ({ text: b.label, x: b.cx })),
+    yAxis: { min: scale.min, max: scale.max, ticks: scale.ticks.map((value) => ({ value, pos: yPos(value) })) },
+    bars,
+    wick: lineOf(spec.wickStyle, theme, '#555555') ?? { color: '#555555' },
+    ...(lineOf(recOf(spec.upBars).border, theme) ? { upBorder: lineOf(recOf(spec.upBars).border, theme) } : {}),
+    ...(lineOf(recOf(spec.downBars).border, theme) ? { downBorder: lineOf(recOf(spec.downBars).border, theme) } : {}),
+    ...(frame.title ? { title: frame.title } : {}),
   }
 }

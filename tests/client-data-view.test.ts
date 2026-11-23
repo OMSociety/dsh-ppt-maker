@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { scatterModelOf, bubbleModelOf, radarModelOf, bubbleRadius } from '../client/render/chart-xy-model'
+import { scatterModelOf, bubbleModelOf, radarModelOf, bubbleRadius, candlestickModelOf } from '../client/render/chart-xy-model'
 import { chartModelOf } from '../client/render/chart-model'
 import { patternTileOf } from '../client/render/pattern-svg'
 // @ts-expect-error 根 tsconfig 不启用 JSX；组件由 tsconfig.client.json 完整校验。
@@ -342,5 +342,24 @@ describe('ChartView · scatter / bubble / radar', () => {
     const mixed = { ...scatter, series: [scatter.series[0], { type: 'bar', encode: { x: 'a', y: 'b' } }] }
     expect(() => chartSvg(mixed)).not.toThrow()
     expect(chartSvg(mixed)).toContain('导出后查看')
+  })
+})
+describe('ChartView · candlestick', () => {
+  const data = { cols: ['d', 'o', 'h', 'l', 'c'], rows: [['1', 10, 15, 8, 14], ['2', 14, 16, 9, 11]] }
+  it('OHLC：实体窄于类目宽 50%，涨红跌绿', () => {
+    const content = { type: 'candlestick', data, series: [{ type: 'candlestick', encode: { x: 'd', open: 'o', high: 'h', low: 'l', close: 'c' } }] }
+    const m = candlestickModelOf(content, null, { width: 400, height: 240 })!
+    expect(m.ohlc).toBe(true)
+    expect(m.bars[0].color).toBe('#d93a2b')
+    expect(m.bars[1].color).toBe('#2a9d5c')
+    expect(m.bars[0].body!.width).toBeLessThanOrEqual(m.plot.width / 2 * 0.5 + 1e-6)
+    expect(chartSvg(content)).toContain('<rect')
+  })
+  it('HLC：无实体，有收盘短横', () => {
+    const content = { type: 'candlestick', data, series: [{ type: 'candlestick', encode: { x: 'd', high: 'h', low: 'l', close: 'c' } }] }
+    const m = candlestickModelOf(content, null, { width: 400, height: 240 })!
+    expect(m.ohlc).toBe(false)
+    expect(m.bars.every((b) => !b.body && b.tickX1 !== undefined)).toBe(true)
+    expect(chartSvg(content)).not.toContain('<rect')
   })
 })

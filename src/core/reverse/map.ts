@@ -1302,7 +1302,7 @@ function mapLine(rec: ReverseShapeRecord, pres: PresentationData, report: Import
   return element
 }
 
-const CHART_KINDS = new Set(['bar', 'column', 'line', 'area', 'pie', 'doughnut', 'scatter', 'bubble', 'radar'])
+const CHART_KINDS = new Set(['bar', 'column', 'line', 'area', 'pie', 'doughnut', 'scatter', 'bubble', 'radar', 'stock'])
 
 /** 库的标记符号 → PPTD `marker.shape`；其余符号（星、叉、加号等）没有对应写法，回落默认圆。 */
 const PPTD_MARKER_SHAPES: Record<string, string> = { circle: 'circle', square: 'rect', diamond: 'diamond', triangle: 'triangle' }
@@ -1505,6 +1505,7 @@ function mapChart(
     categoryAxisHidden?: boolean
     valueAxisMajorGridlines?: boolean
     radarStyle?: 'standard' | 'marker' | 'filled'
+    upDownBars?: { upColor?: string; downColor?: string }
     scatterStyle?: string
     bubbleSizeRepresents?: 'area' | 'width'
     plotAreaLayout?: { x: number; y: number; w: number; h: number; target?: 'inner' | 'outer' }
@@ -1644,6 +1645,26 @@ function mapChart(
     if (s.valueAxisMajorGridlines === false) yAxis.gridLine = false
     if (Object.keys(xAxis).length > 0) element.xAxis = xAxis
     if (Object.keys(yAxis).length > 0) element.yAxis = yAxis
+  } else if (src.kind === 'stock') {
+    // 三个系列 = 高低收，四个 = 开高低收；其他个数无法对应 K 线编码，交给占位。
+    const channels = src.series.length === 4 ? ['open', 'high', 'low', 'close'] : src.series.length === 3 ? ['high', 'low', 'close'] : null
+    if (!channels) return null
+    const encode: Record<string, string> = { x: categoryCol }
+    channels.forEach((channel, i) => { encode[channel] = colNames[i] })
+    const candle: Record<string, unknown> = { type: 'candlestick', name: 'K 线', encode }
+    const bars = s.upDownBars
+    if (channels.length === 4 && bars) {
+      if (bars.upColor) candle.upBars = { fill: asLiteralColor(bars.upColor) }
+      if (bars.downColor) candle.downBars = { fill: asLiteralColor(bars.downColor) }
+    }
+    element.series = [candle]
+    const value: Record<string, unknown> = {}
+    if (typeof src.valueAxis?.min === 'number') value.min = src.valueAxis.min
+    if (typeof src.valueAxis?.max === 'number') value.max = src.valueAxis.max
+    if (s.valueAxisHidden) value.show = false
+    if (s.valueAxisMajorGridlines === false) value.gridLine = false
+    if (s.categoryAxisHidden) element.xAxis = { type: 'category', show: false }
+    if (Object.keys(value).length > 0) element.yAxis = value
   } else if (src.kind === 'radar') {
     const filled = s.radarStyle === 'filled'
     element.series = src.series.map((series, i) => {

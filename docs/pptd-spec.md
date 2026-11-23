@@ -2119,7 +2119,7 @@ interface ReportDroppedEntry {
 }
 
 type DroppedOriginalType =
-  | "chart"      // 无法映射为 chart 元素的原生图表（股价、曲面、三维等，见 §10.5）
+  | "chart"      // 无法映射为 chart 元素的原生图表（曲面、三维等，见 §10.5）
   | "smartArt"   // 缺少绘图缓存、无法展开的 SmartArt 图示（§10.6）
   | "group"      // 组合（子形状展平见 §6.8；展平失败/空组合时容器落此类）
   | "media"      // 音频/视频
@@ -2226,7 +2226,7 @@ interface DeckSource {
 
 ### 10.5 原生图表映射
 
-二维的柱形、条形、折线、面积（含组合与堆叠）、饼图与环形图、散点、气泡与雷达映射为 `chart` 元素（§6.7），其余类型（股价、曲面、任何三维图表）落 dropped + placeholder。映射规则：
+二维的柱形、条形、折线、面积（含组合与堆叠）、饼图与环形图、散点、气泡、雷达与股价（高低收 / 开高低收）映射为 `chart` 元素（§6.7），其余类型（曲面、任何三维图表）落 dropped + placeholder。映射规则：
 
 1. `data.cols` 首列固定为 `类别`，其后每个系列一列，列名取系列名（空名为 `系列N`，重名追加序号）；缺失值写 `null`；
 2. 条形图（横向）写 `yAxis.type: "category"`，系列 `encode.x` 为数值列、`encode.y` 为 `类别`；其余直角坐标图 `encode.x` 为 `类别`；
@@ -2236,7 +2236,10 @@ interface DeckSource {
 6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入）；饼 / 环形图的逐点标签（隐藏、手动位置、字号、颜色、加粗）→ `dataLabels.points`；
 7. 散点 / 气泡没有类目列：每个系列占相邻的 `{系列名} X`、`{系列名}`（气泡再加 `{系列名} 大小`）列，行按点序号对齐，较短系列补 `null`；系列 `encode` 指向这些列；标记形状（圆形以外）与大小（pt 换算为 px）写入 `marker`，气泡按宽度表示大小 → `sizeScale: "linear"`；散点连线样式记 degraded（feature `unknown`），按仅标记落盘；
 8. 雷达沿用 `类别` 列放辐条标签，每个系列一列；填充雷达 → `areaColor`，轮廓 / 带标记雷达 → `areaColor: false`；数值轴的 min / max / 隐藏 / 无网格线 → `spokeAxis`。生成时雷达的样式由全部系列共同决定：只要有一个系列填充，整图按填充雷达写；
-9. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
+9. 股价图（三个系列 = 高低收，四个 = 开高低收）→ 一个 `candlestick` 系列，`encode.x` 为 `类别`，开 / 高 / 低 / 收各取对应系列列；涨跌柱颜色 → `upBars.fill` / `downBars.fill`；其他系列个数的股价图落占位；
+10. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
+
+**原生写法的范围**：生成与逆向覆盖 bar / line / area / pie（含环形）/ scatter / bubble / radar / candlestick 八类。`waterfall`、`heatmap`、`treemap`、`sunburst`、`sankey` 这五类在原生图表里属于扩展图表部件（chartex），所用的 @office-kit/pptx 不能写出，导出时落占位并给出警告，需要这些图时用 SVG 页绘制；曲面图与全部三维图表同样不在原生写法范围内。这六类近期没有支持计划，在库提供对应写入接口之前不变。
 
 图表的字体、网格线样式、坐标轴格式、数据表与趋势线等细节不进入 PPTD；所在页未改动时整页沿用源存档（§10.4），这些细节随之保留。落 placeholder 的图表在所在页重建时按占位直通拷回原件。
 

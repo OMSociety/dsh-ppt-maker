@@ -1311,10 +1311,10 @@ function buildChart(
   }
   const [x, y, w, h] = (element.bounds as number[]) ?? [0, 0, 400, 300]
 
-  const supported = new Set(['bar', 'line', 'area', 'pie', 'scatter', 'bubble', 'radar'])
+  const supported = new Set(['bar', 'line', 'area', 'pie', 'scatter', 'bubble', 'radar', 'candlestick'])
   const firstType = String(series[0]?.type ?? '')
   if (!supported.has(firstType)) {
-    ctx.warnings.push(`${where}：图表类型 ${firstType} 无原生图表写法（原生支持 bar/line/area/pie/scatter/bubble/radar），落为占位；需要时改用 SVG 页`)
+    ctx.warnings.push(`${where}：图表类型 ${firstType} 无原生图表写法（原生支持 bar/line/area/pie/scatter/bubble/radar/candlestick），落为占位；需要时改用 SVG 页`)
     return buildPlaceholder(slide, { ...element, originalType: 'chart' }, resolver, ctx, new Set())
   }
   if (SINGLE_KIND_CHARTS.has(firstType) && series.some((s) => s.type !== firstType)) {
@@ -1565,6 +1565,7 @@ function chartSpecOf(
 
   if (firstType === 'scatter' || firstType === 'bubble') return pointChartSpecOf(element, data, series, firstType, resolver, ctx, where)
   if (firstType === 'radar') return radarChartSpecOf(element, data, series, resolver, ctx, where)
+  if (firstType === 'candlestick') return stockChartSpecOf(element, data, series, resolver, ctx, where)
 
   const horizontal = firstType === 'bar' && chartRecordOf(element.yAxis).type === 'category'
   const kind = firstType === 'bar' ? (horizontal ? 'bar' : 'column') : firstType
@@ -1612,7 +1613,47 @@ function chartSpecOf(
 }
 
 /** 这几类图表的系列只能同类，不与柱 / 线 / 面积混排。 */
-const SINGLE_KIND_CHARTS = new Set(['pie', 'scatter', 'bubble', 'radar'])
+const SINGLE_KIND_CHARTS = new Set(['pie', 'scatter', 'bubble', 'radar', 'candlestick'])
+
+/**
+ * candlestick → 库的 stock：提供 `encode.open` 时写 开-高-低-收 四个系列并画涨跌柱，
+ * 省略时写 高-低-收 三个系列（竖线加收盘点）。涨跌柱颜色取 upBars / downBars 的 fill。
+ */
+function stockChartSpecOf(
+  element: Record<string, unknown>,
+  data: { cols: string[]; rows: Array<Array<number | string | null>> },
+  series: Array<Record<string, unknown>>,
+  resolver: ThemeResolver,
+  ctx: BuildContext,
+  where: string
+): unknown {
+  const cols = data.cols
+  const colIndex = (name: unknown): number => (typeof name === 'string' ? cols.indexOf(name) : -1)
+  const s0 = series[0]
+  const encode = chartRecordOf(s0.encode)
+  const channels = typeof encode.open === 'string' ? ['open', 'high', 'low', 'close'] : ['high', 'low', 'close']
+  const catIdx = colIndex(encode.x)
+  if (catIdx < 0 || channels.some((c) => colIndex(encode[c]) < 0)) {
+    ctx.warnings.push(`${where}：candlestick 的 encode.x / open / high / low / close 未命中 data.cols`)
+    return null
+  }
+  const spec: Record<string, unknown> = {
+    kind: 'stock',
+    categories: data.rows.map((r) => String(r[catIdx] ?? '')),
+    series: channels.map((c) => ({
+      name: String(encode[c]),
+      values: data.rows.map((r) => numOrNull(r[colIndex(encode[c])]))
+    })),
+    hiLowLines: true
+  }
+  if (channels.length === 4) {
+    const up = chartColorOf(chartRecordOf(s0.upBars).fill, resolver)
+    const down = chartColorOf(chartRecordOf(s0.downBars).fill, resolver)
+    spec.upDownBars = { ...(up ? { upColor: up } : {}), ...(down ? { downColor: down } : {}) }
+  }
+  applyCartesianChartOptions(spec, element, series, false, resolver)
+  return spec
+}
 
 const MARKER_SYMBOLS: Record<string, 'circle' | 'square' | 'diamond' | 'triangle'> = {
   circle: 'circle',

@@ -15,6 +15,8 @@ import {
   type XYChartModel,
   bubbleModelOf,
   chartKindOf,
+  candlestickModelOf,
+  type CandlestickChartModel,
   markerGeometry,
   radarModelOf,
   scatterModelOf,
@@ -550,6 +552,30 @@ function RadarChart({ model }: { model: RadarChartModel }) {
     </svg>
   )
 }
+function CandlestickChart({ model }: { model: CandlestickChartModel }) {
+  const { plot } = model
+  const w = (l: { color?: string; width?: number; dash?: string } | undefined, c: string) => ({ stroke: l?.color ?? c, strokeWidth: l?.width ?? 1, ...(l?.dash ? { strokeDasharray: l.dash } : {}) })
+  return (
+    <svg width={model.width} height={model.height} viewBox={`0 0 ${model.width} ${model.height}`} style={{ display: 'block' }}>
+      {model.title && <text x={model.title.x} y={model.title.y} textAnchor="middle" fontSize={model.title.fontSize} fontWeight={600} fill={model.title.color ?? '#333'}>{model.title.text}</text>}
+      {model.yAxis.ticks.map((t) => (
+        <g key={`y:${t.value}`}>
+          <line x1={plot.left} y1={t.pos} x2={plot.left + plot.width} y2={t.pos} stroke={GRID} strokeWidth={1} />
+          <text x={plot.left - 5} y={t.pos + 3} textAnchor="end" fontSize={9} fill={LABEL}>{tickText(t.value)}</text>
+        </g>
+      ))}
+      {model.xLabels.map((l, i) => <text key={`x:${i}`} x={l.x} y={plot.top + plot.height + 14} textAnchor="middle" fontSize={9} fill={LABEL}>{l.text}</text>)}
+      {model.bars.map((b, i) => (
+        <g key={i}>
+          <line x1={b.cx} y1={b.highY} x2={b.cx} y2={b.lowY} {...w(model.wick, b.color)} />
+          {b.body
+            ? <rect x={b.body.x} y={b.body.y} width={b.body.width} height={b.body.height} fill={b.color} {...(b.up ? (model.upBorder ? w(model.upBorder, b.color) : {}) : (model.downBorder ? w(model.downBorder, b.color) : {}))} />
+            : <line x1={b.tickX1} y1={b.closeY} x2={b.tickX2} y2={b.closeY} {...w(model.wick, b.color)} />}
+        </g>
+      ))}
+    </svg>
+  )
+}
 function useElementSize() {
   const ref = React.useRef<HTMLDivElement>(null)
   const [size, setSize] = React.useState({ width: 400, height: 240 })
@@ -589,6 +615,10 @@ export function ChartView({ content, theme }: { content: Record<string, unknown>
   if (kind === 'scatter' || kind === 'bubble') {
     const xy = (kind === 'scatter' ? scatterModelOf : bubbleModelOf)(content, theme, { width, height })
     return wrap(xy ? <XYChart model={xy} /> : note('图表无有效数据'))
+  }
+  if (kind === 'candlestick') {
+    const k = candlestickModelOf(content, theme, { width, height })
+    return wrap(k ? <CandlestickChart model={k} /> : note('图表无有效数据'))
   }
   if (kind === 'radar') {
     const radar = radarModelOf(content, theme, { width, height })
