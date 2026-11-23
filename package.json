@@ -11,7 +11,21 @@
     "type": "git",
     "url": "git+https://github.com/OMSociety/dsh-ppt-maker.git"
   },
-  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "ppt", "pptx", "powerpoint", "slides", "presentation", "slide-deck", "ai-ppt", "ppt-generator", "pptd", "skill"],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "ppt",
+    "pptx",
+    "powerpoint",
+    "slides",
+    "presentation",
+    "slide-deck",
+    "ai-ppt",
+    "ppt-generator",
+    "pptd",
+    "skill"
+  ],
   "main": "./plugin/index.mjs",
   "icon": "./icon.svg",
   "exports": {
@@ -47,11 +61,11 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/libreoffice-kit": "0.1.2",
+    "@deepseek-ai/libreoffice-kit": "0.2.3",
     "@office-kit/pptx": "0.24.0",
     "@office-kit/pptx-preview": "0.15.0",
     "@xmldom/xmldom": "^0.9.8",
-    "fflate": "^0.8.2",
+    "fflate": "^0.8.3",
     "fontkit": "2.0.4",
     "subset-font": "2.9.0",
     "yaml": "^2.8.1"
@@ -94,5 +108,10 @@
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "overrides": {
+    "@deepseek-ai/libreoffice-kit": {
+      "fflate": "^0.8.3"
+    }
   }
 }

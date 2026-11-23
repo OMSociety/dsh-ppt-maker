@@ -120,6 +120,7 @@ import {
   type TextOutline,
   type TransitionOptions
 } from '@office-kit/pptx'
+import { pruneUnreachableParts } from './package-prune.js'
 import { PRESET_ADJUST_GUIDES } from './preset-adjust-guides.js'
 import type { Animation, ElementBase, MasterSpec, Page, PageTransition, Presentation, Theme } from '../pptd/schema.js'
 import { PLACEHOLDER_DEFAULT_LABELS } from '../pptd/schema.js'
@@ -2291,7 +2292,7 @@ export function createOfficeKitEngine(): DeckEngine {
     },
 
     async saveDeck(native: unknown): Promise<Uint8Array> {
-      return savePresentation(native as PresentationData)
+      return pruneUnreachableParts(await savePresentation(native as PresentationData)).bytes
     }
   }
 }
