@@ -62,8 +62,8 @@
   },
   "dependencies": {
     "@deepseek-ai/libreoffice-kit": "0.2.3",
-    "@office-kit/pptx": "0.24.0",
-    "@office-kit/pptx-preview": "0.15.0",
+    "@office-kit/pptx": "0.30.0",
+    "@office-kit/pptx-preview": "0.23.0",
     "@xmldom/xmldom": "^0.9.8",
     "fflate": "^0.8.3",
     "fontkit": "2.0.4",
@@ -78,7 +78,7 @@
     "react-dom": "^18.3.1",
     "tsup": "^9.0.0",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.4"
+    "vitest": "^5.1.1"
   },
   "dsh": {
     "bundle": {

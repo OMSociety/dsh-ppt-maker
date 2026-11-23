@@ -75,11 +75,18 @@ export function contrastRatio(foreground: string, background: string): number | 
 /** Body text on a shape must clear this ratio (WCAG AA large text). */
 export const CONTRAST_THRESHOLD = 3
 
-function textAuditCategory(issue: TextAuditIssue): 'text-overflow' {
+function textAuditCategory(issue: ReportedTextAudit): 'text-overflow' {
   return 'text-overflow'
 }
 
-function describeTextAudit(issue: TextAuditIssue): string {
+/** 溢出与自行换行是质检关心的两类；可选的排版提示类（折词、孤字行、小字号）默认不开启，这里也不上报。 */
+type ReportedTextAudit = Extract<TextAuditIssue, { kind: 'overflow-x' | 'overflow-y' | 'soft-wrap' }>
+
+function isReportedTextAudit(issue: TextAuditIssue): issue is ReportedTextAudit {
+  return issue.kind === 'overflow-x' || issue.kind === 'overflow-y' || issue.kind === 'soft-wrap'
+}
+
+function describeTextAudit(issue: ReportedTextAudit): string {
   if (issue.kind === 'soft-wrap') {
     return `段落 ${issue.paragraphIndex + 1} 自行换行 ${issue.extraLines} 行（超出显式换行意图）`
   }
@@ -127,6 +134,7 @@ export function reviewDeck(pres: PresentationData, options: ReviewOptions = {}):
     ...(options.measureText ? { measureText: options.measureText } : {})
   })
   for (const issue of audits) {
+    if (!isReportedTextAudit(issue)) continue
     const page = issue.slideIndex + 1
     if (pageFilter && !pageFilter.has(page)) continue
     const gross = issue.kind === 'soft-wrap' ? issue.extraLines >= 2 : issue.overflowPx >= 4

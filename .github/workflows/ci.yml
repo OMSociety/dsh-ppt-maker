@@ -61,3 +61,29 @@ jobs:
 
       - name: 全量测试
         run: npx vitest run --no-file-parallelism
+
+  # macOS 只验证纯 TS 主链路：安装、类型检查、构建与不依赖渲染器/字体的单元测试
+  macos-smoke:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 按锁文件安装
+        run: npm ci --no-audit --no-fund
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 构建
+        run: npm run build
+
+      - name: 纯 TS 单元测试
+        run: npx vitest run --no-file-parallelism tests/package-prune.test.ts tests/reverse-group.test.ts tests/reverse-chart.test.ts tests/client-data-view.test.ts

@@ -428,6 +428,7 @@ function lineBreakOffsets(specs: ReadonlyArray<ParagraphSpec>): number[] {
   specs.forEach((spec, index) => {
     if (index > 0) offset += 1
     for (const run of spec.runs) {
+      if (!('text' in run)) continue
       for (let i = 0; i < run.text.length; i++) if (run.text[i] === '\n') out.push(offset + i)
       offset += run.text.length
     }
