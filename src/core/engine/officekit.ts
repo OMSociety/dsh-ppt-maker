@@ -2100,10 +2100,12 @@ const AUTO_TRANSITION_CURATED: ReadonlyArray<{ effect: string; direction?: strin
 /**
  * SVG 页并入主 deck 时挂接的版式。
  *
- * 编成页自带完整版面（底色与全部形状都在页上），只借用主 deck 的版式来避开
- * 第二套母版：PowerPoint 打开含两份母版引用的 deck 会报文件损坏，而
- * `importSlide` 默认会带进源文档的母版/版式/主题。因此一律显式指定目标版式，
- * 再隐藏版式与母版装饰（`setSlideBackgroundGraphicsHidden`）。
+ * 编成页自带完整版面（底色与全部形状都在页上），只借用主 deck 的版式，让
+ * `importSlide` 不把源文档的母版/版式/主题复制进来。不指定版式时复制出的第二套
+ * 母版会给 `p:sldMasterId/@id` 分配一个与既有 `p:sldLayoutId/@id` 相同的值，
+ * PowerPoint 随即报「文件或目录损坏且无法读取」（0x80070570）；指定目标版式后
+ * deck 内只剩原有母版，编号不会撞车。版式装饰由
+ * `setSlideBackgroundGraphicsHidden` 隐藏。
  */
 function svgPageLayoutOf(
   pres: PresentationData,

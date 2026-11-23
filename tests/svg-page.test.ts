@@ -8,6 +8,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { getShapePosition, getShapeSize, getShapeText, getShapeTextAutoFit, getShapeTextWrap, getSlideCount, getSlideMasterCount, getSlideShapes, getSlideSize, getSlideText, getSlides, isSlideBackgroundGraphicsHidden, loadPresentation, validatePresentation } from '@office-kit/pptx'
+import { strFromU8, unzipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { compileSvgPage, themeHashOf } from '../src/core/svg/compiler.js'
 import { createProject, editProject, loadProject } from '../src/core/project/store.js'
@@ -15,6 +16,31 @@ import { buildProjectDeck, renderPptxImages, saveRawProjectPptx } from '../src/c
 import { probeVenv } from './__fixtures__/venv.js'
 
 const hasVenv = probeVenv().ready
+
+/**
+ * 包级编号自检：`p:sldMasterId/@id` 与 `p:sldLayoutId/@id` 共用同一个编号空间，
+ * 撞号时 PowerPoint 报「文件或目录损坏且无法读取」（0x80070570），而 LibreOffice
+ * 与 python-pptx 都能照常打开，只在真实 Office 里暴露。
+ */
+function packageIdCollisions(bytes: Uint8Array): string[] {
+  const parts = unzipSync(bytes)
+  const presentation = strFromU8(parts['ppt/presentation.xml'])
+  const masterIds = [...presentation.matchAll(/<p:sldMasterId id="(\d+)"/g)].map((m) => m[1])
+  const layoutIds: string[] = []
+  for (const [name, data] of Object.entries(parts)) {
+    if (!/^ppt\/slideMasters\/[^/]+\.xml$/.test(name)) continue
+    for (const m of strFromU8(data).matchAll(/<p:sldLayoutId id="(\d+)"/g)) layoutIds.push(m[1])
+  }
+  const problems = masterIds
+    .filter((id) => layoutIds.includes(id))
+    .map((id) => `sldMasterId ${id} 与 sldLayoutId 撞号`)
+  const seen = new Set<string>()
+  for (const id of masterIds) {
+    if (seen.has(id)) problems.push(`sldMasterId ${id} 重复`)
+    seen.add(id)
+  }
+  return problems
+}
 
 const SPIKE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
   <rect x="0" y="0" width="960" height="540" fill="#123456"/>
@@ -121,8 +147,9 @@ describe.skipIf(!hasVenv)('svg 页轨道', () => {
     expect(getShapePosition(getSlideShapes(slides[1])[0])).toEqual({ x: 60 * 12700, y: 60 * 12700 })
     expect(getShapeSize(getSlideShapes(slides[1])[0])).toEqual({ w: 840 * 12700, h: 420 * 12700 })
 
-    // PowerPoint 拒绝打开含两份母版引用的 deck，SVG 页必须挂在主 deck 既有版式上。
+    // SVG 页挂在主 deck 既有版式上：不复制第二套母版，包内编号不撞号。
     expect(getSlideMasterCount(pres)).toBe(1)
+    expect(packageIdCollisions(bytes)).toEqual([])
     expect(isSlideBackgroundGraphicsHidden(slides[1])).toBe(true)
     expect(isSlideBackgroundGraphicsHidden(slides[0])).toBe(false)
 

@@ -561,6 +561,8 @@ interface SvgSource {
 2. **`svgSource.ref` 必填非空**，且必须是 `media/svg/` 下的安全相对路径：非绝对路径、不含 `..`、以 `media/svg/` 开头、以 `.svg` 结尾（大小写不敏感）；违反报 blocker `SchemaError`。
 3. **`elements` 必须为空数组 `[]`**——设计源在 `svgSource.ref`，页内不再列元素；违反报 blocker `SchemaError`。
 4. **不支持页内 `animations`**（编译器阶段不支持）；写了报 blocker `SchemaError`。
+5. **不继承母版与版式装饰**：编成页自带完整版面（底色与全部形状都在页上），导出时挂在 `layoutRef.name` 指明的版式上但不显示该版式的装饰；`layoutRef` 缺省时挂 deck 的第一个版式。版式只用于容纳页面，不参与画面。
+6. **deck 内容器的编号空间**：`p:sldMasterId/@id` 与 `p:sldLayoutId/@id` 共用同一编号空间，撞号会让 PowerPoint 报「文件或目录损坏且无法读取」（0x80070570），而 LibreOffice、WPS 与 python-pptx 仍能正常打开。引擎保证导出产物内两类编号互不重复。
 
 示例：
 

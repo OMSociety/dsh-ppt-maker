@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-11-24
+
+### 修复
+
+- **含 SVG 页的 .pptx 现在能被 PowerPoint 打开。** 导出时把 SVG 编译页并入主 deck 会复制出一套自己的母版，新母版的编号又与既有版式编号相同；PowerPoint 因此报「文件或目录损坏且无法读取」（0x80070570），而 LibreOffice、WPS 与 python-pptx 都能照常打开。现在 SVG 页挂到主 deck 既有版式上，包内只剩原有的母版。
+
+### Fixed
+
+- **A .pptx containing SVG pages now opens in PowerPoint.** Merging a compiled SVG page into the deck used to copy a second master whose ID collided with an existing layout ID, so PowerPoint reported a corrupt file (`0x80070570`) while LibreOffice, WPS and python-pptx opened it fine. SVG pages now attach to a layout of the existing master, leaving a single master in the package.
+
 ## [2.0.2] - 2026-11-24
 
 ### 新增

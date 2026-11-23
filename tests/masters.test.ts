@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { strFromU8, unzipSync } from 'fflate'
 import { createProject, loadProject } from '../src/core/project/store.js'
 import { createOfficeKitEngine } from '../src/core/engine/officekit.js'
 import { parseProject, stringifyDeck, stringifyPage } from '../src/core/pptd/parse.js'
@@ -154,4 +155,36 @@ describe('deck.masters（spec §3.4）', () => {
     const messages = parsed.issues.map((i) => i.message).join('\n')
     expect(messages).toContain('layout.name 全 deck 重复')
   })
+
+  // p:sldMasterId/@id 与 p:sldLayoutId/@id 共用同一编号空间；撞号时 PowerPoint 报
+  // 「文件或目录损坏且无法读取」（0x80070570），LibreOffice 与 python-pptx 仍能打开。
+  it('多个母版的产物里母版编号不与版式编号撞号', async () => {
+    const dir = join(process.cwd(), '.cache', `test-multi-master-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+    await seed(dir, [
+      { name: '母版甲', layouts: [{ name: '版式甲' }] },
+      { name: '母版乙', layouts: [{ name: '版式乙' }] }
+    ], '版式乙')
+    const loaded = await loadProject(process.cwd(), dir)
+    expect(loaded.issues.filter((i) => i.level === 'blocker')).toEqual([])
+    const built = await createOfficeKitEngine().buildDeck(
+      { deck: loaded.deck, pages: [...loaded.pages.values()] },
+      {
+        projectDir: dir,
+        loadMedia: async (src: string) => new Uint8Array(await readFile(join(dir, src))),
+        warnings: []
+      }
+    )
+    const { savePresentation } = await import('@office-kit/pptx')
+    const bytes = await savePresentation(built.native as never)
+    const parts = unzipSync(bytes)
+    const masterIds = [...strFromU8(parts['ppt/presentation.xml']).matchAll(/<p:sldMasterId id="(\d+)"/g)].map((m) => m[1])
+    const layoutIds: string[] = []
+    for (const [name, data] of Object.entries(parts)) {
+      if (!/^ppt\/slideMasters\/[^/]+\.xml$/.test(name)) continue
+      for (const m of strFromU8(data).matchAll(/<p:sldLayoutId id="(\d+)"/g)) layoutIds.push(m[1])
+    }
+    expect(masterIds.length).toBeGreaterThan(1)
+    expect(masterIds.filter((id) => layoutIds.includes(id))).toEqual([])
+    expect(new Set(masterIds).size).toBe(masterIds.length)
+  }, 120_000)
 })
