@@ -611,9 +611,9 @@ function validateElement(element: unknown, ctx: { profile: Profile; path: string
     issues.push(
       blocker(ERROR_CODES.PlaceholderNotAllowedError, 'profile: generate 的工程里不允许 elementType: "placeholder"', `${path}#elementType`)
     )
-  } else if (profile === 'reverse' && (elementType === 'icon' || elementType === 'chart')) {
+  } else if (profile === 'reverse' && elementType === 'icon') {
     issues.push(
-      blocker(ERROR_CODES.ProfileViolationError, `逆向方言不产出 ${elementType} 元素（源图标按 shape/image、图表走 dropped + placeholder 映射）`, `${path}#elementType`)
+      blocker(ERROR_CODES.ProfileViolationError, '逆向方言不产出 icon 元素（源文件里的图标按 shape 或 image 映射）', `${path}#elementType`)
     )
   } else if (!allowed.includes(elementType)) {
     issues.push(

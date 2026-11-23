@@ -708,9 +708,8 @@ type Element =
 
 | 元素 | 生成方言 | 逆向方言 |
 |---|---|---|
-| `text` / `shape` / `line` / `image` / `table` | 产出 | 产出 |
+| `text` / `shape` / `line` / `image` / `table` / `chart` | 产出 | 产出 |
 | `icon` | 产出 | 不产出（源文件里的图标按 `shape`（custGeom）或 `image` 映射） |
-| `chart` | 产出 | 不产出（原生图表部件走 dropped + placeholder，见 §10.1） |
 | `placeholder` | 不允许 | 产出 |
 
 ### 6.1 Text
@@ -2080,7 +2079,7 @@ interface ReportDroppedEntry {
 }
 
 type DroppedOriginalType =
-  | "chart"      // 原生图表部件不映射为 chart 元素（chart 仅生成方言，见 §2.4）
+  | "chart"      // 无法映射为 chart 元素的原生图表（散点、雷达、股价、曲面、三维等，见 §10.5）
   | "smartArt"   // SmartArt 图示
   | "group"      // 组合（子形状展平见 §6.8；展平失败/空组合时容器落此类）
   | "media"      // 音频/视频
@@ -2169,7 +2168,7 @@ interface DeckSource {
 }
 ```
 
-**为什么需要它**：逆向方言只把页面自身的形状落成元素；主题、母版与版式上的装饰图形，以及 §10.1 的 dropped 部件（chart / SmartArt / OLE 等）都不在 PPTD 里。源存档让导出时这些内容仍然在场。
+**为什么需要它**：逆向方言只把页面自身的形状落成元素；主题、母版与版式上的装饰图形，以及 §10.1 的 dropped 部件（未映射的图表、SmartArt、OLE 等）都不在 PPTD 里。源存档让导出时这些内容仍然在场。
 
 **导出行为**（`deck.profile === "reverse"` 且 `archive` / `originalSha1` 齐全时启用）：
 
@@ -2180,6 +2179,20 @@ interface DeckSource {
 5. 存档缺失、越界或 sha1 不符 → 整份按 PPTD 从空白文档重建（主题与母版装饰不在场），warnings 说明原因；页指纹文件缺失 → 仍用存档骨架，但全部页重建。
 
 存档与页指纹不参与 `manifest.checksum`，不随编辑变化；`originalSha1` 永远指向「整轮导入」那一刻的源文件。
+
+### 10.5 原生图表映射
+
+二维的柱形、条形、折线、面积（含组合与堆叠）、饼图与环形图映射为 `chart` 元素（§6.7），其余类型（散点、气泡、雷达、股价、曲面、任何三维图表）落 dropped + placeholder。映射规则：
+
+1. `data.cols` 首列固定为 `类别`，其后每个系列一列，列名取系列名（空名为 `系列N`，重名追加序号）；缺失值写 `null`；
+2. 条形图（横向）写 `yAxis.type: "category"`，系列 `encode.x` 为数值列、`encode.y` 为 `类别`；其余直角坐标图 `encode.x` 为 `类别`；
+3. 分组 `stacked` → 柱 / 面积系列 `stack: "value"`，`percentStacked` → `stack: "percent"`；折线不堆叠；
+4. 系列色与逐点色从图表部件解析（主题色与亮度变换、图案填充按浓度混合、渐变取首个色标）→ 柱的 `fill`、折线与面积的 `lineColor`；坐标轴隐藏 → `show: false`，数值轴无主网格线 → `gridLine: false`；平滑折线 → `smooth: true`；数值轴的 min / max 原样写入；分类间距 `gapWidth` 换算为 `barWidth = 100 / (100 + gapWidth)`；
+5. 饼图 → `pie` 系列；环形图另写 `innerRadius = holeSize / 100`（限定在 [0.1, 0.9]）；首扇区角度 → `startAngle`；逐点颜色齐全时 → `fill` 数组；
+6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入；存在逐点隐藏的标签时整图不写标签并记 degraded）；
+7. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
+
+图表的字体、网格线样式、坐标轴格式、数据表与趋势线等细节不进入 PPTD；所在页未改动时整页沿用源存档（§10.4），这些细节随之保留。
 
 ## 11. 错误码表
 
@@ -2205,7 +2218,7 @@ interface Issue {
 |---|---|---|
 | `UnsupportedSchemaError` | blocker | `schema` 缺失、为 `null`，或是整数但不在支持集 `{2}`；`schema` 不是整数时报 `SchemaError`（§2.0） |
 | `UnknownProfileError` | blocker | `profile` 取值不是 `generate` / `reverse` |
-| `ProfileViolationError` | blocker | 字段越方言：生成方言出现 `source` / 逆向专属页字段 / 逆向专属元素字段 / 逆向专属动画字段 / icon 与 chart 之外的逆向限制（逆向方言出现 `$key` 主题引用、`pageType`、icon、chart 等） |
+| `ProfileViolationError` | blocker | 字段越方言：生成方言出现 `source` / 逆向专属页字段 / 逆向专属元素字段 / 逆向专属动画字段 / 逆向限制（逆向方言出现 `$key` 主题引用、`pageType`、icon 等） |
 | `SourceRequiredError` | blocker | 逆向方言缺 `source` / `source.path` / `source.slideCount` / `source.size` |
 
 ### 11.2 deck / export / theme

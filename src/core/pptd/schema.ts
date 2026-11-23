@@ -330,6 +330,7 @@ export const REVERSE_ELEMENT_TYPES = [
   'line',
   'image',
   'table',
+  'chart',
   'placeholder'
 ] as const
 

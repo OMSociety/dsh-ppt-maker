@@ -1281,13 +1281,23 @@ function chartSpecOf(
       ctx.warnings.push(`${where}：pie 图表 encode.category/value 未命中 data.cols`)
       return null
     }
+    const innerRadius = typeof s0.innerRadius === 'number' ? s0.innerRadius : 0
+    const fills = Array.isArray(s0.fill) ? s0.fill : typeof s0.fill === 'string' ? [s0.fill] : []
+    const pointColors = fills.length > 0
+      ? data.rows.map((_r, i) => (resolver.color(fills[i % fills.length]) as string | undefined) ?? null)
+      : undefined
+    const pieLabels = chartDataLabelsOf(element.dataLabels, s0.dataLabels, resolver)
     return {
-      kind: 'pie',
+      ...(pieLabels ? { dataLabels: pieLabels } : {}),
+      kind: innerRadius > 0 ? 'doughnut' : 'pie',
       categories: data.rows.map((r) => String(r[catIdx] ?? '')),
+      ...(innerRadius > 0 ? { holeSizePct: Math.round(Math.min(0.9, innerRadius) * 100) } : {}),
+      ...(typeof s0.startAngle === 'number' ? { firstSliceAngleDeg: ((Math.round(s0.startAngle) % 360) + 360) % 360 } : {}),
       series: [
         {
           name: typeof s0.name === 'string' ? s0.name : String(encode.value ?? ''),
-          values: data.rows.map((r) => numOrNull(r[valIdx]))
+          values: data.rows.map((r) => numOrNull(r[valIdx])),
+          ...(pointColors && pointColors.some((c) => c !== null) ? { pointColors } : {})
         }
       ]
     }

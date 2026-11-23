@@ -75,13 +75,13 @@
     "keptChars": 416,
     "pictures": 1,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 1,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 2,
+    "dropped": 1,
     "degraded": 2,
-    "placeholders": 2
+    "placeholders": 1
   },
   "syn-academic-v2.pptx": {
     "pages": 8,
@@ -89,13 +89,13 @@
     "keptChars": 578,
     "pictures": 2,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 2,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 20,
-    "placeholders": 1
+    "placeholders": 0
   },
   "syn-consulting-v1.pptx": {
     "pages": 9,
@@ -103,13 +103,13 @@
     "keptChars": 416,
     "pictures": 1,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 1,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 2,
+    "dropped": 1,
     "degraded": 2,
-    "placeholders": 2
+    "placeholders": 1
   },
   "syn-consulting-v2.pptx": {
     "pages": 8,
@@ -117,13 +117,13 @@
     "keptChars": 573,
     "pictures": 2,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 2,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 20,
-    "placeholders": 1
+    "placeholders": 0
   },
   "syn-finance-v1.pptx": {
     "pages": 8,
@@ -131,13 +131,13 @@
     "keptChars": 360,
     "pictures": 1,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 1,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 1,
-    "placeholders": 1
+    "placeholders": 0
   },
   "syn-finance-v2.pptx": {
     "pages": 8,
@@ -145,13 +145,13 @@
     "keptChars": 576,
     "pictures": 2,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 2,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 20,
-    "placeholders": 1
+    "placeholders": 0
   },
   "syn-promotion-v1.pptx": {
     "pages": 8,
@@ -159,13 +159,13 @@
     "keptChars": 344,
     "pictures": 1,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 1,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 1,
-    "placeholders": 1
+    "placeholders": 0
   },
   "syn-promotion-v2.pptx": {
     "pages": 8,
@@ -173,13 +173,13 @@
     "keptChars": 570,
     "pictures": 2,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 2,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 20,
-    "placeholders": 1
+    "placeholders": 0
   },
   "syn-work-v1.pptx": {
     "pages": 8,
@@ -187,13 +187,13 @@
     "keptChars": 343,
     "pictures": 1,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 1,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 1,
-    "placeholders": 1
+    "placeholders": 0
   },
   "syn-work-v2.pptx": {
     "pages": 8,
@@ -201,13 +201,13 @@
     "keptChars": 565,
     "pictures": 2,
     "tables": 1,
-    "charts": 0,
+    "charts": 1,
     "sourcePictures": 2,
     "sourceTables": 1,
     "sourceCharts": 1,
-    "dropped": 1,
+    "dropped": 0,
     "degraded": 20,
-    "placeholders": 1
+    "placeholders": 0
   },
   "tpl-badge-blue-desens.pptx": {
     "pages": 51,
@@ -215,13 +215,13 @@
     "keptChars": 4236,
     "pictures": 38,
     "tables": 1,
-    "charts": 0,
+    "charts": 5,
     "sourcePictures": 38,
     "sourceTables": 1,
     "sourceCharts": 6,
-    "dropped": 6,
-    "degraded": 126,
-    "placeholders": 6
+    "dropped": 1,
+    "degraded": 130,
+    "placeholders": 1
   },
   "tpl-badge-red-desens.pptx": {
     "pages": 51,
@@ -229,13 +229,13 @@
     "keptChars": 4236,
     "pictures": 38,
     "tables": 1,
-    "charts": 0,
+    "charts": 5,
     "sourcePictures": 38,
     "sourceTables": 1,
     "sourceCharts": 6,
-    "dropped": 6,
-    "degraded": 126,
-    "placeholders": 6
+    "dropped": 1,
+    "degraded": 130,
+    "placeholders": 1
   },
   "tpl-defense-desens.pptx": {
     "pages": 25,
@@ -243,13 +243,13 @@
     "keptChars": 2555,
     "pictures": 8,
     "tables": 0,
-    "charts": 0,
+    "charts": 4,
     "sourcePictures": 8,
     "sourceTables": 0,
     "sourceCharts": 4,
-    "dropped": 4,
+    "dropped": 0,
     "degraded": 57,
-    "placeholders": 4
+    "placeholders": 0
   },
   "tpl-theme-a-desens.pptx": {
     "pages": 20,
@@ -257,13 +257,13 @@
     "keptChars": 2681,
     "pictures": 7,
     "tables": 0,
-    "charts": 0,
+    "charts": 4,
     "sourcePictures": 7,
     "sourceTables": 0,
     "sourceCharts": 4,
-    "dropped": 4,
+    "dropped": 0,
     "degraded": 21,
-    "placeholders": 4
+    "placeholders": 0
   },
   "tpl-theme-b-desens.pptx": {
     "pages": 25,
@@ -271,12 +271,12 @@
     "keptChars": 2596,
     "pictures": 16,
     "tables": 0,
-    "charts": 0,
+    "charts": 5,
     "sourcePictures": 16,
     "sourceTables": 0,
     "sourceCharts": 5,
-    "dropped": 5,
+    "dropped": 0,
     "degraded": 34,
-    "placeholders": 5
+    "placeholders": 0
   }
 }

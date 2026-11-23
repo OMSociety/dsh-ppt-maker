@@ -20,6 +20,7 @@ import {
   getParagraphSpacing,
   type ParagraphProperties,
   getShapeAdjustValues,
+  getShapeChartSpec,
   getShapeBodyPrEffective,
   getShapeAnimation,
   getShapeCustomGeometry,
@@ -78,6 +79,7 @@ import {
   isChartShape,
   isShapeTextBox,
   isTableShape,
+  readPackagePart,
   type PresentationData,
   type SlideBackground,
   type SlideData,
@@ -85,6 +87,7 @@ import {
   type SlideShapeData
 } from '@office-kit/pptx'
 import { PRESET_ADJUST_GUIDES } from '../engine/preset-adjust-guides.js'
+import { drawingColorOf } from './read.js'
 import {
   PLACEHOLDER_DEFAULT_LABELS,
   type Animation,
@@ -1227,6 +1230,237 @@ function mapLine(rec: ReverseShapeRecord, pres: PresentationData, report: Import
   return element
 }
 
+const CHART_KINDS = new Set(['bar', 'column', 'line', 'area', 'pie', 'doughnut'])
+
+interface ChartPaint {
+  series: Array<{ color?: string; points: Map<number, string>; formatCode?: string }>
+}
+
+/** Paint of one `<c:spPr>`: solid, pattern (blended to the ink share), or the first gradient stop. */
+function chartPaintOf(pres: PresentationData, spPr: string | undefined): string | undefined {
+  if (!spPr) return undefined
+  const body = spPr.replace(/<a:ln\b[\s\S]*?<\/a:ln>/g, '')
+  const solid = /<a:solidFill>([\s\S]*?)<\/a:solidFill>/.exec(body)?.[1]
+  if (solid) return drawingColorOf(pres, solid)
+  const pattern = /<a:pattFill\b[^>]*prst="(\w+)"[^>]*>([\s\S]*?)<\/a:pattFill>/.exec(body)
+  if (pattern) {
+    const fg = drawingColorOf(pres, /<a:fgClr>([\s\S]*?)<\/a:fgClr>/.exec(pattern[2])?.[1] ?? '')
+    const bg = drawingColorOf(pres, /<a:bgClr>([\s\S]*?)<\/a:bgClr>/.exec(pattern[2])?.[1] ?? '')
+    if (fg && bg) return blendHex(fg, bg, patternInk(pattern[1]))
+    return fg ?? bg
+  }
+  const stop = /<a:gradFill\b[\s\S]*?<a:gs\b[^>]*>([\s\S]*?)<\/a:gs>/.exec(body)?.[1]
+  return stop ? drawingColorOf(pres, stop) : undefined
+}
+
+/**
+ * Series and data-point paints read from the chart part itself: theme colours
+ * with transforms, pattern fills and gradients the parsed chart spec leaves
+ * unresolved. Returns null when the part cannot be located.
+ */
+function chartPaintsOf(pres: PresentationData, slidePart: string, shape: SlideShapeData): ChartPaint | null {
+  try {
+    const rid = /<c:chart\b[^>]*\br:id="([^"]+)"/.exec(getShapeXmlString(shape))?.[1]
+    if (!rid) return null
+    const part = slidePart.startsWith('/') ? slidePart : `/${slidePart}`
+    const dir = part.slice(0, part.lastIndexOf('/'))
+    const relsBytes = readPackagePart(pres, `${dir}/_rels/${part.slice(dir.length + 1)}.rels`)
+    if (!relsBytes) return null
+    const rels = new TextDecoder().decode(relsBytes)
+    const rel = [...rels.matchAll(/<Relationship\b[^>]*>/g)].map((m) => m[0]).find((r) => r.includes(`Id="${rid}"`))
+    const target = rel ? /Target="([^"]+)"/.exec(rel)?.[1] : undefined
+    if (!target) return null
+    const segments = (target.startsWith('/') ? target : `${dir}/${target}`).split('/')
+    const resolved: string[] = []
+    for (const seg of segments) {
+      if (seg === '..') resolved.pop()
+      else if (seg !== '.' && seg !== '') resolved.push(seg)
+    }
+    const chartBytes = readPackagePart(pres, `/${resolved.join('/')}`)
+    if (!chartBytes) return null
+    const xml = new TextDecoder().decode(chartBytes)
+    const series = [...xml.matchAll(/<c:ser>([\s\S]*?)<\/c:ser>/g)].map((m) => {
+      const ser = m[1]
+      const points = new Map<number, string>()
+      for (const pt of ser.matchAll(/<c:dPt>([\s\S]*?)<\/c:dPt>/g)) {
+        const idx = Number(/<c:idx val="(\d+)"/.exec(pt[1])?.[1])
+        const color = chartPaintOf(pres, /<c:spPr>([\s\S]*?)<\/c:spPr>/.exec(pt[1])?.[1])
+        if (Number.isInteger(idx) && color) points.set(idx, color)
+      }
+      const own = ser.replace(/<c:dPt>[\s\S]*?<\/c:dPt>/g, '').replace(/<c:dLbls>[\s\S]*?<\/c:dLbls>/g, '')
+      const color = chartPaintOf(pres, /<c:spPr>([\s\S]*?)<\/c:spPr>/.exec(own)?.[1])
+      const formatCode = /<c:val>[\s\S]*?<c:formatCode>([^<]*)<\/c:formatCode>/.exec(ser)?.[1]
+      return { ...(color ? { color } : {}), points, ...(formatCode ? { formatCode } : {}) }
+    })
+    return { series }
+  } catch {
+    return null
+  }
+}
+
+/** Excel number format subset (§6.7 numberFormat) a label format code maps to. */
+function labelNumberFormat(code: string | undefined): string | undefined {
+  if (!code) return undefined
+  const trimmed = code.trim()
+  return ['0', '0.0', '0%', '0.0%', '#,##0', '0.0E+00'].includes(trimmed) ? trimmed : undefined
+}
+
+/**
+ * 原生图表 → PPTD chart（§6.7）。覆盖柱 / 条 / 折线 / 面积（含组合与堆叠）、饼与环形；
+ * 其余类型（散点、雷达、股价、曲面、三维等）返回 null，由调用方落占位。
+ * 类目列名固定为「类别」，系列列名取系列名（重名追加序号）。
+ */
+function mapChart(
+  rec: ReverseShapeRecord,
+  pres: PresentationData,
+  slidePart: string,
+  report: ImportReport
+): Record<string, unknown> | null {
+  let spec: ReturnType<typeof getShapeChartSpec> = null
+  try {
+    spec = getShapeChartSpec(rec.raw as SlideShapeData)
+  } catch {
+    return null
+  }
+  if (!spec || !CHART_KINDS.has(spec.kind) || spec.series.length === 0) return null
+  const s = spec as typeof spec & {
+    grouping?: string
+    gapWidthPct?: number
+    holeSizePct?: number
+    firstSliceAngleDeg?: number
+    legend?: { position: string | null }
+    view3D?: unknown
+    valueAxisHidden?: boolean
+    categoryAxisHidden?: boolean
+    valueAxisMajorGridlines?: boolean
+  }
+  if (s.view3D) return null
+  const src = spec
+  const paints = chartPaintsOf(pres, slidePart, rec.raw as SlideShapeData)
+  const seriesColor = (i: number): string | undefined => {
+    const own = src.series[i]?.color
+    return paints?.series[i]?.color ?? (own ? asLiteralColor(own) : undefined)
+  }
+  const categoryCol = '类别'
+  const used = new Set([categoryCol])
+  const colNames = src.series.map((series, i) => {
+    const base = series.name.trim() || `系列${i + 1}`
+    let name = base
+    for (let n = 2; used.has(name); n++) name = `${base}${n}`
+    used.add(name)
+    return name
+  })
+  const rows = src.categories.map((category, r) => [
+    category,
+    ...src.series.map((series) => {
+      const v = series.values[r]
+      return typeof v === 'number' && Number.isFinite(v) ? v : null
+    })
+  ])
+  const element: Record<string, unknown> = {
+    ...baseElement(rec),
+    elementType: 'chart',
+    data: { cols: [categoryCol, ...colNames], rows }
+  }
+  const labels = src.series[0]?.dataLabels ?? src.dataLabels
+  const hiddenPointLabels = src.series.some((series) =>
+    (series.pointDataLabels ?? []).some((p) => p !== null && !p.showValue && !p.showPercent && !p.showCategory)
+  )
+  const showLabels = labels && !hiddenPointLabels ? labels.showValue || labels.showPercent || labels.showCategory : false
+  const labelConfig = (content?: string): Record<string, unknown> => {
+    const out: Record<string, unknown> = { show: true }
+    if (content) out.content = content
+    const style = (labels as { textStyle?: { sizePt?: number; color?: string; bold?: boolean } } | undefined)?.textStyle
+    if (typeof style?.sizePt === 'number') out.fontSize = fmtNum(style.sizePt)
+    if (style?.bold) out.bold = true
+    const format = labelNumberFormat(paints?.series[0]?.formatCode)
+    if (format) out.numberFormat = format
+    return out
+  }
+  if (hiddenPointLabels) {
+    report.degraded.push({
+      page: rec.slideIndex,
+      elementId: elementIdOf(rec),
+      feature: 'unknown',
+      detail: '数据标签逐点显隐无法表达，标签未落盘'
+    } as ImportReport['degraded'][number])
+  }
+  if (src.kind === 'pie' || src.kind === 'doughnut') {
+    const first = src.series[0]
+    const pie: Record<string, unknown> = {
+      type: 'pie',
+      name: colNames[0],
+      encode: { category: categoryCol, value: colNames[0] }
+    }
+    if (src.kind === 'doughnut') pie.innerRadius = Math.min(0.9, Math.max(0.1, (s.holeSizePct ?? 50) / 100))
+    if (typeof s.firstSliceAngleDeg === 'number' && s.firstSliceAngleDeg !== 0) pie.startAngle = s.firstSliceAngleDeg
+    const base = seriesColor(0)
+    const points = src.categories.map((_c, i) => {
+      const own = first.pointColors?.[i]
+      return paints?.series[0]?.points.get(i) ?? (typeof own === 'string' ? asLiteralColor(own) : undefined)
+    })
+    if (points.every((c) => c !== undefined)) pie.fill = points
+    else if (points.some((c) => c !== undefined)) pie.fill = points.map((c) => c ?? base ?? '#808080')
+    else if (base) pie.fill = base
+    if (labels && showLabels) {
+      pie.dataLabels = labelConfig(
+        labels.showPercent ? 'percentage' : labels.showCategory && !labels.showValue ? 'category' : 'value'
+      )
+    }
+    element.series = [pie]
+  } else {
+    const horizontal = src.kind === 'bar'
+    const stack = s.grouping === 'stacked' ? 'value' : s.grouping === 'percentStacked' ? 'percent' : undefined
+    element.series = src.series.map((series, i) => {
+      const kind = series.chartKind ?? src.kind
+      const type = kind === 'bar' || kind === 'column' ? 'bar' : kind
+      const out: Record<string, unknown> = {
+        type,
+        name: colNames[i],
+        encode: horizontal ? { x: colNames[i], y: categoryCol } : { x: categoryCol, y: colNames[i] }
+      }
+      const color = seriesColor(i)
+      if (color) out[type === 'bar' ? 'fill' : 'lineColor'] = color
+      if (stack && type !== 'line') out.stack = stack
+      if (type !== 'bar' && series.smooth) out.smooth = true
+      const own = series.dataLabels ?? src.dataLabels
+      if (!hiddenPointLabels && own && (own.showValue || own.showPercent || own.showCategory)) out.dataLabels = labelConfig()
+      return out
+    })
+    const category: Record<string, unknown> = { type: 'category' }
+    if (s.categoryAxisHidden) category.show = false
+    const value: Record<string, unknown> = {}
+    const axis = src.valueAxis
+    if (typeof axis?.min === 'number') value.min = axis.min
+    if (typeof axis?.max === 'number') value.max = axis.max
+    if (s.valueAxisHidden) value.show = false
+    if (s.valueAxisMajorGridlines === false) value.gridLine = false
+    const categoryAxis = horizontal || Object.keys(category).length > 1 ? category : undefined
+    const valueAxis = Object.keys(value).length > 0 ? value : undefined
+    if (horizontal) {
+      if (categoryAxis) element.yAxis = categoryAxis
+      if (valueAxis) element.xAxis = valueAxis
+    } else {
+      if (categoryAxis) element.xAxis = categoryAxis
+      if (valueAxis) element.yAxis = valueAxis
+    }
+    if (typeof s.gapWidthPct === 'number' && s.gapWidthPct >= 0) {
+      element.barWidth = fmtNum(Math.min(1, 100 / (100 + s.gapWidthPct)))
+    }
+  }
+  if (src.title) element.title = src.title
+  element.legend = s.legend ? s.legend.position !== null : false
+  if (src.series.some((series) => series.secondaryAxis)) {
+    report.degraded.push({
+      page: rec.slideIndex,
+      elementId: elementIdOf(rec),
+      feature: 'unknown',
+      detail: '次坐标轴系列并入主坐标轴落盘'
+    } as ImportReport['degraded'][number])
+  }
+  return element
+}
+
 function fmtNum(v: number): number {
   return Math.round(v * 100) / 100
 }
@@ -1515,7 +1749,9 @@ function mapPage(
         continue
       }
       if (isChartShape(rawShape)) {
-        ensurePlaceholder(page, rec, 'chart', report, '原生图表部件不映射为 PPTD 元素')
+        const chart = mapChart(rec, pres, slide.partName, report)
+        if (chart) page.elements.push(chart as Page['elements'][number])
+        else ensurePlaceholder(page, rec, 'chart', report, '该类型的原生图表不映射为 PPTD 元素')
         continue
       }
       switch (rec.kind) {

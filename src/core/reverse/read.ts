@@ -158,13 +158,20 @@ const THEME_SLOT: Record<string, keyof PresentationTheme> = {
 }
 const DEFAULT_CLR_MAP: Record<string, string> = { bg1: 'lt1', tx1: 'dk1', bg2: 'lt2', tx2: 'dk2' }
 
-/** lumMod / lumOff / shade / tint applied to `#RRGGBB` (ECMA-376 §20.1.2.3, HSL luminance). */
+const toLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+const toSrgb = (c: number): number => {
+  const v = Math.min(1, Math.max(0, c))
+  return v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055
+}
+
+/** lumMod / lumOff / shade / tint applied to `#RRGGBB` (ECMA-376 §20.1.2.3). */
 function applyTransforms(hex: string, transforms: Array<[string, number]>): string {
   let [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
   for (const [name, raw] of transforms) {
     const v = raw / 100000
-    if (name === 'shade') [r, g, b] = [r * v, g * v, b * v]
-    else if (name === 'tint') [r, g, b] = [r + (1 - r) * v, g + (1 - g) * v, b + (1 - b) * v]
+    // shade / tint operate on linear RGB (sRGB gamma removed, then re-applied).
+    if (name === 'shade') [r, g, b] = [r, g, b].map((c) => toSrgb(toLinear(c) * v))
+    else if (name === 'tint') [r, g, b] = [r, g, b].map((c) => toSrgb(toLinear(c) * v + (1 - v)))
     else if (name === 'lumMod' || name === 'lumOff') {
       const max = Math.max(r, g, b)
       const min = Math.min(r, g, b)
@@ -204,13 +211,21 @@ function groupSolidFill(pres: PresentationData, group: SlideShapeData): string |
   }
   const grpSpPr = /<p:grpSpPr\b[^>]*>([\s\S]*?)<\/p:grpSpPr>/.exec(xml)?.[1]
   const solid = grpSpPr ? /<a:solidFill>([\s\S]*?)<\/a:solidFill>/.exec(grpSpPr)?.[1] : undefined
-  if (!solid) return undefined
-  const transforms = [...solid.matchAll(/<a:(lumMod|lumOff|shade|tint)\s+val="(\d+)"/g)].map(
+  return solid ? drawingColorOf(pres, solid) : undefined
+}
+
+/**
+ * Resolves one DrawingML colour element (`<a:srgbClr>` / `<a:schemeClr>` with
+ * child transforms) to `#RRGGBB`. Theme colours go through the deck theme and
+ * the default colour map; transforms apply in document order.
+ */
+export function drawingColorOf(pres: PresentationData, colorXml: string): string | undefined {
+  const transforms = [...colorXml.matchAll(/<a:(lumMod|lumOff|shade|tint)\s+val="(\d+)"/g)].map(
     (m) => [m[1], Number(m[2])] as [string, number]
   )
-  const srgb = /<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/.exec(solid)?.[1]
+  const srgb = /<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/.exec(colorXml)?.[1]
   if (srgb) return applyTransforms(`#${srgb.toUpperCase()}`, transforms)
-  const scheme = /<a:schemeClr\s+val="(\w+)"/.exec(solid)?.[1]
+  const scheme = /<a:schemeClr\s+val="(\w+)"/.exec(colorXml)?.[1]
   if (!scheme) return undefined
   const theme = getPresentationTheme(pres)
   const slot = THEME_SLOT[DEFAULT_CLR_MAP[scheme] ?? scheme]
