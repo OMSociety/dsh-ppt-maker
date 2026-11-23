@@ -134,7 +134,7 @@ export async function releaseProject(cwd: string, dir: string, options: ReleaseO
     sha256,
     postflight: pf,
     fontsUsed: pipeline.fontsUsed,
-    transition: pipeline.deck.export?.transition ?? 'fade',
+    transition: pipeline.deck.export?.transition ?? 'morph',
     animations: pipeline.deck.export?.animations ?? 'auto',
     fontEmbed: saved.fontEmbed
       ? {

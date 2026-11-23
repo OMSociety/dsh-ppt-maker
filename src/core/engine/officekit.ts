@@ -2096,6 +2096,12 @@ const AUTO_TRANSITION_CURATED: ReadonlyArray<{ effect: string; direction?: strin
   { effect: 'wipe', direction: 'r' }
 ]
 
+/** deck 级转场的取值：`morph` 平滑、`fade` 淡入淡出、`auto` 按策展词表轮换。 */
+function deckTransitionOf(mode: 'morph' | 'fade' | 'auto', pageIndex: number): { effect: string; direction?: string } {
+  if (mode === 'auto') return AUTO_TRANSITION_CURATED[pageIndex % AUTO_TRANSITION_CURATED.length]
+  return { effect: mode }
+}
+
 function applyAnimations(
   slide: SlideData,
   page: Page,
@@ -2393,7 +2399,7 @@ export function createOfficeKitEngine(): DeckEngine {
 
       const size = Array.isArray(deck.size) ? deck.size : [960, 540]
       const exportCfg = deck.export ?? {}
-      const transitionMode = exportCfg.transition ?? 'fade'
+      const transitionMode = exportCfg.transition ?? 'morph'
       const animationsMode = exportCfg.animations ?? 'auto'
       const profile = deck.profile ?? 'generate'
 
@@ -2489,10 +2495,7 @@ export function createOfficeKitEngine(): DeckEngine {
           if (typeof page.notes === 'string' && page.notes !== '') setSlideNotes(slide, page.notes)
           // deck 级转场对 svg 页同样生效（页内动画 svg 页不支持，见规格 §4）。
           if (transitionMode !== 'none') {
-            const curated =
-              transitionMode === 'auto'
-                ? AUTO_TRANSITION_CURATED[pageIndex % AUTO_TRANSITION_CURATED.length]
-                : { effect: 'fade' }
+            const curated = deckTransitionOf(transitionMode, pageIndex)
             try {
               setSlideTransition(slide, {
                 effect: curated.effect as never,
@@ -2593,10 +2596,7 @@ export function createOfficeKitEngine(): DeckEngine {
           if (profile === 'reverse') {
             if (page.transition && applyTransition(slide, page.transition, ctx, pageLabel)) stats.transitionPages++
           } else {
-            const curated =
-              transitionMode === 'auto'
-                ? AUTO_TRANSITION_CURATED[pageIndex % AUTO_TRANSITION_CURATED.length]
-                : { effect: 'fade' }
+            const curated = deckTransitionOf(transitionMode, pageIndex)
             try {
               setSlideTransition(slide, {
                 effect: curated.effect as never,

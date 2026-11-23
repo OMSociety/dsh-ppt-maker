@@ -178,7 +178,7 @@ export function exportConfigOf(deck: Presentation): Required<Presentation['expor
   const raw = isRecord(deck.export) ? deck.export : {}
   const out = { ...DEFAULT_EXPORT }
   if (raw.fontEmbed === 'subset' || raw.fontEmbed === 'full' || raw.fontEmbed === 'off') out.fontEmbed = raw.fontEmbed
-  if (raw.transition === 'fade' || raw.transition === 'none' || raw.transition === 'auto') out.transition = raw.transition
+  if (raw.transition === 'morph' || raw.transition === 'fade' || raw.transition === 'none' || raw.transition === 'auto') out.transition = raw.transition
   if (raw.animations === 'auto' || raw.animations === 'off') out.animations = raw.animations
   return out
 }
@@ -306,7 +306,7 @@ export function validateExportConfig(raw: unknown, path: string): Issue[] {
   }
   const domains: Record<string, readonly string[]> = {
     fontEmbed: ['subset', 'full', 'off'],
-    transition: ['fade', 'none', 'auto'],
+    transition: ['morph', 'fade', 'none', 'auto'],
     animations: ['auto', 'off']
   }
   for (const [key, allowed] of Object.entries(domains)) {

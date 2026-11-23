@@ -382,8 +382,8 @@ export const SCHEME_REF_PREFIX = 'scheme:'
  * ------------------------------------------------------------------ */
 
 export type ExportFontEmbed = 'subset' | 'full' | 'off'
-/** Spec §3.2 — `"auto"` 按策展词表逐页轮换（fade → push → wipe），其余语义见 §8.1。 */
-export type ExportTransition = 'fade' | 'none' | 'auto'
+/** Spec §3.2 — `"morph"` 平滑切换（默认）；`"auto"` 按策展词表逐页轮换（fade → push → wipe），其余语义见 §8.1。 */
+export type ExportTransition = 'morph' | 'fade' | 'none' | 'auto'
 export type ExportAnimations = 'auto' | 'off'
 
 /** Spec §3.2 — the export contract. Three independent fields, all optional. */
@@ -396,7 +396,7 @@ export interface ExportConfig {
 /** Spec §3.2 defaults. */
 export const DEFAULT_EXPORT: Required<ExportConfig> = {
   fontEmbed: 'subset',
-  transition: 'fade',
+  transition: 'morph',
   animations: 'auto'
 }
 

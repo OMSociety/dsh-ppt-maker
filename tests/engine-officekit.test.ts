@@ -29,7 +29,7 @@ function deck(overrides: Partial<Presentation> = {}): Presentation {
       colors: { primary: '#2563EB', text: '#1F2937' },
       textStyles: { title: { fontSize: 40, color: '$primary' } }
     },
-    export: { fontEmbed: 'subset', transition: 'fade', animations: 'auto' },
+    export: { fontEmbed: 'subset', transition: 'morph', animations: 'auto' },
     pages: ['pages/01.page'],
     ...overrides
   }
@@ -89,12 +89,18 @@ describe('officekit 引擎', () => {
     expect(shapes).toHaveLength(1)
   })
 
-  it('默认写 fade 转场，export.transition=none 时不写', async () => {
+  it('默认写 morph 转场，export.transition=fade 写淡入，none 时不写', async () => {
     const engine = createOfficeKitEngine()
     const page: Page = { elements: [] }
-    const withFade = await engine.buildDeck({ deck: deck(), pages: [page] }, ctx())
-    const fadeBytes = await engine.saveDeck(withFade.native)
-    const fadeBack = await loadPresentation(fadeBytes)
+    const withMorph = await engine.buildDeck({ deck: deck(), pages: [page] }, ctx())
+    const morphBack = await loadPresentation(await engine.saveDeck(withMorph.native))
+    expect(getSlideTransition(getSlides(morphBack)[0])?.effect).toBe('morph')
+
+    const withFade = await engine.buildDeck(
+      { deck: deck({ export: { fontEmbed: 'off', transition: 'fade', animations: 'off' } }), pages: [page] },
+      ctx()
+    )
+    const fadeBack = await loadPresentation(await engine.saveDeck(withFade.native))
     expect(getSlideTransition(getSlides(fadeBack)[0])?.effect).toBe('fade')
 
     const noTransition = await engine.buildDeck(

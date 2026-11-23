@@ -332,7 +332,7 @@ export async function createProject(cwd: string, options: CreateProjectOptions):
       ...(options.title !== undefined ? { title: options.title } : {}),
       size: options.size ?? DEFAULT_SIZE,
       ...(options.deckTheme !== undefined ? { theme: options.deckTheme } : {}),
-      export: { fontEmbed: 'subset', transition: 'fade', animations: 'auto' },
+      export: { fontEmbed: 'subset', transition: 'morph', animations: 'auto' },
       pages: []
     }
 

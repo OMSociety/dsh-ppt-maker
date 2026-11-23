@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-24
+
+### 变更
+
+- **默认页面转场改为平滑（`morph`）。** `export.transition` 的默认值与新建工程写入的值由 `fade` 改为 `morph`，导出写成 `<p159:morph option="byObject"/>`：相邻页保留同名元素时做位移与缩放动画，不识别平滑的软件回退为淡入淡出；`fade`、`auto`、`none` 仍可显式选用。
+
+### 修复
+
+- **插件安装不再被构建脚本拦截。** 依赖的 `@deepseek-ai/libreoffice-kit` 固定为 0.1.2：0.2.x 起新增的 `koffi` 带安装脚本，pnpm 默认拒绝执行，`dsh plugin add` 以 `ERR_PNPM_IGNORED_BUILDS` 失败，用户需手动放行；0.1.2 没有该依赖，安装不需要任何额外声明。
+
+### Changed
+
+- **The default page transition is now Morph (`morph`).** The default of `export.transition` and the value written into new projects change from `fade` to `morph`. The export writes `<p159:morph option="byObject"/>`, which animates movement and scaling between same-named objects on adjacent pages and falls back to a fade in software that does not know Morph; `fade`, `auto` and `none` stay selectable.
+
+### Fixed
+
+- **Installing the plugin is no longer blocked by a build script.** `@deepseek-ai/libreoffice-kit` is pinned to 0.1.2: from 0.2.x it pulls in `koffi`, which has an install script that pnpm refuses to run by default, so `dsh plugin add` failed with `ERR_PNPM_IGNORED_BUILDS` and the user had to allow the build by hand. 0.1.2 has no such dependency, so installation needs no extra declaration.
 ## [2.0.0] - 2026-11-23
 
 ### 更新说明

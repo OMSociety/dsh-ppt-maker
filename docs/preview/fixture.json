@@ -613,7 +613,7 @@
           "Noto Sans SC",
           "Microsoft YaHei"
         ],
-        "transition": "fade",
+        "transition": "morph",
         "animations": "auto",
         "fontEmbed": {
           "mode": "subset",
@@ -669,7 +669,7 @@
       ],
       "export": {
         "fontEmbed": "subset",
-        "transition": "fade",
+        "transition": "morph",
         "animations": "auto"
       },
       "pages": [

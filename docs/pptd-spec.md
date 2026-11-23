@@ -312,7 +312,7 @@ theme:
         - {fill: {type: solid, color: "#ffffff"}}
 export:
   fontEmbed: subset
-  transition: fade
+  transition: morph
   animations: auto
 pages:
   - pages/01_cover.page
@@ -348,7 +348,7 @@ deck 级字段，控制导出产物（`.pptx`）的三项全局行为。三字�
 ```ts
 interface ExportConfig {
   fontEmbed?: "subset" | "full" | "off";   // 默认 "subset"；字体嵌入档位，见 §9
-  transition?: "fade" | "none" | "auto";    // 默认 "fade"；deck 级转场，见 §8.1
+  transition?: "morph" | "fade" | "none" | "auto";    // 默认 "morph"；deck 级转场，见 §8.1
   animations?: "auto" | "off";             // 默认 "auto"；是否写出页级动画，见 §7.8
 }
 ```
@@ -358,7 +358,8 @@ interface ExportConfig {
 | `fontEmbed` | `subset`（默认） | 嵌入工程实际用到的字体，按字符集子集化（CJK 场景体积降一个数量级）；受 fsType 许可闸约束（§9.1） |
 | | `full` | 嵌入整字体，不子集化；目标机可自由编辑新增字符，代价是产物体积 |
 | | `off` | 不嵌入字体；目标机需自行安装，否则回落替代字体并触发 `missingFonts` 警告 |
-| `transition` | `fade`（默认） | 对没有页级转场记录的页写淡入淡出转场（`spd="fast"`、`advClick="1"`）；逆向方言里已有 `page.transition` 的页以页级为准 |
+| `transition` | `morph`（默认） | 对没有页级转场记录的页写平滑转场（`spd="fast"`、`advClick="1"`，`<p159:morph option="byObject"/>`，回退为 `fade`）；逆向方言里已有 `page.transition` 的页以页级为准 |
+| | `fade` | 对没有页级转场记录的页写淡入淡出转场（`spd="fast"`、`advClick="1"`）；逆向方言里已有 `page.transition` 的页以页级为准 |
 | | `none` | 导出产物任何页根级都不写 `<p:transition>`（含逆向方言的页级记录） |
 | | `auto` | 对没有页级转场记录的页按策展词表逐页轮换 `fade → push(dir=r) → wipe(dir=r)`（`spd="fast"`、`advClick="1"`）；策展词表是引擎层的固定常量，目的是让 AI 生成的 deck 页间有节奏变化而非清一色淡入；逆向方言里已有 `page.transition` 的页仍以页级为准 |
 | `animations` | `auto`（默认） | 按各页 `animations` 数组写出 `<p:timing>`；逆向方言里 `effect: null` 的未建模步骤跳过并计入导出摘要 |
@@ -2000,7 +2001,8 @@ deck 级 `export.animations`（§3.2）控制动画写出：
 
 `export.transition` 控制导出时写出哪些转场（§3.2）：
 
-- `fade`（默认）：全部页面统一写 `fade` 转场。
+- `morph`（默认）：全部页面统一写 `morph` 平滑转场（`option="byObject"`，相邻页同名对象之间做位移与缩放动画）；不识别平滑的软件按 `fade` 显示。
+- `fade`：全部页面统一写 `fade` 转场。
 - `auto`：按策展词表逐页轮换——`fade` → `push(direction: r)` → `wipe(direction: r)` 循环，避免整副片子全是同一种淡入。
 - `none`：不写任何转场。`none` 是该字段的哨兵值，**不是**转场效果 token，不可出现在 `page.transition.effect` 中。
 
