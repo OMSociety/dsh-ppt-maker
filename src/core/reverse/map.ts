@@ -834,21 +834,6 @@ function withAlpha(color: string, opacity: number | null | undefined): string {
   return `${color}${Math.round(Math.max(0, opacity) * 255).toString(16).padStart(2, '0').toUpperCase()}`
 }
 
-/** Linear blend of two `#RRGGBB` colours; `t` = share of `a`. */
-function blendHex(a: string, b: string, t: number): string {
-  const ch = (hex: string, i: number): number => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)
-  const out = [0, 1, 2].map((i) => Math.round(ch(a, i) * t + ch(b, i) * (1 - t)))
-  return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`
-}
-
-/** Share of foreground ink a preset pattern paints (pctN = N%; hatches ≈ 25%). */
-function patternInk(preset: string): number {
-  const m = /^pct(\d+)$/.exec(preset)
-  if (m) return Number(m[1]) / 100
-  if (/^(dk|wd|smGrid|lgGrid|smCheck|lgCheck|solidDmnd|shingle|plaid|sphere|weave|trellis)/.test(preset)) return 0.4
-  return 0.25
-}
-
 /** Library gradient read-back → PPTD GradientFill; fewer than 2 stops → null. */
 function pptdGradientOf(gradient: ReadGradientFill): Record<string, unknown> | null {
   if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length < 2) return null
@@ -1319,12 +1304,28 @@ function mapLine(rec: ReverseShapeRecord, pres: PresentationData, report: Import
 
 const CHART_KINDS = new Set(['bar', 'column', 'line', 'area', 'pie', 'doughnut'])
 
+/** A chart paint: a colour string or a PPTD PatternFill record. */
+type ChartPaintValue = string | Record<string, unknown>
+
 interface ChartPaint {
-  series: Array<{ color?: string; points: Map<number, string>; formatCode?: string }>
+  series: Array<{
+    color?: ChartPaintValue
+    points: Map<number, ChartPaintValue>
+    formatCode?: string
+    pointLabels: Array<Record<string, unknown> | null>
+    pointLabelFlags: Array<{ show: boolean; value: boolean; percent: boolean; category: boolean } | null>
+  }>
+  container?: Record<string, unknown>
 }
 
-/** Paint of one `<c:spPr>`: solid, pattern (blended to the ink share), or the first gradient stop. */
-function chartPaintOf(pres: PresentationData, spPr: string | undefined): string | undefined {
+/** Colour a paint reduces to when only a single colour is expressible (pattern → its foreground). */
+function paintColorOf(paint: ChartPaintValue | undefined): string | undefined {
+  if (paint === undefined) return undefined
+  return typeof paint === 'string' ? paint : String(paint.foreground)
+}
+
+/** Paint of one `<c:spPr>`: solid, pattern (PatternFill; blended colour when a colour cannot be resolved), or the first gradient stop. */
+function chartPaintOf(pres: PresentationData, spPr: string | undefined): ChartPaintValue | undefined {
   if (!spPr) return undefined
   const body = spPr.replace(/<a:ln\b[\s\S]*?<\/a:ln>/g, '')
   const solid = /<a:solidFill>([\s\S]*?)<\/a:solidFill>/.exec(body)?.[1]
@@ -1333,7 +1334,7 @@ function chartPaintOf(pres: PresentationData, spPr: string | undefined): string 
   if (pattern) {
     const fg = drawingColorOf(pres, /<a:fgClr>([\s\S]*?)<\/a:fgClr>/.exec(pattern[2])?.[1] ?? '')
     const bg = drawingColorOf(pres, /<a:bgClr>([\s\S]*?)<\/a:bgClr>/.exec(pattern[2])?.[1] ?? '')
-    if (fg && bg) return blendHex(fg, bg, patternInk(pattern[1]))
+    if (fg && bg) return { type: 'pattern', preset: pattern[1], foreground: fg, background: bg }
     return fg ?? bg
   }
   const stop = /<a:gradFill\b[\s\S]*?<a:gs\b[^>]*>([\s\S]*?)<\/a:gs>/.exec(body)?.[1]
@@ -1392,12 +1393,13 @@ function chartPaintsOf(pres: PresentationData, slidePart: string, shape: SlideSh
   try {
     const rid = /<c:chart\b[^>]*\br:id="([^"]+)"/.exec(getShapeXmlString(shape))?.[1]
     if (!rid) return null
-    const chartBytes = slideRelPart(pres, slidePart, rid)?.bytes
+    const partObj = slideRelPart(pres, slidePart, rid); console.log('PART', slidePart, rid, partObj?.name)
+    const chartBytes = partObj?.bytes
     if (!chartBytes) return null
     const xml = new TextDecoder().decode(chartBytes)
     const series = [...xml.matchAll(/<c:ser>([\s\S]*?)<\/c:ser>/g)].map((m) => {
       const ser = m[1]
-      const points = new Map<number, string>()
+      const points = new Map<number, ChartPaintValue>()
       for (const pt of ser.matchAll(/<c:dPt>([\s\S]*?)<\/c:dPt>/g)) {
         const idx = Number(/<c:idx val="(\d+)"/.exec(pt[1])?.[1])
         const color = chartPaintOf(pres, /<c:spPr>([\s\S]*?)<\/c:spPr>/.exec(pt[1])?.[1])
@@ -1406,12 +1408,63 @@ function chartPaintsOf(pres: PresentationData, slidePart: string, shape: SlideSh
       const own = ser.replace(/<c:dPt>[\s\S]*?<\/c:dPt>/g, '').replace(/<c:dLbls>[\s\S]*?<\/c:dLbls>/g, '')
       const color = chartPaintOf(pres, /<c:spPr>([\s\S]*?)<\/c:spPr>/.exec(own)?.[1])
       const formatCode = /<c:val>[\s\S]*?<c:formatCode>([^<]*)<\/c:formatCode>/.exec(ser)?.[1]
-      return { ...(color ? { color } : {}), points, ...(formatCode ? { formatCode } : {}) }
+      const labels = pointLabelsOf(pres, ser)
+      return { ...(color ? { color } : {}), points, ...(formatCode ? { formatCode } : {}), ...labels }
     })
-    return { series }
+    const tail = xml.slice(xml.indexOf('</c:chart>') + '</c:chart>'.length)
+    const container = chartPaintOf(pres, /^\s*<c:spPr>([\s\S]*?)<\/c:spPr>/.exec(tail)?.[1])
+    return { series, ...(typeof container === 'object' ? { container } : {}) }
   } catch {
     return null
   }
+}
+
+/** Per-point `<c:dLbl>` of one series → DataLabelPoint records (§6.7) plus the content flags each point shows. */
+function pointLabelsOf(
+  pres: PresentationData,
+  ser: string
+): Pick<ChartPaint['series'][number], 'pointLabels' | 'pointLabelFlags'> {
+  const pointLabels: Array<Record<string, unknown> | null> = []
+  const pointLabelFlags: ChartPaint['series'][number]['pointLabelFlags'] = []
+  const block = /<c:dLbls>([\s\S]*?)<\/c:dLbls>/.exec(ser)?.[1] ?? ''
+  for (const m of block.matchAll(/<c:dLbl>([\s\S]*?)<\/c:dLbl>/g)) {
+    const body = m[1]
+    const idx = Number(/<c:idx val="(\d+)"/.exec(body)?.[1])
+    if (!Number.isInteger(idx)) continue
+    const flag = (name: string): boolean => /val="(1|true)"/.test(new RegExp(`<c:${name}\\b[^>]*>`).exec(body)?.[0] ?? '')
+    const deleted = flag('delete')
+    const value = flag('showVal')
+    const percent = flag('showPercent')
+    const category = flag('showCatName')
+    const show = !deleted && (value || percent || category)
+    const point: Record<string, unknown> = {}
+    if (!show) point.show = false
+    else {
+      const x = Number(/<c:manualLayout>[\s\S]*?<c:x val="([^"]+)"/.exec(body)?.[1])
+      const y = Number(/<c:manualLayout>[\s\S]*?<c:y val="([^"]+)"/.exec(body)?.[1])
+      if (Number.isFinite(x) && Number.isFinite(y)) point.offset = { x: fmtNum4(x), y: fmtNum4(y) }
+      // 标签框尺寸在 c15:layout 扩展里，缺了它长数字会被渲染器折行。
+      const sizeW = Number(/<c15:layout\b[\s\S]*?<c:w val="([^"]+)"/.exec(body)?.[1])
+      const sizeH = Number(/<c15:layout\b[\s\S]*?<c:h val="([^"]+)"/.exec(body)?.[1])
+      if (Number.isFinite(sizeW) && Number.isFinite(sizeH) && sizeW > 0 && sizeH > 0) {
+        point.size = { w: fmtNum4(sizeW), h: fmtNum4(sizeH) }
+      }
+      const rPr = /<a:(?:defRPr|rPr)\b[^>]*>/.exec(body)?.[0]
+      const sz = Number(/\bsz="(\d+)"/.exec(rPr ?? '')?.[1])
+      if (Number.isFinite(sz) && sz > 0) point.fontSize = fmtNum(sz / 100)
+      if (/\bb="(1|true)"/.test(rPr ?? '')) point.bold = true
+      const fill = /<a:(?:defRPr|rPr)\b[^>]*>\s*<a:solidFill>([\s\S]*?)<\/a:solidFill>/.exec(body)?.[1]
+      const color = fill ? drawingColorOf(pres, fill) : undefined
+      if (color) point.color = color
+    }
+    pointLabels[idx] = Object.keys(point).length > 0 ? point : null
+    pointLabelFlags[idx] = { show, value, percent, category }
+  }
+  for (let i = 0; i < pointLabels.length; i++) {
+    pointLabels[i] ??= null
+    pointLabelFlags[i] ??= null
+  }
+  return { pointLabels, pointLabelFlags }
 }
 
 /** Excel number format subset (§6.7 numberFormat) a label format code maps to. */
@@ -1454,7 +1507,7 @@ function mapChart(
   if (s.view3D) return null
   const src = spec
   const paints = chartPaintsOf(pres, slidePart, rec.raw as SlideShapeData)
-  const seriesColor = (i: number): string | undefined => {
+  const seriesColor = (i: number): ChartPaintValue | undefined => {
     const own = src.series[i]?.color
     return paints?.series[i]?.color ?? (own ? asLiteralColor(own) : undefined)
   }
@@ -1479,11 +1532,17 @@ function mapChart(
     elementType: 'chart',
     data: { cols: [categoryCol, ...colNames], rows }
   }
-  const labels = src.series[0]?.dataLabels ?? src.dataLabels
-  const hiddenPointLabels = src.series.some((series) =>
-    (series.pointDataLabels ?? []).some((p) => p !== null && !p.showValue && !p.showPercent && !p.showCategory)
-  )
-  const showLabels = labels && !hiddenPointLabels ? labels.showValue || labels.showPercent || labels.showCategory : false
+  if (paints?.container) element.fill = paints.container
+  const isPie = src.kind === 'pie' || src.kind === 'doughnut'
+  const pointFlags = isPie ? (paints?.series[0]?.pointLabelFlags ?? []) : []
+  const visiblePoint = pointFlags.find((f) => f?.show)
+  const baseLabels = src.series[0]?.dataLabels ?? src.dataLabels
+  const labels = baseLabels && (baseLabels.showValue || baseLabels.showPercent || baseLabels.showCategory)
+    ? baseLabels
+    : visiblePoint
+      ? { ...(baseLabels ?? {}), showValue: visiblePoint.value, showPercent: visiblePoint.percent, showCategory: visiblePoint.category }
+      : baseLabels
+  const showLabels = labels ? labels.showValue || labels.showPercent || labels.showCategory : false
   const labelConfig = (content?: string): Record<string, unknown> => {
     const out: Record<string, unknown> = { show: true }
     if (content) out.content = content
@@ -1493,14 +1552,6 @@ function mapChart(
     const format = labelNumberFormat(paints?.series[0]?.formatCode)
     if (format) out.numberFormat = format
     return out
-  }
-  if (hiddenPointLabels) {
-    report.degraded.push({
-      page: rec.slideIndex,
-      elementId: elementIdOf(rec),
-      feature: 'unknown',
-      detail: '数据标签逐点显隐无法表达，标签未落盘'
-    } as ImportReport['degraded'][number])
   }
   if (src.kind === 'pie' || src.kind === 'doughnut') {
     const first = src.series[0]
@@ -1520,9 +1571,14 @@ function mapChart(
     else if (points.some((c) => c !== undefined)) pie.fill = points.map((c) => c ?? base ?? '#808080')
     else if (base) pie.fill = base
     if (labels && showLabels) {
-      pie.dataLabels = labelConfig(
+      const config = labelConfig(
         labels.showPercent ? 'percentage' : labels.showCategory && !labels.showValue ? 'category' : 'value'
       )
+      const pointLabels = paints?.series[0]?.pointLabels ?? []
+      let last = pointLabels.length
+      while (last > 0 && pointLabels[last - 1] === null) last--
+      if (last > 0) config.points = pointLabels.slice(0, last)
+      pie.dataLabels = config
     }
     element.series = [pie]
   } else {
@@ -1537,11 +1593,15 @@ function mapChart(
         encode: horizontal ? { x: colNames[i], y: categoryCol } : { x: categoryCol, y: colNames[i] }
       }
       const color = seriesColor(i)
-      if (color) out[type === 'bar' ? 'fill' : 'lineColor'] = color
+      if (color && type === 'bar') out.fill = color
+      else if (color && type === 'area' && typeof color === 'object') {
+        out.areaColor = color
+        out.lineColor = paintColorOf(color)
+      } else if (color) out.lineColor = paintColorOf(color)
       if (stack && type !== 'line') out.stack = stack
       if (type !== 'bar' && series.smooth) out.smooth = true
       const own = series.dataLabels ?? src.dataLabels
-      if (!hiddenPointLabels && own && (own.showValue || own.showPercent || own.showCategory)) out.dataLabels = labelConfig()
+      if (own && (own.showValue || own.showPercent || own.showCategory)) out.dataLabels = labelConfig()
       return out
     })
     const category: Record<string, unknown> = { type: 'category' }
@@ -2155,3 +2215,6 @@ export function mapReverseModel(
 
   return { deck, pages, media, report }
 }
+
+
+

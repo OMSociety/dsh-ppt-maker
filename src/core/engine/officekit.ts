@@ -121,6 +121,8 @@ import {
   type TransitionOptions
 } from '@office-kit/pptx'
 import { pruneUnreachableParts } from './package-prune.js'
+import { applyChartPatches, chartPatchesOf, recordChartPatch, type ChartPatch, type GradientPaint, type PatternPaint, type PointLabelPatch } from './chart-patch.js'
+import { patternFallbackColor } from '../pptd/pattern-ink.js'
 import { PRESET_ADJUST_GUIDES } from './preset-adjust-guides.js'
 import type { Animation, ElementBase, MasterSpec, Page, PageTransition, Presentation, Theme } from '../pptd/schema.js'
 import { PLACEHOLDER_DEFAULT_LABELS } from '../pptd/schema.js'
@@ -1297,7 +1299,8 @@ function buildChart(
   slide: SlideData,
   element: Record<string, unknown>,
   resolver: ThemeResolver,
-  ctx: BuildContext
+  ctx: BuildContext,
+  recordPatch: (patch: ChartPatch) => void
 ): SlideShapeData | null {
   const where = `元素 ${String(element.elementId)}`
   const data = element.data as { cols?: string[]; rows?: Array<Array<number | string | null>> } | undefined
@@ -1315,11 +1318,74 @@ function buildChart(
     return buildPlaceholder(slide, { ...element, originalType: 'chart' }, resolver, ctx, new Set())
   }
 
-  const spec = chartSpecOf(element, data as { cols: string[]; rows: Array<Array<number | string | null>> }, series, resolver, ctx, where)
+  const patch: ChartPatch = { slide, elementId: String(element.elementId), series: [] }
+  const spec = chartSpecOf(element, data as { cols: string[]; rows: Array<Array<number | string | null>> }, series, resolver, ctx, where, patch)
   if (!spec) return null
+  const containerColor = applyChartContainerFill(element.fill as Record<string, unknown> | undefined, resolver, patch, ctx, where)
+  if (containerColor !== undefined) (spec as Record<string, unknown>).chartAreaFill = containerColor
   const shape = addSlideChart(slide, { spec: spec as ChartSpec, x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h) })
   applyCommonGeometry(shape, element as ElementBase, ctx, where)
+  if (patch.container || patch.series.length > 0 || patch.pointLabels) recordPatch(patch)
   return shape
+}
+
+/**
+ * 图表容器背景。返回库规格可用的实色（实色填充、图案与渐变的回落色）；
+ * 图案与渐变另记入补丁，保存时写成真实填充。
+ */
+function applyChartContainerFill(
+  fill: Record<string, unknown> | undefined,
+  resolver: ThemeResolver,
+  patch: ChartPatch,
+  ctx: BuildContext,
+  where: string
+): string | undefined {
+  if (fill === undefined) return undefined
+  if (fill.type === 'solid') {
+    const color = resolver.color(fill.color)
+    if (color === undefined) ctx.warnings.push(`${where}：solid 填充缺 color`)
+    return color === undefined ? undefined : String(color)
+  }
+  if (fill.type === 'pattern') {
+    const paint = patternPaintOf(fill, resolver)
+    if (!paint) {
+      ctx.warnings.push(`${where}：pattern 填充缺 preset、foreground 或 background`)
+      return undefined
+    }
+    patch.container = paint
+    return patternFallbackOf(paint)
+  }
+  if (fill.type === 'gradient') {
+    const options = gradientOptionsOf(fill, resolver)
+    if (!options) {
+      ctx.warnings.push(`${where}：gradient 填充至少需要 2 个色标`)
+      return undefined
+    }
+    const stops = options.stops.map((s) => ({
+      position: s.offset,
+      color: String(s.color).slice(1, 7).toUpperCase(),
+      ...(s.opacity !== undefined ? { opacity: s.opacity } : {})
+    }))
+    const gradient: GradientPaint = { stops, angleDeg: options.angleDeg ?? 0 }
+    patch.container = gradient
+    return String(options.stops[0].color)
+  }
+  ctx.warnings.push(`${where}：图表背景不支持 ${String(fill.type)} 填充，已跳过`)
+  return undefined
+}
+
+/** PPTD PatternFill → 补丁用图案（6 位十六进制无 #）；缺字段时 null。 */
+function patternPaintOf(fill: unknown, resolver: ThemeResolver): PatternPaint | null {
+  const rec = chartRecordOf(fill)
+  const fg = resolver.color(rec.foreground)
+  const bg = resolver.color(rec.background)
+  if (typeof rec.preset !== 'string' || fg === undefined || bg === undefined) return null
+  return { preset: rec.preset, foreground: String(fg).slice(1, 7).toUpperCase(), background: String(bg).slice(1, 7).toUpperCase() }
+}
+
+/** 图案回落成的实色：前景 / 背景按图案油墨占比混合。 */
+function patternFallbackOf(paint: PatternPaint): string {
+  return patternFallbackColor(paint.preset, `#${paint.foreground}`, `#${paint.background}`)
 }
 
 function chartRecordOf(value: unknown): Record<string, unknown> {
@@ -1361,6 +1427,23 @@ function chartDataLabelsOf(
   return out
 }
 
+/** 与图表类型无关的容器级设置：图例显隐、绘图区手动位置。 */
+function applyChartFrameOptions(spec: Record<string, unknown>, element: Record<string, unknown>): void {
+  const legend = element.legend
+  if (legend === false || chartRecordOf(legend).show === false) spec.legend = { position: null }
+
+  const plotLayout = chartRecordOf(element.plotLayout)
+  if (['x', 'y', 'w', 'h'].every((k) => typeof plotLayout[k] === 'number')) {
+    spec.plotAreaLayout = {
+      x: plotLayout.x as number,
+      y: plotLayout.y as number,
+      w: plotLayout.w as number,
+      h: plotLayout.h as number,
+      ...(plotLayout.target === 'inner' || plotLayout.target === 'outer' ? { target: plotLayout.target } : {})
+    }
+  }
+}
+
 function applyCartesianChartOptions(
   spec: Record<string, unknown>,
   element: Record<string, unknown>,
@@ -1397,8 +1480,7 @@ function applyCartesianChartOptions(
   }
   if (valueAxis.reverse === true) spec.valueAxisOrientation = 'maxMin'
 
-  const legend = element.legend
-  if (legend === false || chartRecordOf(legend).show === false) spec.legend = { position: null }
+  applyChartFrameOptions(spec, element)
 
   const stack = series.find((item) => item.type === 'bar' && (item.stack === 'value' || item.stack === 'percent'))?.stack
   if (stack) {
@@ -1408,17 +1490,6 @@ function applyCartesianChartOptions(
   const barWidth = element.barWidth
   if (typeof barWidth === 'number' && Number.isFinite(barWidth) && barWidth > 0 && barWidth <= 1) {
     spec.gapWidthPct = Math.round((1 - barWidth) / barWidth * 100)
-  }
-
-  const plotLayout = chartRecordOf(element.plotLayout)
-  if (['x', 'y', 'w', 'h'].every((k) => typeof plotLayout[k] === 'number')) {
-    spec.plotAreaLayout = {
-      x: plotLayout.x as number,
-      y: plotLayout.y as number,
-      w: plotLayout.w as number,
-      h: plotLayout.h as number,
-      ...(plotLayout.target === 'inner' || plotLayout.target === 'outer' ? { target: plotLayout.target } : {})
-    }
   }
 
   const dataLabels = chartDataLabelsOf(element.dataLabels, undefined, resolver)
@@ -1431,7 +1502,8 @@ function chartSpecOf(
   series: Array<Record<string, unknown>>,
   resolver: ThemeResolver,
   ctx: BuildContext,
-  where: string
+  where: string,
+  patch: ChartPatch
 ): unknown {
   const cols = data.cols
   const colIndex = (name: unknown): number => (typeof name === 'string' ? cols.indexOf(name) : -1)
@@ -1447,12 +1519,24 @@ function chartSpecOf(
       return null
     }
     const innerRadius = typeof s0.innerRadius === 'number' ? s0.innerRadius : 0
-    const fills = Array.isArray(s0.fill) ? s0.fill : typeof s0.fill === 'string' ? [s0.fill] : []
+    const fills = Array.isArray(s0.fill) ? s0.fill : s0.fill !== undefined ? [s0.fill] : []
+    const patternPoints: Record<number, PatternPaint> = {}
     const pointColors = fills.length > 0
-      ? data.rows.map((_r, i) => (resolver.color(fills[i % fills.length]) as string | undefined) ?? null)
+      ? data.rows.map((_r, i) => {
+          const fill = fills[i % fills.length]
+          if (chartRecordOf(fill).type === 'pattern') {
+            const paint = patternPaintOf(fill, resolver)
+            if (!paint) return null
+            patternPoints[i] = paint
+            return patternFallbackOf(paint)
+          }
+          return (resolver.color(fill) as string | undefined) ?? null
+        })
       : undefined
+    if (Object.keys(patternPoints).length > 0) patch.series.push({ index: 0, points: patternPoints })
     const pieLabels = chartDataLabelsOf(element.dataLabels, s0.dataLabels, resolver)
-    return {
+    pieLabelPatchOf(pieLabels, element.dataLabels, s0.dataLabels, resolver, patch)
+    const pieSpec: Record<string, unknown> = {
       ...(pieLabels ? { dataLabels: pieLabels } : {}),
       kind: innerRadius > 0 ? 'doughnut' : 'pie',
       categories: data.rows.map((r) => String(r[catIdx] ?? '')),
@@ -1466,11 +1550,13 @@ function chartSpecOf(
         }
       ]
     }
+    applyChartFrameOptions(pieSpec, element)
+    return pieSpec
   }
 
   const horizontal = firstType === 'bar' && chartRecordOf(element.yAxis).type === 'category'
   const kind = firstType === 'bar' ? (horizontal ? 'bar' : 'column') : firstType
-  const mappedSeries = series.map((s) => {
+  const mappedSeries = series.map((s, seriesPos) => {
     const encode = (s.encode ?? {}) as Record<string, unknown>
     const xIdx = colIndex(encode.x)
     const yIdx = colIndex(encode.y)
@@ -1484,8 +1570,17 @@ function chartSpecOf(
       name: typeof s.name === 'string' ? s.name : String((horizontal ? encode.x : encode.y) ?? ''),
       values: data.rows.map((r) => numOrNull(r[valueIdx]))
     }
-    const fill = typeof s.fill === 'string' ? resolver.color(s.fill) : undefined
-    if (fill !== undefined) out.color = String(fill)
+    const paintRaw = s.type === 'area' ? (s.areaColor ?? s.fill) : s.fill
+    if (chartRecordOf(paintRaw).type === 'pattern') {
+      const paint = patternPaintOf(paintRaw, resolver)
+      if (paint) {
+        out.color = patternFallbackOf(paint)
+        patch.series.push({ index: seriesPos, fill: paint })
+      }
+    } else if (typeof paintRaw === 'string') {
+      const fill = resolver.color(paintRaw)
+      if (fill !== undefined) out.color = String(fill)
+    }
     if (firstType === 'line' || firstType === 'area') out.chartKind = firstType
     if (s.dataLabels !== undefined) {
       const dataLabels = chartDataLabelsOf(element.dataLabels, s.dataLabels, resolver)
@@ -1502,6 +1597,45 @@ function chartSpecOf(
   }
   applyCartesianChartOptions(spec, element, series, horizontal, resolver)
   return spec
+}
+
+/** 饼 / 环形图 dataLabels.points → 补丁里的逐点 dLbl。 */
+function pieLabelPatchOf(
+  labels: Record<string, unknown> | undefined,
+  chartValue: unknown,
+  seriesValue: unknown,
+  resolver: ThemeResolver,
+  patch: ChartPatch
+): void {
+  const points = chartRecordOf({ ...chartRecordOf(chartValue), ...chartRecordOf(seriesValue) }).points
+  if (!Array.isArray(points)) return
+  const flags = {
+    showValue: labels?.showValue === true,
+    showCategory: labels?.showCategory === true,
+    showPercent: labels?.showPercent === true
+  }
+  const content = flags.showValue || flags.showCategory || flags.showPercent ? flags : { ...flags, showValue: true }
+  const numberFormat = typeof labels?.numberFormat === 'string' ? labels.numberFormat : undefined
+  const out: PointLabelPatch[] = []
+  points.forEach((raw, index) => {
+    if (raw === null || typeof raw !== 'object') return
+    const p = raw as Record<string, unknown>
+    const label: PointLabelPatch = { index, show: p.show !== false, ...content, ...(numberFormat ? { numberFormat } : {}) }
+    const offset = chartRecordOf(p.offset)
+    if (typeof offset.x === 'number' && typeof offset.y === 'number') label.offset = { x: offset.x, y: offset.y }
+    const size = chartRecordOf(p.size)
+    if (typeof size.w === 'number' && typeof size.h === 'number') label.size = { w: size.w, h: size.h }
+    if (typeof p.fontSize === 'number') label.fontSize = p.fontSize
+    if (typeof p.bold === 'boolean') label.bold = p.bold
+    if (typeof p.color === 'string') {
+      const color = resolver.color(p.color)
+      if (color !== undefined) label.color = String(color).slice(1, 7).toUpperCase()
+    }
+    out.push(label)
+  })
+  if (out.length === 0) return
+  patch.pointLabels = out
+  patch.labelDefault = flags
 }
 
 function numOrNull(value: number | string | null | undefined): number | null {
@@ -2219,7 +2353,7 @@ export function createOfficeKitEngine(): DeckEngine {
                 shape = buildTable(slide, record, resolver, deck.theme, ctx, fonts)
                 break
               case 'chart':
-                shape = buildChart(slide, record, resolver, ctx)
+                shape = buildChart(slide, record, resolver, ctx, (p) => recordChartPatch(pres, p))
                 break
               case 'icon':
                 warnings.push(`${pageLabel}：icon 元素（${String(record.iconName)}）暂不支持，落为占位`)
@@ -2293,7 +2427,10 @@ export function createOfficeKitEngine(): DeckEngine {
     },
 
     async saveDeck(native: unknown): Promise<Uint8Array> {
-      return pruneUnreachableParts(await savePresentation(native as PresentationData)).bytes
+      const pres = native as PresentationData
+      const saved = await savePresentation(pres)
+      const patched = applyChartPatches(saved, chartPatchesOf(pres), (slide) => getSlideIndex(pres, slide as SlideData))
+      return pruneUnreachableParts(patched).bytes
     }
   }
 }

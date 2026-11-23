@@ -56,7 +56,7 @@ export const PATTERN_PRESETS: ReadonlySet<string> = new Set([
 /**
  * Element-level `fill` and page `background` are Fill objects
  * (spec §5: SolidFill | GradientFill | PatternFill | ImageFill).
- * Chart elements are skipped: their series-level fill is a Color.
+ * A chart element's `fill` paints the chart container; series fills are checked in validateChartData.
  */
 function fillIssues(fill: unknown, path: string): Issue[] {
   if (fill === undefined) return []
@@ -88,7 +88,7 @@ function fillIssues(fill: unknown, path: string): Issue[] {
 /** Required fields per elementType. Unknown types are reported by parse.ts. */
 export function validateElementFields(element: Record<string, unknown>, path: string): Issue[] {
   const issues: Issue[] = []
-  if (element.elementType !== 'chart') issues.push(...fillIssues(element.fill, path))
+  issues.push(...fillIssues(element.fill, path))
   const border = element.border
   if (isRecord(border) && border.gradient !== undefined) {
     const g = border.gradient
@@ -312,6 +312,8 @@ export function validateChartData(element: Record<string, unknown>, path: string
         blocker(ERROR_CODES.InvalidValueError, `${type} 的 dataLabels.content 只能取 ${allowedContent.join(' / ')}`, `${sp}.dataLabels.content`)
       )
     }
+    issues.push(...seriesPaintIssues(raw, type, sp))
+    issues.push(...dataLabelPointIssues(labels, sp))
     if (type === 'waterfall') issues.push(...waterfallIssues(encode, columnValues, sp))
     if (type === 'sankey') issues.push(...sankeyIssues(encode, columnValues, sp))
   })
@@ -326,6 +328,52 @@ export function validateChartData(element: Record<string, unknown>, path: string
   if (radarCategories.size > 1) {
     issues.push(blocker(ERROR_CODES.SchemaError, '同一图表内所有 radar 系列必须引用同一个 encode.category 列', `${path}#series`))
   }
+  return issues
+}
+
+/** Series fills that may be a pattern: bar / area / pie (pie also as an array). */
+function seriesPaintIssues(raw: Record<string, unknown>, type: string, sp: string): Issue[] {
+  const fields = type === 'bar' ? ['fill'] : type === 'area' ? ['areaColor'] : type === 'pie' ? ['fill'] : []
+  const issues: Issue[] = []
+  for (const key of fields) {
+    const value = raw[key]
+    const items = type === 'pie' && Array.isArray(value) ? value : [value]
+    items.forEach((item, i) => {
+      if (isRecord(item) && item.type === 'pattern') {
+        const where = Array.isArray(value) ? `${sp}.${key}[${i}]` : `${sp}.${key}`
+        const bad = fillIssues(item, where)
+        issues.push(...bad.map((issue) => ({ ...issue, path: where })))
+      }
+    })
+  }
+  return issues
+}
+
+/** dataLabels.points: sparse array of { show, offset{x,y}, fontSize, color, bold } | null. */
+function dataLabelPointIssues(labels: unknown, sp: string): Issue[] {
+  if (!isRecord(labels) || labels.points === undefined) return []
+  const where = `${sp}.dataLabels.points`
+  if (!Array.isArray(labels.points)) {
+    return [blocker(ERROR_CODES.SchemaError, 'dataLabels.points 须为数组（null 槽沿用系列级设置）', where)]
+  }
+  const issues: Issue[] = []
+  labels.points.forEach((point, i) => {
+    if (point === null) return
+    const at = `${where}[${i}]`
+    const finite = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v)
+    const ok =
+      isRecord(point) &&
+      (point.show === undefined || typeof point.show === 'boolean') &&
+      (point.bold === undefined || typeof point.bold === 'boolean') &&
+      (point.fontSize === undefined || (finite(point.fontSize) && (point.fontSize as number) > 0)) &&
+      (point.color === undefined || nonEmptyString(point.color)) &&
+      (point.offset === undefined || (isRecord(point.offset) && finite(point.offset.x) && finite(point.offset.y))) &&
+      (point.size === undefined ||
+        (isRecord(point.size) && finite(point.size.w) && (point.size.w as number) > 0 && finite(point.size.h) && (point.size.h as number) > 0))
+    if (!ok) {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'dataLabels.points 的元素须为 null 或 { show?: boolean, offset?: { x, y }, size?: { w, h }, fontSize?: 正数, color?: Color, bold?: boolean }', at))
+    }
+  })
   return issues
 }
 

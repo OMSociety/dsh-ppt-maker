@@ -117,6 +117,7 @@ description: 设计、生成、重做与导出 PPT 演示文稿：从内容出�
 - **出血效果**：形状超出画布会被判出界。想要「圆被页边裁掉一角」「斜带贯穿到边」的效果，用 `custom` 路径把形状直接画成裁切后的轮廓，`bounds` 保持在画布内。
 - **线条**：`line` 必须给 `viewBox` 与 `points`（至少两点）；粗斜线用细长的 `custom` 平行四边形更可控。
 - **横向条形图**：`yAxis.type: "category"`，系列的 `encode.x` 指向数值列、`encode.y` 指向类目列。要每个类目一种颜色：每个类目建一个系列、同设 `stack: "value"`，数据行里其他系列的格子留 `null`。关图例用 `legend.show: false`，标数值用 `dataLabels.show: true`。
+- **图表填充与逐点标签**：柱、面积、饼的系列填充可写图案；饼图的 `dataLabels.points` 能给单个切片换位置、字号与颜色——把一个点的标签用 `offset` 挪到环中心、其余点 `show: false`，就成了环中央的大字；数字长又离切片远时补 `size: {w, h}` 给足标签框，否则会逐字折行。图表的绘图区位置写 `plotLayout`。
 - **表格**：`rows` 是二维数组，`columnWidths`、`rowHeights` 是比例且各自加起来为 1，`rowHeights` 的项数等于行数。只要底部细横线：`border: [null, null, {style: solid, width: 1, color: "#c4bcab"}, null]`（顺序为上、右、下、左）。表格不能旋转。
 - **图片**：放进 `media/` 再用相对路径引用；保持原始宽高比，**严禁拉伸变形**。配图优先级：用户材料 → 官方来源 → 检索到的真实图片 → 生成图；不放与页面结论无关的凑数图。
 

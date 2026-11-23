@@ -7,9 +7,60 @@
  */
 import * as React from 'react'
 import type { ThemeLike } from '../render/resolve'
-import { CHART_PALETTE, chartModelOf, type ChartSeriesModel } from '../render/chart-model'
+import { CHART_PALETTE, chartModelOf, type ChartPatternModel, type ChartSeriesModel } from '../render/chart-model'
+import { patternTileOf } from '../render/pattern-svg'
 const GRID = 'rgba(60,60,60,0.16)'
 const LABEL = '#5c5c5c'
+
+/** 本次渲染用到的图案瓦片，按前景 / 背景 / 预设去重后分配 SVG id。 */
+function usePatternDefs(paints: Array<ChartPatternModel | undefined>) {
+  return React.useMemo(() => {
+    const ids = new Map<string, string>()
+    const defs: Array<{ id: string; pattern: ChartPatternModel }> = []
+    for (const paint of paints) {
+      if (!paint) continue
+      const key = `${paint.preset}|${paint.foreground}|${paint.background}`
+      if (ids.has(key)) continue
+      const id = `pptd-pat-${ids.size}`
+      ids.set(key, id)
+      defs.push({ id, pattern: paint })
+    }
+    return { idOf: (paint: ChartPatternModel) => ids.get(`${paint.preset}|${paint.foreground}|${paint.background}`), defs }
+  }, [paints])
+}
+
+function PatternDefs({ defs }: { defs: Array<{ id: string; pattern: ChartPatternModel }> }) {
+  if (!defs.length) return null
+  return (
+    <defs>
+      {defs.map(({ id, pattern }) => {
+        const tile = patternTileOf(pattern.preset)
+        return (
+          <pattern key={id} id={id} width={tile.size} height={tile.size} patternUnits="userSpaceOnUse">
+            <rect width={tile.size} height={tile.size} fill={pattern.background} />
+            {tile.lines.map((line, index) => (
+              <line
+                key={index}
+                x1={line.x1}
+                y1={line.y1}
+                x2={line.x2}
+                y2={line.y2}
+                stroke={pattern.foreground}
+                strokeWidth={line.width}
+              />
+            ))}
+            {tile.dots.map((dot, index) => (
+              <circle key={index} cx={dot.cx} cy={dot.cy} r={dot.r} fill={pattern.foreground} />
+            ))}
+          </pattern>
+        )
+      })}
+    </defs>
+  )
+}
+
+/** 图案填充引用：有瓦片时指向 `url(#id)`，否则回落实色。 */
+export type FillOf = (paint: ChartPatternModel | undefined, color: string) => string
 
 function niceScale(values: number[], minOverride?: number, maxOverride?: number) {
   const min = minOverride ?? Math.min(0, ...values)
@@ -48,11 +99,15 @@ function CartesianChart({
   content,
   width,
   height,
+  fillOf,
+  defs,
 }: {
   model: ChartSeriesModel[]
   content: Record<string, unknown>
   width: number
   height: number
+  fillOf: FillOf
+  defs: React.ReactNode
 }) {
   const categories = Array.from(new Set(model.flatMap((series) => series.categories)))
   const horizontal = model[0]?.kind === 'bar' && recordOf(content.yAxis).type === 'category'
@@ -106,6 +161,7 @@ function CartesianChart({
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+      {defs}
       {scale.ticks.map((tick) => {
         if (!valueGrid && !valueLabels) return null
         const pos = valuePosition(tick)
@@ -187,7 +243,7 @@ function CartesianChart({
                         width={Math.max(1, Math.abs(valuePos - basePos))}
                         height={band}
                         rx={2}
-                        fill={series.color}
+                        fill={fillOf(series.pattern, series.color)}
                       />
                     ) : (
                       <rect
@@ -196,7 +252,7 @@ function CartesianChart({
                         width={band}
                         height={Math.max(1, Math.abs(valuePos - basePos))}
                         rx={2}
-                        fill={series.color}
+                        fill={fillOf(series.pattern, series.color)}
                       />
                     )}
                     {dataLabel}
@@ -245,14 +301,38 @@ function CartesianChart({
   )
 }
 
-function PieChart({ series, width, height }: { series: ChartSeriesModel; width: number; height: number }) {
+/** Excel 数字格式串子集（§6.7）→ 标签文本。 */
+function formatLabel(value: number, format: string | undefined): string {
+  if (!format) return String(Math.round(value * 100) / 100)
+  const decimals = /\.(0+)/.exec(format)?.[1].length ?? 0
+  if (format.includes('%')) return `${(value * 100).toFixed(decimals)}%`
+  if (format.includes('E+')) return value.toExponential(decimals).toUpperCase()
+  return value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, format.includes('#,##0') ? ',' : '')
+}
+
+function PieChart({
+  series,
+  width,
+  height,
+  fillOf,
+  defs,
+}: {
+  series: ChartSeriesModel
+  width: number
+  height: number
+  fillOf: FillOf
+  defs: React.ReactNode
+}) {
   const total = series.points.reduce((sum, point) => sum + Math.max(0, point.value), 0) || 1
   const cx = width / 2
   const cy = Math.max(35, (height - 24) / 2)
   const radius = Math.max(12, Math.min(width / 3, height / 3))
-  let angle = -Math.PI / 2
+  const hole = Math.max(0, Math.min(0.9, series.innerRadius ?? 0))
+  let angle = -Math.PI / 2 + ((series.startAngle ?? 0) * Math.PI) / 180
+  const labels = series.dataLabels
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+      {defs}
       {series.points.map((point, index) => {
         const next = angle + (Math.max(0, point.value) / total) * Math.PI * 2
         const x1 = cx + radius * Math.cos(angle)
@@ -260,9 +340,41 @@ function PieChart({ series, width, height }: { series: ChartSeriesModel; width: 
         const x2 = cx + radius * Math.cos(next)
         const y2 = cy + radius * Math.sin(next)
         const large = next - angle > Math.PI ? 1 : 0
-        const path = `M${cx},${cy} L${x1},${y1} A${radius},${radius} 0 ${large} 1 ${x2},${y2} Z`
+        const slice = `M${cx},${cy} L${x1},${y1} A${radius},${radius} 0 ${large} 1 ${x2},${y2} Z`
         angle = next
-        return <path key={`${point.category}:${index}`} d={path} fill={index === 0 ? series.color : CHART_PALETTE[index % CHART_PALETTE.length]} stroke="#fff" strokeWidth={1.5} />
+        const paletteColor = index === 0 ? series.color : CHART_PALETTE[index % CHART_PALETTE.length]
+        const paint = point.paint
+        return (
+          <path
+            key={`${point.category}:${index}`}
+            d={slice}
+            fill={fillOf(paint?.pattern, paint?.color ?? paletteColor)}
+            stroke="#fff"
+            strokeWidth={1.5}
+          />
+        )
+      })}
+      {hole > 0 && <circle cx={cx} cy={cy} r={radius * hole} fill="#fff" />}
+      {labels?.show && series.points.map((point, index) => {
+        const override = labels.points?.[index] ?? null
+        if (override && override.show === false) return null
+        const offset = override?.offset
+        const x = cx + (offset ? offset.x * width : 0)
+        const y = cy + (offset ? offset.y * height : 0) + (override?.fontSize ?? labels.fontSize ?? 10) / 3
+        return (
+          <text
+            key={`label:${index}`}
+            x={x}
+            y={y}
+            textAnchor="middle"
+            fontSize={override?.fontSize ?? labels.fontSize ?? 10}
+            fontWeight={override?.bold ? 600 : undefined}
+            fill={override?.color ?? labels.color ?? LABEL}
+            {...(labels.fontFamily ? { fontFamily: labels.fontFamily } : {})}
+          >
+            {formatLabel(point.value, labels.numberFormat)}
+          </text>
+        )
       })}
       <text x={cx} y={height - 8} textAnchor="middle" fontSize={10} fill={LABEL}>
         {series.points.map((point) => point.category).join(' · ')}
@@ -294,20 +406,32 @@ function useElementSize() {
 export function ChartView({ content, theme }: { content: Record<string, unknown>; theme?: ThemeLike | null }) {
   const model = chartModelOf(content, theme)
   const { ref, width, height } = useElementSize()
+  const paints = React.useMemo(
+    () => model.flatMap((series) => [series.pattern, ...series.points.map((point) => point.paint?.pattern)]),
+    [model]
+  )
+  const patterns = usePatternDefs(paints)
   if (!model.length) {
     return <div style={{ fontSize: 12, color: '#6b7280', padding: 8 }}>图表无有效数据</div>
   }
   const kind = model[0].kind
-  const supported = kind === 'pie' || model.every((series) => ['bar', 'line', 'area'].includes(series.kind))
+  const isPie = kind === 'pie' || kind === 'doughnut'
+  const supported = isPie || model.every((series) => ['bar', 'line', 'area'].includes(series.kind))
+  const fillOf = (paint: ChartPatternModel | undefined, color: string) => {
+    const id = paint ? patterns.idOf(paint) : undefined
+    return id ? `url(#${id})` : color
+  }
   return (
     <div ref={ref} style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-      {kind === 'pie' ? (
-        <PieChart series={model[0]} width={width} height={height} />
+      {isPie ? (
+        <PieChart series={model[0]} width={width} height={height} fillOf={fillOf} defs={<PatternDefs defs={patterns.defs} />} />
       ) : supported ? (
-        <CartesianChart model={model} content={content} width={width} height={height} />
+        <CartesianChart model={model} content={content} width={width} height={height} fillOf={fillOf} defs={<PatternDefs defs={patterns.defs} />} />
       ) : (
         <div style={{ fontSize: 12, color: '#6b7280', padding: 8 }}>{kind} 图请在导出后查看精确外观</div>
       )}
     </div>
   )
 }
+
+

@@ -227,3 +227,52 @@ describe('TableView · PPTD rows/style 契约', () => {
     expect(tableCellViewModel({ text: 'x', border: null }, {}, null).borderTop).toBe('none')
   })
 })
+
+describe('ChartView · 图案填充与逐点标签', () => {
+  const hatch = { type: 'pattern', preset: 'ltUpDiag', foreground: '#005193', background: '#ffffff' }
+
+  it('系列图案填充画成 SVG 瓦片引用', () => {
+    const markup = chartSvg({
+      elementType: 'chart',
+      data: { cols: ['月', '额'], rows: [['一', 3], ['二', 5]] },
+      series: [{ type: 'bar', name: '额', encode: { x: '月', y: '额' }, fill: hatch }],
+    })
+    expect(markup).toContain('<pattern id="pptd-pat-0"')
+    expect(markup).toContain('fill="url(#pptd-pat-0)"')
+    expect(markup).toContain('fill="#ffffff"')
+  })
+
+  it('环形图逐点标签按 offset 落在环中心，隐藏点不出标签', () => {
+    const markup = chartSvg({
+      elementType: 'chart',
+      data: { cols: ['项', '占比'], rows: [['完成', 0.74], ['其余', 0.26]] },
+      series: [{
+        type: 'pie',
+        name: '占比',
+        encode: { category: '项', value: '占比' },
+        innerRadius: 0.7,
+        fill: ['#005193', hatch],
+        dataLabels: {
+          show: true,
+          numberFormat: '0%',
+          fontSize: 40,
+          points: [{ offset: { x: -0.2459, y: -0.276 }, fontSize: 40, bold: true }, { show: false }],
+        },
+      }],
+    })
+    expect(markup).toContain('74%')
+    expect(markup).not.toContain('26%')
+    expect(markup).toMatch(/<text[^>]*font-size="40"[^>]*>74%<\/text>/)
+    expect(markup).toContain('font-weight="600"')
+    expect(markup).toContain('fill="url(#pptd-pat-0)"')
+  })
+
+  it('图案填充进模型时同时给出回落色', () => {
+    const model = chartModelOf({
+      data: { cols: ['月', '额'], rows: [['一', 3]] },
+      series: [{ type: 'bar', name: '额', encode: { x: '月', y: '额' }, fill: hatch }],
+    })
+    expect(model[0].pattern).toEqual({ preset: 'ltUpDiag', foreground: '#005193', background: '#ffffff' })
+    expect(model[0].color).toBe('#005193')
+  })
+})

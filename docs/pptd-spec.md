@@ -1015,7 +1015,7 @@ interface Chart extends ElementBase {
   fontFamily?: FontFamily;             // 默认沿主题 / 母版字体回落
 
   // —— 图表外框（控制整个图表元素的矩形容器，与系列配色独立）——
-  fill?: Fill;                         // 默认不应用
+  fill?: Fill;                         // 默认不应用；solid / gradient / pattern 作用于图表容器背景（chartSpace），image 不生效并记 warning
   border?: Border;                     // 默认不应用
   shadow?: Shadow;                     // 默认不应用
 }
@@ -1050,7 +1050,7 @@ interface ChartData {
 
 #### 6.7.2 通用规则
 
-1. **系列的 `fill` 类型**：`Color | GradientFill`；字符串视为纯色 Color（HEX8 或 `$xxx` 主题引用），对象视为 GradientFill（`type: "gradient"`）；部分类型支持 `(Color | GradientFill)[]` 数组形式（按切片/节点循环）。**系列级 fill 不支持 ImageFill**。
+1. **系列的 `fill` 类型**：`Color | GradientFill`；字符串视为纯色 Color（HEX8 或 `$xxx` 主题引用），对象视为 GradientFill（`type: "gradient"`）；部分类型支持 `(Color | GradientFill)[]` 数组形式（按切片/节点循环）。bar / area / pie 的系列填充另可写 `PatternFill`（`type: "pattern"`，54 个 OOXML 预设，见 §6.0 Fill）；pie 的数组元素也可为 `PatternFill`。**系列级 fill 不支持 ImageFill**。
 2. **类型混排**：一张图的 `series[]` 允许包含哪些类型，由各类型小节的「系列约束」决定；校验器据此检查。
 3. **条件生效的顶层字段**：`xAxis` / `yAxis` / `barWidth` / `barGap` / `categoryGap` / `spokeAxis` 是**坐标系级**配置，按 `series[].type` 集合条件生效（适用性明细见 §6.7.5 速查表）。
 4. **Color 主题引用域**：所有 `Color` 类型的字段（含嵌套数组与对象里的每一处 Color 位置）都支持 `$xxx` 主题引用——如 `upBars: {fill: "$success"}`、`colorScheme: ["$bg", "$primary"]`、`fill: ["$primary", "$accent"]`。
@@ -1107,8 +1107,20 @@ interface DataLabelConfig extends TextStyle {
   show?: boolean;                      // 默认 false
   content?: "value" | "percentage" | "category";  // 默认随类型（见 §6.7.5 速查表）
   numberFormat?: string;               // 默认不格式化；Excel 数字格式串（见下）
+  points?: (DataLabelPoint | null)[];  // 默认不应用；逐点覆盖，下标 = 数据点序号，null 槽沿用系列级设置；仅 pie 系列生效
+}
+
+interface DataLabelPoint {
+  show?: boolean;                      // 默认沿用系列级；false = 该点不显示标签
+  offset?: { x: number; y: number };   // 默认不偏移；相对默认位置的偏移，占图表宽 / 高的比例，可为负
+  size?: { w: number; h: number };     // 默认由渲染器自动撑开；标签文本框宽高，占图表宽 / 高的比例
+  fontSize?: number;                   // 默认沿用系列级
+  color?: Color;                       // 默认沿用系列级
+  bold?: boolean;                      // 默认沿用系列级
 }
 ```
+
+`points` 把单个数据点的标签放到任意位置并单独设字号颜色：环形图用 `offset` 把一个点的标签移到环中心做大字，其余点 `show: false`。`size` 是标签文本框尺寸，数字较长而 offset 又把它挪到远离切片的位置时，渲染器只按默认框宽排版会逐字折行，此时用 `size` 给足宽高。
 
 **numberFormat 标准**：取 Excel 数字格式串子集——`0`（整数）/ `0.0`（一位小数）/ `0%`（百分比）/ `0.0%`（带小数百分比）/ `#,##0`（千分位）/ `0.0E+00`（科学计数法）。`[Red]` 颜色段、负数分段、条件格式等高级语法**不支持**。
 
@@ -1192,7 +1204,7 @@ interface BarSeries {
   yAxisIndex?: number;                 // 默认 0；仅 chart.yAxis 为数组时有意义
   stack?: "value" | "percent";         // 默认不堆叠；"value" 直接求和，"percent" 归一化到 100%
   symbol?: ShapeDef;                   // 默认普通矩形柱；象形柱形状定义（ShapeDef 见 §6.4）
-  fill?: Color | GradientFill;         // 默认跟随主题色循环
+  fill?: Color | GradientFill | PatternFill;  // 默认跟随主题色循环
   border?: Border;                     // 默认不应用
   dataLabels?: DataLabelConfig;        // 默认不显示；content 只取 "value"
 }
@@ -1227,7 +1239,7 @@ interface AreaSeries extends LinearSeriesBase {
   xAxisIndex?: number;                 // 默认 0
   yAxisIndex?: number;                 // 默认 0
   stack?: "value" | "percent" | "stream";  // 默认不堆叠；"stream" = streamgraph（仅 area）
-  areaColor?: Color | GradientFill;    // 默认由 lineColor 半透明派生
+  areaColor?: Color | GradientFill | PatternFill;  // 默认由 lineColor 半透明派生
   dataLabels?: DataLabelConfig;        // 默认不显示
 }
 ```
@@ -1308,7 +1320,7 @@ interface PieSeries {
   encode: { category: string; value: string };  // 必填
   innerRadius?: number;                // 默认 0；[0, 1]；> 0 即环形图
   startAngle?: number;                 // 默认 0（12 点方向）
-  fill?: Color | GradientFill | (Color | GradientFill)[];  // 默认跟随主题色循环；数组按切片循环
+  fill?: Color | GradientFill | PatternFill | (Color | GradientFill | PatternFill)[];  // 默认跟随主题色循环；数组按切片循环
   border?: Border;                     // 默认不应用
   dataLabels?: DataLabelConfig;        // 默认不显示；content 取 "value" | "percentage" | "category"，默认 "value"
 }
@@ -2219,9 +2231,9 @@ interface DeckSource {
 1. `data.cols` 首列固定为 `类别`，其后每个系列一列，列名取系列名（空名为 `系列N`，重名追加序号）；缺失值写 `null`；
 2. 条形图（横向）写 `yAxis.type: "category"`，系列 `encode.x` 为数值列、`encode.y` 为 `类别`；其余直角坐标图 `encode.x` 为 `类别`；
 3. 分组 `stacked` → 柱 / 面积系列 `stack: "value"`，`percentStacked` → `stack: "percent"`；折线不堆叠；
-4. 系列色与逐点色从图表部件解析（主题色与亮度变换、图案填充按浓度混合、渐变取首个色标）→ 柱的 `fill`、折线与面积的 `lineColor`；坐标轴隐藏 → `show: false`，数值轴无主网格线 → `gridLine: false`；平滑折线 → `smooth: true`；数值轴的 min / max 原样写入；绘图区手动位置 → `plotLayout`；分类间距 `gapWidth` 换算为 `barWidth = 100 / (100 + gapWidth)`；
+4. 系列色与逐点色从图表部件解析（主题色与亮度变换、渐变取首个色标）→ 柱的 `fill`、折线与面积的 `lineColor`；柱 / 面积系列、饼切片与图表容器背景的图案填充 → `PatternFill`（预设与前景 / 背景色原样写入），容器背景 → `fill`；坐标轴隐藏 → `show: false`，数值轴无主网格线 → `gridLine: false`；平滑折线 → `smooth: true`；数值轴的 min / max 原样写入；绘图区手动位置 → `plotLayout`；分类间距 `gapWidth` 换算为 `barWidth = 100 / (100 + gapWidth)`；
 5. 饼图 → `pie` 系列；环形图另写 `innerRadius = holeSize / 100`（限定在 [0.1, 0.9]）；首扇区角度 → `startAngle`；逐点颜色齐全时 → `fill` 数组；
-6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入；存在逐点隐藏的标签时整图不写标签并记 degraded）；
+6. 标题字符串 → `title`；图例：源图表含图例元素即显示，不含或显式隐藏为 `false`；数据标签显示数值 / 百分比 / 类别 → `dataLabels`（字号、加粗与 §6.7 子集内的数字格式一并写入）；饼 / 环形图的逐点标签（隐藏、手动位置、字号、颜色、加粗）→ `dataLabels.points`；
 7. 次坐标轴系列并入主坐标轴，记 degraded（feature `unknown`）。
 
 图表的字体、网格线样式、坐标轴格式、数据表与趋势线等细节不进入 PPTD；所在页未改动时整页沿用源存档（§10.4），这些细节随之保留。落 placeholder 的图表在所在页重建时按占位直通拷回原件。
