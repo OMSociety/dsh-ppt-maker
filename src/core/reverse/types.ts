@@ -49,7 +49,6 @@ export interface ReportDegradedEntry {
     | 'text.columns'
     | 'text.autoFit'
     | 'background.patternFill'
-    | 'shape.patternFill'
     | 'text.gradientFill'
     | 'text.letterSpacing'
     | 'shape.scene3d'

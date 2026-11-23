@@ -663,7 +663,17 @@ interface ImageFill {
   opacity?: number;             // [0, 1]，默认 1
 }
 
-type Fill = SolidFill | GradientFill | ImageFill;
+interface PatternFill {
+  type: "pattern";
+  preset: PatternPreset;        // OOXML 预设图案：pct5…pct90、horz/vert、ltHorz/dkHorz、narHorz、dashHorz、cross、
+                                //   upDiag/dnDiag 及 lt/dk/wd/dash 变体、diagCross、smCheck/lgCheck、smGrid/lgGrid/dotGrid、
+                                //   smConfetti/lgConfetti、horzBrick/diagBrick、solidDmnd/openDmnd/dotDmnd、plaid、sphere、
+                                //   weave、divot、shingle、wave、trellis、zigZag
+  foreground: Color;            // 图案线条色
+  background: Color;            // 图案底色
+}
+
+type Fill = SolidFill | GradientFill | PatternFill | ImageFill;
 ```
 
 另有两个共享类型，供 §7 动画与 §2.3 R2 逆向颜色复用：
@@ -743,7 +753,7 @@ interface TextContent {
   wrap?: boolean;                        // 默认 true；false 则文字溢出框外不换行
   padding?: [number, number, number, number];  // 文字到框边的内边距 [上, 右, 下, 左]（px）；默认 [3.6, 7.2, 3.6, 7.2]
   align?: Alignment;                     // 默认 [left, top]
-  gradient?: GradientFill;               // 文字渐变填充（与 color 互斥，gradient 优先）
+  gradient?: GradientFill;               // 文字渐变填充：整段文字共用同一渐变，优先于 color；color 作为不支持渐变处的回落色
   shadow?: Shadow;
 }
 ```
@@ -2107,8 +2117,7 @@ type DegradedFeature =
   | "image.artisticEffect" | "image.biLevel" | "image.compressionState"
   | "text.bodyRotation" | "text.columns" | "text.autoFit"
   | "background.patternFill"     // 图案填充降级为最接近的 solid/gradient 字面量（§4.1）
-  | "shape.patternFill"          // 形状图案填充降级为前景与背景按图案浓度混合的 solid
-  | "text.gradientFill"          // 渐变/图案文字填充降级为轴起点色标（或前景色）的纯色
+  | "text.gradientFill"          // 图案文字填充，或各段文字渐变不同，降级为轴起点色标（或前景色）的纯色
   | "text.letterSpacing"         // 各 run 字间距不一致，按出现最多的值写入元素级 letterSpacing
   | "shape.scene3d"              // 正交相机三维旋转，按投影压扁包围盒落盘
   | "smartArt.expanded"          // SmartArt 按绘图缓存展开为形状组合（§10.6）

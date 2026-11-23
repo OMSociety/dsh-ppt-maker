@@ -41,10 +41,21 @@ function ratioIssues(field: string, value: unknown, path: string): Issue[] {
   return []
 }
 
-const FILL_TYPES = new Set(['solid', 'gradient', 'image'])
+const FILL_TYPES = new Set(['solid', 'gradient', 'pattern', 'image'])
+
+/** ECMA-376 ST_PresetPatternVal tokens accepted by PatternFill.preset (spec §5). */
+export const PATTERN_PRESETS: ReadonlySet<string> = new Set([
+  'pct5', 'pct10', 'pct20', 'pct25', 'pct30', 'pct40', 'pct50', 'pct60', 'pct70', 'pct75', 'pct80', 'pct90',
+  'horz', 'vert', 'ltHorz', 'ltVert', 'dkHorz', 'dkVert', 'narHorz', 'narVert', 'dashHorz', 'dashVert',
+  'cross', 'dnDiag', 'upDiag', 'ltDnDiag', 'ltUpDiag', 'dkDnDiag', 'dkUpDiag', 'wdDnDiag', 'wdUpDiag',
+  'dashDnDiag', 'dashUpDiag', 'diagCross', 'smCheck', 'lgCheck', 'smGrid', 'lgGrid', 'dotGrid',
+  'smConfetti', 'lgConfetti', 'horzBrick', 'diagBrick', 'solidDmnd', 'openDmnd', 'dotDmnd', 'plaid',
+  'sphere', 'weave', 'divot', 'shingle', 'wave', 'trellis', 'zigZag'
+])
 
 /**
- * Element-level `fill` is a Fill object (spec §5: SolidFill | GradientFill | ImageFill).
+ * Element-level `fill` and page `background` are Fill objects
+ * (spec §5: SolidFill | GradientFill | PatternFill | ImageFill).
  * Chart elements are skipped: their series-level fill is a Color.
  */
 function fillIssues(fill: unknown, path: string): Issue[] {
@@ -52,13 +63,21 @@ function fillIssues(fill: unknown, path: string): Issue[] {
   const where = `${path}#fill`
   if (!isRecord(fill) || typeof fill.type !== 'string' || !FILL_TYPES.has(fill.type)) {
     const hint = typeof fill === 'string' ? `（写成 {type: "solid", color: ${JSON.stringify(fill)}}）` : ''
-    return [blocker(ERROR_CODES.SchemaError, `fill 须为对象且 type 为 solid / gradient / image${hint}`, where)]
+    return [blocker(ERROR_CODES.SchemaError, `fill 须为对象且 type 为 solid / gradient / pattern / image${hint}`, where)]
   }
   if (fill.type === 'solid' && !nonEmptyString(fill.color)) {
     return [blocker(ERROR_CODES.SchemaError, 'solid 填充必须有 color', where)]
   }
   if (fill.type === 'gradient' && (!Array.isArray(fill.stops) || fill.stops.length < 2)) {
     return [blocker(ERROR_CODES.SchemaError, 'gradient 填充至少需要 2 个 stops', where)]
+  }
+  if (fill.type === 'pattern') {
+    if (typeof fill.preset !== 'string' || !PATTERN_PRESETS.has(fill.preset)) {
+      return [blocker(ERROR_CODES.SchemaError, `pattern 填充的 preset 须为 OOXML 预设图案（如 pct50、dkUpDiag、smGrid），收到 ${JSON.stringify(fill.preset)}`, where)]
+    }
+    if (!nonEmptyString(fill.foreground) || !nonEmptyString(fill.background)) {
+      return [blocker(ERROR_CODES.SchemaError, 'pattern 填充必须有 foreground 与 background 颜色', where)]
+    }
   }
   if (fill.type === 'image' && !nonEmptyString(fill.src)) {
     return [blocker(ERROR_CODES.SchemaError, 'image 填充必须有 src', where)]
@@ -75,6 +94,13 @@ export function validateElementFields(element: Record<string, unknown>, path: st
     const g = border.gradient
     if (!isRecord(g) || g.type !== 'gradient' || !Array.isArray(g.stops) || g.stops.length < 2) {
       issues.push(blocker(ERROR_CODES.SchemaError, 'border.gradient 须为 GradientFill（type: gradient，至少 2 个 stops）', `${path}#border.gradient`))
+    }
+  }
+  const content = element.content
+  if (isRecord(content) && content.gradient !== undefined) {
+    const g = content.gradient
+    if (!isRecord(g) || g.type !== 'gradient' || !Array.isArray(g.stops) || g.stops.length < 2) {
+      issues.push(blocker(ERROR_CODES.SchemaError, 'content.gradient 须为 GradientFill（type: gradient，至少 2 个 stops）', `${path}#content.gradient`))
     }
   }
   if (element.group !== undefined) {

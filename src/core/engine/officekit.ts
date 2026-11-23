@@ -81,6 +81,8 @@ import {
   setShapeTextWrap,
   setSlideBackground,
   setSlideBackgroundGradientFill,
+  setSlideBackgroundPatternFill,
+  setShapePatternFill,
   setSlideBackgroundImage,
   setSlideHidden,
   setSlideLayout,
@@ -104,6 +106,7 @@ import {
   type Emu,
   type GeomCommand,
   type GradientFillOptions,
+  type PatternFillOptions,
   type LineEndType,
   type ParagraphSpec,
   type PresentationData,
@@ -306,7 +309,7 @@ interface ResolvedContent {
   wrap: boolean
   textDirection?: string
   padding?: [number, number, number, number]
-  gradient?: unknown
+  gradient?: GradientFillOptions
   shadow?: unknown
 }
 
@@ -358,8 +361,11 @@ function resolveContent(
     const resolved = resolver.color(bgRaw)
     if (resolved !== undefined) out.backgroundColor = String(resolved)
   }
-  if (content.gradient !== undefined || styleRef.gradient !== undefined) {
-    warnings.push(`${where}：文字渐变（gradient）暂不支持，已按纯色处理`)
+  const gradient = content.gradient ?? styleRef.gradient
+  if (gradient !== undefined) {
+    const options = gradient && typeof gradient === 'object' ? gradientOptionsOf(gradient as Record<string, unknown>, resolver) : null
+    if (options) out.gradient = options
+    else warnings.push(`${where}：文字渐变（gradient）至少需要 2 个色标，按纯色处理`)
   }
   const shadow = content.shadow ?? styleRef.shadow
   if (shadow !== undefined) out.shadow = shadow
@@ -548,6 +554,10 @@ function applyFill(
       ctx.warnings.push(`${where}：径向渐变（radial）暂不支持，已按线性渐变处理`)
     }
     setShapeGradientFill(shape, options)
+  } else if (type === 'pattern') {
+    const options = patternOptionsOf(fill, resolver)
+    if (!options) { ctx.warnings.push(`${where}：pattern 填充缺 preset、foreground 或 background`); return }
+    setShapePatternFill(shape, options)
   } else if (type === 'image') {
     // Synchronous fill application can't await — media bytes are preloaded by the caller.
     const bytes = (fill as { __bytes?: Uint8Array }).__bytes
@@ -559,6 +569,14 @@ function applyFill(
   } else {
     ctx.warnings.push(`${where}：未知填充类型 ${String(type)}，已跳过`)
   }
+}
+
+/** PPTD PatternFill → 库的图案参数；缺字段时返回 null。 */
+function patternOptionsOf(fill: Record<string, unknown>, resolver: ThemeResolver): PatternFillOptions | null {
+  const foreground = resolver.color(fill.foreground)
+  const background = resolver.color(fill.background)
+  if (typeof fill.preset !== 'string' || foreground === undefined || background === undefined) return null
+  return { preset: fill.preset as PatternFillOptions['preset'], foreground: String(foreground), background: String(background) }
 }
 
 /** PPTD GradientFill → 库的渐变参数；有效色标不足 2 个时返回 null。 */
@@ -694,6 +712,16 @@ function applyElementOpacity(shape: SlideShapeData, opacity: number, ctx: BuildC
 }
 
 /** Adds an alpha transform to every run that carries an explicit colour. */
+/** Element-level text gradient: every run paints with the same gradient (spec §5 TextContent.gradient). */
+function applyRunGradient(specs: ParagraphSpec[], gradient: GradientFillOptions): void {
+  for (const spec of specs) {
+    for (const run of spec.runs) {
+      const { color: _color, colorTransforms: _transforms, ...rest } = (run.format ?? {}) as TextFormat
+      ;(run as { format?: TextFormat }).format = { ...rest, textFill: { kind: 'gradient', ...gradient } }
+    }
+  }
+}
+
 function applyRunOpacity(specs: ParagraphSpec[], opacity: number): number {
   let uncoloured = 0
   for (const spec of specs) {
@@ -745,6 +773,7 @@ function buildText(
 
   const shape = addSlideTextBox(slide, { x: toEmu(x), y: toEmu(y), w: toEmu(w), h: toEmu(h), text: '' })
   const specs = richRunsToSpecs(parsed.paragraphs, base, resolver, fonts)
+  if (base.gradient) applyRunGradient(specs, base.gradient)
   if (typeof element.opacity === 'number' && element.opacity < 1) {
     const uncoloured = applyRunOpacity(specs, Math.max(0, element.opacity))
     if (uncoloured > 0) {
@@ -1811,6 +1840,10 @@ async function applyBackground(
     } else {
       ctx.warnings.push(`${where}：渐变背景至少需要 2 个色标`)
     }
+  } else if (fill.type === 'pattern') {
+    const options = patternOptionsOf(fill, resolver)
+    if (options) setSlideBackgroundPatternFill(slide, options)
+    else ctx.warnings.push(`${where}：图案背景缺 preset、foreground 或 background`)
   } else if (fill.type === 'image') {
     const bytes = await preloadImageBytes(fill.src, ctx, where)
     if (bytes) setSlideBackgroundImage(slide, bytes)

@@ -255,10 +255,15 @@ function TextView({
   const align = Array.isArray(content.align) ? (content.align as string[]) : []
   const wrap = typeof content.wrap === 'boolean' ? content.wrap : undefined
   const css = textStyleToCss(st, align, wrap)
+  // 文字渐变：渐变铺在文字容器上并裁到字形，run 内联色（导出时的回落色）在此让位。
+  const gradient = content.gradient ? fillToCss(content.gradient, theme) : undefined
+  const inner: React.CSSProperties | undefined = gradient
+    ? { backgroundImage: gradient, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }
+    : undefined
   return (
     <div style={{ ...style, ...css }} className="pptd-text">
       {/* sanitizeHtml 已做白名单清洗，这里 innerHTML 安全。 */}
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+      <div style={inner} className={gradient ? 'pptd-text-gradient' : undefined} dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   )
 }

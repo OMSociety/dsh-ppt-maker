@@ -18,6 +18,7 @@ import {
   setShapeAdjustValues,
   setShapeParagraphs,
   setShapeStroke,
+  setShapePatternFill,
   setShapeTextMargins
 } from '@office-kit/pptx'
 import { reverseImport } from '../src/core/reverse/index.js'
@@ -39,7 +40,8 @@ afterEach(async () => {
 })
 
 type AnyElement = Page['elements'][number] & {
-  content?: { text?: string; padding?: number[]; letterSpacing?: number }
+  content?: { text?: string; padding?: number[]; letterSpacing?: number; gradient?: { stops: { position: number; color: string }[]; angle?: number } }
+  fill?: { type?: string; preset?: string; foreground?: string; background?: string }
   shapeName?: string
   adjustments?: number[]
 }
@@ -62,6 +64,8 @@ async function sourceDeck(): Promise<Uint8Array> {
     fill: { kind: 'gradient', angleDeg: 90, stops: [{ offset: 0, color: '#C00000' }, { offset: 1, color: '#C00000', opacity: 0 }] }
   })
   void tilted
+  const hatch = addSlideShape(slide, { preset: 'rect', x: emu(60 * PT), y: emu(440 * PT), w: emu(120 * PT), h: emu(60 * PT) })
+  setShapePatternFill(hatch, { preset: 'dkUpDiag', foreground: '#1F4E79', background: '#FFFFFF' })
   const bytes = await savePresentation(pres)
   // 「01」的文字填充改成乱序书写的渐变：先写 74% 的白，再写 0% 的强调色。
   const files = unzipSync(bytes)
@@ -93,6 +97,11 @@ describe('reverse：文本与形状细节保真', () => {
 
     const big = elements.find((e) => e.content?.text?.includes('>01<') || e.content?.text === '01')!
     expect(big.content?.text?.toLowerCase()).toContain('#f39800')
+    expect(big.content?.gradient?.stops.map((s) => [s.position, s.color])).toEqual([[0.74, '#FFFFFF'], [0, '#F39800']])
+    expect(big.content?.gradient?.angle).toBe(90)
+
+    const hatch = elements.find((e) => e.fill?.type === 'pattern')!
+    expect(hatch.fill).toEqual({ type: 'pattern', preset: 'dkUpDiag', foreground: '#1F4E79', background: '#FFFFFF' })
     expect(big.content?.padding).toBeUndefined()
 
     const arc = elements.find((e) => e.shapeName === 'arc')!
@@ -121,6 +130,8 @@ describe('reverse：文本与形状细节保真', () => {
     expect(xml).toMatch(/lIns="0"/)
     expect(xml).toMatch(/spc="300"/)
     expect(xml).toMatch(/algn="dist"/)
+    expect(xml).toMatch(/<a:pattFill prst="dkUpDiag"><a:fgClr><a:srgbClr val="1F4E79"\/><\/a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"\/>/)
+    expect(xml).toMatch(/sz="12000"[^>]*>(?:(?!<\/a:rPr>)[\s\S])*<a:gradFill/)
     expect(xml).toMatch(/<a:gd name="adj1" fmla="val 1615952"\/>/)
     expect(xml).toMatch(/<a:gd name="adj2" fmla="val 6569477"\/>/)
     expect(xml).toMatch(/<a:ln w="12700"><a:gradFill[^>]*><a:gsLst><a:gs pos="0"><a:srgbClr val="C00000"\/><\/a:gs><a:gs pos="100000"><a:srgbClr val="C00000"><a:alpha val="0"\/>/)

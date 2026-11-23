@@ -56,6 +56,9 @@ import {
   getSlideBackground,
   getSlideBackgroundGradientFill,
   getSlideBackgroundImageBytes,
+  getSlideBackgroundPatternFill,
+  getSlideLayoutBackgroundPatternFill,
+  getSlideMasterBackgroundPatternFill,
   getSlideLayout,
   getSlideLayoutBackground,
   getSlideLayoutBackgroundGradientFill,
@@ -81,6 +84,7 @@ import {
   isTableShape,
   readPackagePart,
   type PresentationData,
+  type ReadGradientFill,
   type SlideBackground,
   type SlideData,
   type SlideLayoutData,
@@ -329,7 +333,7 @@ function readRichParagraphs(
   pres: PresentationData,
   shape: SlideShapeData,
   fit: TextFit = NO_FIT,
-  onFillFlattened?: (kind: string) => void
+  onFillFlattened?: (kind: string, fill: unknown) => void
 ): RichParagraph[] | null {
   let paraCount = 0
   try {
@@ -436,9 +440,11 @@ function readRichParagraphs(
 
 /**
  * Run colour: the solid colour when there is one; a gradient or pattern text
- * fill (PPTD runs only carry a colour) contributes its first stop / foreground.
+ * fill contributes its first stop / foreground, which stays in the run as the
+ * fallback colour. mapText lifts a gradient shared by every run to
+ * `content.gradient`.
  */
-function runColorOf(fmt: Record<string, unknown>, onFlattened?: (kind: string) => void): string | null {
+function runColorOf(fmt: Record<string, unknown>, onFlattened?: (kind: string, fill: unknown) => void): string | null {
   if (typeof fmt.color === 'string') return fmt.color
   const fill = fmt.textFill as { kind?: string; stops?: Array<{ offset?: number; color?: string; resolvedColor?: string }>; foreground?: string } | undefined
   if (fill?.kind === 'gradient' && fill.stops && fill.stops.length > 0) {
@@ -446,11 +452,11 @@ function runColorOf(fmt: Record<string, unknown>, onFlattened?: (kind: string) =
     const stop = [...fill.stops].sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0))[0]
     const color = stop.resolvedColor ?? stop.color
     if (typeof color !== 'string') return null
-    onFlattened?.('gradient')
+    onFlattened?.('gradient', fill)
     return color
   }
   if (fill?.kind === 'pattern' && typeof fill.foreground === 'string') {
-    onFlattened?.('pattern')
+    onFlattened?.('pattern', fill)
     return fill.foreground
   }
   return null
@@ -500,13 +506,25 @@ function mapText(
   const shape = rec.raw as SlideShapeData
   const fit = readTextFit(shape)
   const flattened = new Set<string>()
-  const rich = readRichParagraphs(pres, shape, fit, (kind) => flattened.add(kind))
+  const runGradients: unknown[] = []
+  const rich = readRichParagraphs(pres, shape, fit, (kind, fill) => {
+    flattened.add(kind)
+    if (kind === 'gradient') runGradients.push(fill)
+  })
+  // 全部文字 run 共用同一渐变 → 元素级 content.gradient（run 里保留首色作回落色）。
+  const runCount = (rich ?? []).reduce((sum, p) => sum + p.spacings.length, 0)
+  let textGradient: Record<string, unknown> | null = null
+  if (flattened.size === 1 && runCount > 0 && runGradients.length === runCount) {
+    const keys = new Set(runGradients.map((g) => JSON.stringify(g)))
+    if (keys.size === 1) textGradient = pptdGradientOf(runGradients[0] as ReadGradientFill)
+  }
+  if (textGradient) flattened.clear()
   if (flattened.size > 0) {
     report.degraded.push({
       page: rec.slideIndex,
       elementId,
       feature: 'text.gradientFill',
-      detail: '文字的渐变/图案填充按首个色标（或前景色）写成纯色',
+      detail: '文字的图案填充或各段不同的渐变按首个色标（或前景色）写成纯色',
       originalValue: [...flattened].join(',')
     })
   }
@@ -558,6 +576,7 @@ function mapText(
       }
     })()
   }
+  if (textGradient) content.gradient = textGradient
   // 内边距（bodyPr l/t/r/bIns，EMU）：任一边与 Office 默认不同才写，缺失边取默认。
   const margins = body?.margins
   if (margins) {
@@ -800,11 +819,31 @@ function patternInk(preset: string): number {
   return 0.25
 }
 
+/** Library gradient read-back → PPTD GradientFill; fewer than 2 stops → null. */
+function pptdGradientOf(gradient: ReadGradientFill): Record<string, unknown> | null {
+  if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length < 2) return null
+  const radial = gradient.path !== undefined && gradient.path !== 'linear'
+  return {
+    type: 'gradient',
+    gradientType: radial ? 'radial' : 'linear',
+    stops: gradient.stops.map((stop) => ({
+      position: Math.min(1, Math.max(0, stop.offset)),
+      color: gradientStopColor(stop)
+    })),
+    ...(!radial && typeof gradient.angleDeg === 'number' ? { angle: ((gradient.angleDeg % 360) + 360) % 360 } : {})
+  }
+}
+
+/** Library pattern read-back → PPTD PatternFill; unresolved colours → null. */
+function pptdPatternOf(pattern: { preset: string; foreground: string; background: string } | null): Record<string, unknown> | null {
+  if (!pattern || !/^#[0-9A-Fa-f]{6}$/.test(pattern.foreground) || !/^#[0-9A-Fa-f]{6}$/.test(pattern.background)) return null
+  return { type: 'pattern', preset: pattern.preset, foreground: pattern.foreground.toUpperCase(), background: pattern.background.toUpperCase() }
+}
+
 /**
  * The fill the shape actually paints (spec §2.3 R4 effective values): own fill,
  * then theme style reference and placeholder cascade (`getShapeFillEffective`),
- * then `<a:grpFill/>` from the enclosing group. Pattern fills have no PPTD
- * counterpart and become the solid colour they average to (recorded as degraded).
+ * then `<a:grpFill/>` from the enclosing group.
  */
 function readShapeFill(
   rec: ReverseShapeRecord,
@@ -847,33 +886,14 @@ function readShapeFill(
   if (kind === 'gradient') {
     try {
       const gradient = getShapeGradientFillEffective(pres, shape) ?? getShapeGradientFill(shape)
-      if (!gradient || gradient.stops.length < 2) return null
-      const radial = gradient.path !== undefined && gradient.path !== 'linear'
-      return {
-        type: 'gradient',
-        gradientType: radial ? 'radial' : 'linear',
-        stops: gradient.stops.map((stop) => ({
-          position: Math.min(1, Math.max(0, stop.offset)),
-          color: gradientStopColor(stop)
-        })),
-        ...(!radial && typeof gradient.angleDeg === 'number' ? { angle: ((gradient.angleDeg % 360) + 360) % 360 } : {})
-      }
+      return gradient ? pptdGradientOf(gradient) : null
     } catch {
       return null
     }
   }
   if (kind === 'pattern') {
     try {
-      const pattern = getShapePatternFill(pres, shape)
-      if (!pattern || !/^#[0-9A-Fa-f]{6}$/.test(pattern.foreground) || !/^#[0-9A-Fa-f]{6}$/.test(pattern.background)) return null
-      report.degraded.push({
-        page: rec.slideIndex,
-        elementId: elementIdOf(rec),
-        feature: 'shape.patternFill',
-        detail: '图案填充按前景与背景的平均色写成纯色',
-        originalValue: `${pattern.preset} ${pattern.foreground}/${pattern.background}`
-      })
-      return { type: 'solid', color: blendHex(pattern.foreground, pattern.background, patternInk(pattern.preset)) }
+      return pptdPatternOf(getShapePatternFill(pres, shape))
     } catch {
       return null
     }
@@ -1512,6 +1532,7 @@ interface BackgroundSource {
   solidColor: string | null
   gradient: { stops: ReadonlyArray<{ offset: number; color: string }> } | null
   imageBytes: Uint8Array | null
+  pattern?: Record<string, unknown> | null
   level: 'slide' | 'layout' | 'master'
 }
 
@@ -1536,8 +1557,12 @@ function resolveEffectiveBackground(rawSlide: SlideData, pres: PresentationData)
     bg: SlideBackground,
     gradient: BackgroundSource['gradient'],
     imageBytes: Uint8Array | null,
-    level: BackgroundSource['level']
+    level: BackgroundSource['level'],
+    pattern: Record<string, unknown> | null = null
   ): BackgroundSource | null => {
+    if (bg.kind === 'pattern') {
+      return pattern ? { bg, solidColor: null, gradient: null, imageBytes: null, pattern, level } : null
+    }
     if (bg.kind === 'solid') {
       return { bg, solidColor: bg.color, gradient, imageBytes, level }
     }
@@ -1551,24 +1576,27 @@ function resolveEffectiveBackground(rawSlide: SlideData, pres: PresentationData)
       if (imageBytes) return { bg, solidColor: null, gradient, imageBytes, level }
       return null
     }
-    return null // inherit / pattern / unknown → 往上
+    return null // inherit / unknown → 往上
   }
 
   // slide 层
   if (slideBg.kind !== 'inherit') {
     let gradient: BackgroundSource['gradient'] = null
     let imageBytes: Uint8Array | null = null
+    let pattern: Record<string, unknown> | null = null
     try {
       if (slideBg.kind === 'gradient') {
         const g = getSlideBackgroundGradientFill(rawSlide)
         if (g) gradient = { stops: g.stops.map((s) => ({ offset: s.offset, color: String(s.color) })) }
       } else if (slideBg.kind === 'image') {
         imageBytes = getSlideBackgroundImageBytes(rawSlide)
+      } else if (slideBg.kind === 'pattern') {
+        pattern = pptdPatternOf(getSlideBackgroundPatternFill(pres, rawSlide))
       }
     } catch {
       /* fall through */
     }
-    const src = readLevel(slideBg, gradient, imageBytes, 'slide')
+    const src = readLevel(slideBg, gradient, imageBytes, 'slide', pattern)
     if (src) return src
   }
 
@@ -1583,17 +1611,20 @@ function resolveEffectiveBackground(rawSlide: SlideData, pres: PresentationData)
     if (layoutBg && layoutBg.kind !== 'inherit') {
       let gradient: BackgroundSource['gradient'] = null
       let imageBytes: Uint8Array | null = null
+      let pattern: Record<string, unknown> | null = null
       try {
         if (layoutBg.kind === 'gradient') {
           const g = getSlideLayoutBackgroundGradientFill(layout)
           if (g) gradient = { stops: g.stops.map((s) => ({ offset: s.offset, color: String(s.color) })) }
         } else if (layoutBg.kind === 'image') {
           imageBytes = getSlideLayoutBackgroundImageBytes(pres, layout)
+        } else if (layoutBg.kind === 'pattern') {
+          pattern = pptdPatternOf(getSlideLayoutBackgroundPatternFill(pres, layout))
         }
       } catch {
         /* fall through */
       }
-      const src = readLevel(layoutBg, gradient, imageBytes, 'layout')
+      const src = readLevel(layoutBg, gradient, imageBytes, 'layout', pattern)
       if (src) return src
     }
 
@@ -1607,17 +1638,20 @@ function resolveEffectiveBackground(rawSlide: SlideData, pres: PresentationData)
     if (masterBg && masterBg.kind !== 'inherit') {
       let gradient: BackgroundSource['gradient'] = null
       let imageBytes: Uint8Array | null = null
+      let pattern: Record<string, unknown> | null = null
       try {
         if (masterBg.kind === 'gradient') {
           const g = getSlideMasterBackgroundGradientFill(pres, layout)
           if (g) gradient = { stops: g.stops.map((s) => ({ offset: s.offset, color: String(s.color) })) }
         } else if (masterBg.kind === 'image') {
           imageBytes = getSlideMasterBackgroundImageBytes(pres, layout)
+        } else if (masterBg.kind === 'pattern') {
+          pattern = pptdPatternOf(getSlideMasterBackgroundPatternFill(pres, layout))
         }
       } catch {
         /* fall through */
       }
-      const src = readLevel(masterBg, gradient, imageBytes, 'master')
+      const src = readLevel(masterBg, gradient, imageBytes, 'master', pattern)
       if (src) return src
     }
   }
@@ -1647,6 +1681,8 @@ function applyBackgroundChain(
       gradientType: 'linear',
       stops: src.gradient.stops.map((s) => ({ position: s.offset, color: asLiteralColor(s.color) }))
     }
+  } else if (src.pattern) {
+    page.background = src.pattern
   } else if (src.imageBytes) {
     const ext = imageExtOf(src.imageBytes)
     const partName = `ppt/media/bg-${slideIndex}-${src.level}${ext}`

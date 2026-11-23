@@ -140,6 +140,12 @@ export function fillToCss(
     const pptdAngle = typeof f.angle === 'number' ? f.angle : 0
     return `linear-gradient(${pptdAngle + 90}deg, ${parts.join(', ')})`
   }
+  if (type === 'pattern') {
+    const fg = resolveColor(f.foreground, theme)
+    const bg = resolveColor(f.background, theme)
+    if (!fg || !bg) return fg ?? bg
+    return patternToCss(typeof f.preset === 'string' ? f.preset : 'pct50', fg, bg)
+  }
   if (type === 'image') {
     const raw = typeof f.src === 'string' ? f.src : undefined
     if (!raw) return undefined
@@ -175,4 +181,46 @@ export function backgroundToCss(
     return fillToCss(b, theme, resolveMedia)
   }
   return undefined
+}
+
+/**
+ * PatternFill → CSS background. Line and grid families draw as repeating
+ * gradients; dot, confetti and texture presets show as the colour they average
+ * to (their exact look is in the exported PPTX).
+ */
+export function patternToCss(preset: string, fg: string, bg: string): string {
+  const heavy = /^dk|^wd/.test(preset)
+  const light = /^lt|^nar|^dash/.test(preset)
+  const line = heavy ? 3 : light ? 1 : 2
+  const step = /^nar/.test(preset) ? 4 : /^wd/.test(preset) ? 10 : 8
+  const stripes = (angle: number) => `repeating-linear-gradient(${angle}deg, ${fg} 0 ${line}px, transparent ${line}px ${step}px)`
+  const base = /Horz$|^horz$/.test(preset)
+    ? [stripes(0)]
+    : /Vert$|^vert$/.test(preset)
+      ? [stripes(90)]
+      : /UpDiag$|^upDiag$/.test(preset)
+        ? [stripes(45)]
+        : /DnDiag$|^dnDiag$/.test(preset)
+          ? [stripes(-45)]
+          : preset === 'cross' || /Grid$/.test(preset)
+            ? [stripes(0), stripes(90)]
+            : preset === 'diagCross'
+              ? [stripes(45), stripes(-45)]
+              : null
+  if (base) return `${base.join(', ')}, ${bg}`
+  const pct = /^pct(\d+)$/.exec(preset)
+  const ink = pct ? Number(pct[1]) / 100 : 0.25
+  return blendCss(fg, bg, ink)
+}
+
+function blendCss(fg: string, bg: string, t: number): string {
+  const rgb = (hex: string): number[] | null => {
+    const m = /^#([0-9a-f]{6})/i.exec(hex)
+    return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null
+  }
+  const a = rgb(fg)
+  const b = rgb(bg)
+  if (!a || !b) return bg
+  const mix = a.map((v, i) => Math.round(v * t + b[i] * (1 - t)))
+  return `#${mix.map((v) => v.toString(16).padStart(2, '0')).join('')}`
 }

@@ -432,6 +432,7 @@ export const CSS = `
   font-size:11px;color:var(--dsw-alias-label-secondary);
 }
 .pptd-text a{color:#0563C1;text-decoration:underline}
+.pptd-text-gradient *{color:transparent !important}
 .ppt-history-preview-label{
   font-size:12px;color:var(--dsw-alias-label-secondary);margin:0 0 6px;
 }
