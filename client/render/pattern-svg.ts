@@ -18,7 +18,7 @@ function strokeOf(preset: string): { width: number; step: number } {
   const heavy = /^(dk|wd)/.test(preset)
   const light = /^(lt|nar|dash)/.test(preset)
   const width = heavy ? 3 : light ? 1 : 2
-  const step = /^nar/.test(preset) ? 4 : /^wd/.test(preset) ? 10 : 8
+  const step = /^(nar|lt|dk|dash)/.test(preset) ? 4 : /^wd/.test(preset) ? 8 : 8
   return { width, step }
 }
 
@@ -26,13 +26,15 @@ function strokeOf(preset: string): { width: number; step: number } {
 export function patternTileOf(preset: string): PatternTile {
   const { width, step } = strokeOf(preset)
   const tile = step * 2
-  const diag = (tilt: number) => {
+  // OOXML 的 UpDiag 自左下向右上（"/"），DnDiag 自左上向右下（"\"）；线长跨满整块瓦片并外延，拼接无断口。
+  const diag = (up: boolean) => {
     const lines: PatternTile['lines'] = []
-    for (let offset = -tile; offset <= tile * 2; offset += step) {
-      const rad = (tilt * Math.PI) / 180
-      const dx = Math.cos(rad) * tile
-      const dy = Math.sin(rad) * tile
-      lines.push({ x1: offset, y1: 0, x2: offset + dx, y2: dy, width })
+    for (let offset = -tile; offset <= tile; offset += step) {
+      lines.push(
+        up
+          ? { x1: offset, y1: tile, x2: offset + tile, y2: 0, width }
+          : { x1: offset, y1: 0, x2: offset + tile, y2: tile, width }
+      )
     }
     return lines
   }
@@ -54,14 +56,14 @@ export function patternTileOf(preset: string): PatternTile {
 
   if (/Horz$/.test(preset)) return { size: tile, lines: horiz(), dots: [] }
   if (/Vert$/.test(preset)) return { size: tile, lines: vert(), dots: [] }
-  if (/UpDiag$/.test(preset)) return { size: tile, lines: diag(45), dots: [] }
-  if (/DnDiag$/.test(preset)) return { size: tile, lines: diag(-45), dots: [] }
+  if (/UpDiag$/.test(preset)) return { size: tile, lines: diag(true), dots: [] }
+  if (/DnDiag$/.test(preset)) return { size: tile, lines: diag(false), dots: [] }
   if (preset === 'cross' || /Grid$/.test(preset)) {
     return { size: tile, lines: [...horiz(), ...vert()], dots: [] }
   }
-  if (preset === 'diagCross') return { size: tile, lines: [...diag(45), ...diag(-45)], dots: [] }
+  if (preset === 'diagCross') return { size: tile, lines: [...diag(true), ...diag(false)], dots: [] }
   if (/^(smCheck|lgCheck)/.test(preset)) {
-    return { size: tile, lines: [...diag(45), ...diag(-45)], dots: [] }
+    return { size: tile, lines: [...diag(true), ...diag(false)], dots: [] }
   }
   const pct = /^pct(\d+)$/.exec(preset)
   if (pct) {

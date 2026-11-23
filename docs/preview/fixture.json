@@ -11,7 +11,7 @@
     "activeKey": "preview",
     "openRequests": [],
     "manifest": {
-      "revision": 20,
+      "revision": 22,
       "title": "构成主义 · 功能演示",
       "designSystem": "work",
       "theme": "blue-flame-brand",
@@ -26,14 +26,14 @@
   "project": {
     "key": "preview",
     "dir": "demo-deck",
-    "revision": 20,
+    "revision": 22,
     "manifest": {
-      "revision": 20,
+      "revision": 22,
       "createdAt": "2026-11-17T21:10:27.804Z",
-      "updatedAt": "2026-11-22T21:21:11.422Z",
+      "updatedAt": "2026-11-23T13:08:19.598Z",
       "designSystem": "work",
       "theme": "blue-flame-brand",
-      "checksum": "c234769b110d545a60cf7e97e6bdc667440b4158",
+      "checksum": "30bdff00242bd94b0cab497cd6d1121b0ca79ce7",
       "qaReport": {
         "revision": 18,
         "checkedAt": "2026-11-22T20:34:58.557Z",
@@ -942,7 +942,7 @@
           }
         ]
       },
-      "revision": 20
+      "revision": 22
     },
     "pages/02.page": {
       "path": "pages/02.page",
@@ -1195,10 +1195,15 @@
                   "x": "交付",
                   "y": "环节"
                 },
-                "fill": "#7d766a",
+                "fill": {
+                  "type": "pattern",
+                  "preset": "ltUpDiag",
+                  "foreground": "#7d766a",
+                  "background": "#ede6d6"
+                },
                 "dataLabels": {
                   "show": true,
-                  "color": "#ffffff",
+                  "color": "#121212",
                   "fontSize": 12
                 }
               }
@@ -1433,7 +1438,7 @@
           }
         ]
       },
-      "revision": 20
+      "revision": 22
     },
     "pages/03.page": {
       "path": "pages/03.page",
@@ -1444,7 +1449,7 @@
         },
         "elements": []
       },
-      "revision": 20
+      "revision": 22
     }
   },
   "media": {

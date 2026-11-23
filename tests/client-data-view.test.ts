@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { chartModelOf } from '../client/render/chart-model'
+import { patternTileOf } from '../client/render/pattern-svg'
 // @ts-expect-error 根 tsconfig 不启用 JSX；组件由 tsconfig.client.json 完整校验。
 import { ChartView } from '../client/components/ChartView'
 import { tableCellViewModel, tableModelOf } from '../client/render/table-model'
@@ -240,6 +241,19 @@ describe('ChartView · 图案填充与逐点标签', () => {
     expect(markup).toContain('<pattern id="pptd-pat-0"')
     expect(markup).toContain('fill="url(#pptd-pat-0)"')
     expect(markup).toContain('fill="#ffffff"')
+  })
+
+  it('斜纹瓦片：UpDiag 自左下向右上，线长跨满瓦片，DnDiag 反向', () => {
+    const up = patternTileOf('ltUpDiag')
+    const down = patternTileOf('ltDnDiag')
+    for (const line of up.lines) {
+      expect(line.x2 - line.x1).toBe(up.size)
+      expect(line.y1 - line.y2).toBe(up.size)
+    }
+    for (const line of down.lines) {
+      expect(line.x2 - line.x1).toBe(down.size)
+      expect(line.y2 - line.y1).toBe(down.size)
+    }
   })
 
   it('环形图逐点标签按 offset 落在环中心，隐藏点不出标签', () => {
