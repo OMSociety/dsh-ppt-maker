@@ -93,10 +93,9 @@ describe.skipIf(!hasVenv)('svg 页轨道', () => {
   it('buildDeck：native 页与 svg 页混合合并，页序保持，validate 零 error', async () => {
     const dir = 'svg-mixed'
     const abs = path.join(tmp, dir)
+    await createProject(tmp, { dir, title: 'svg 混合', size: [960, 540] })
     await mkdir(path.join(abs, 'media', 'svg'), { recursive: true })
     await writeFile(path.join(abs, 'media', 'svg', 'cover.svg'), SPIKE_SVG)
-
-    await createProject(tmp, { dir, title: 'svg 混合', size: [960, 540] })
     await editProject(tmp, {
       dir,
       ops: [
@@ -160,9 +159,9 @@ describe.skipIf(!hasVenv)('svg 页轨道', () => {
   it('buildDeck：4:3 原生页与 SVG 页共用 800×600 画布', async () => {
     const dir = 'svg-4x3'
     const abs = path.join(tmp, dir)
+    await createProject(tmp, { dir, title: '4:3 混合', size: [800, 600] })
     await mkdir(path.join(abs, 'media', 'svg'), { recursive: true })
     await writeFile(path.join(abs, 'media', 'svg', 'page.svg'), RATIO_43_SVG)
-    await createProject(tmp, { dir, title: '4:3 混合', size: [800, 600] })
     await editProject(tmp, {
       dir,
       ops: [
