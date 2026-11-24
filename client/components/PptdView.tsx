@@ -15,6 +15,7 @@
  * rotation 单位为度，绕元素中心旋转。
  */
 import * as React from 'react'
+import { canvasMediaUrl } from '../render/media'
 import { backgroundToCss, borderToCss, fillToCss, resolveColor, resolveTextStyle, shadowToCss, type ThemeLike } from '../render/resolve'
 import { pathFromPoints } from '../render/points'
 import { fitCanvas, type CanvasFit } from '../render/canvas-fit'
@@ -89,7 +90,7 @@ export function PptdView({ page, size, theme, resolveMedia, overlay, className }
   const elements = Array.isArray(page?.elements) ? (page!.elements as PptdElement[]) : []
   const isSvgPage = page?.pageType === 'svg'
   const svgRef = isSvgPage && page?.svgSource?.ref ? page.svgSource.ref : null
-  const svgUrl = svgRef && resolveMedia ? resolveMedia(svgRef) : svgRef
+  const svgUrl = canvasMediaUrl(svgRef, resolveMedia)
 
   return (
     <div ref={wrapRef} className={`pptd-viewport${className ? ` ${className}` : ''}`}>
@@ -458,7 +459,7 @@ function ImageView({
   fit?: 'cover' | 'fill'
 }) {
   const raw = (el.src ?? (el.content?.src as string)) as string | undefined
-  const src = raw && resolveMedia ? resolveMedia(raw) : raw
+  const src = canvasMediaUrl(raw, resolveMedia)
   // 记「哪一个 src 失败」而不是布尔值：换图后 src 一变，失败标记自动失效。
   const [failedSrc, setFailedSrc] = React.useState<string | null>(null)
   const failed = Boolean(src) && failedSrc === src

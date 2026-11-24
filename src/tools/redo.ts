@@ -26,7 +26,7 @@ export function registerRedoTool(ctx: PluginToolCtx): (() => void) | undefined {
         redoneOps: { type: 'array', items: { type: 'string' } },
         warnings: { type: 'array', items: { type: 'string' } }
       }),
-      render: renderSummary((r) => `已重做到 revision ${String(r.revision)}（${(r.redoneOps as string[] | undefined)?.length ?? 0} 个 op）`)
+      render: renderSummary((r) => `重做结果：编辑版本 ${String(r.revision)}（${(r.redoneOps as string[] | undefined)?.length ?? 0} 个 op）`)
     },
     execute: async (args, exec) => {
       try {

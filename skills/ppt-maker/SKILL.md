@@ -19,7 +19,7 @@ description: 设计、生成、重做与导出 PPT 演示文稿：从内容出�
 | `ppt_create` | 新建工程 | `manifest.revision`（=0，之后所有写操作的基准） |
 | `ppt_edit` | 批量原子编辑（一次一串 ops，任一失败整批不落盘） | `revision`、`warnings` |
 | `ppt_undo` / `ppt_redo` | 撤销 / 重做 | `revision` |
-| `ppt_svg` | SVG 页面轨：写 SVG 源并挂页，或立即编译早检 | `ref`、`compiled` |
+| `ppt_svg` | SVG 页面轨：写 SVG 源并挂页，或立即编译早检 | `put` 返回 `ref`、`revision`；`compile` 返回 `compiled` |
 | `ppt_render` | 构建最终 pptx 并光栅化成每页 PNG | `images[].absolutePath` |
 | `ppt_check` | 规则质检（`ai: true` 追加 AI 视觉建议） | `pass`、`issues[]` |
 | `ppt_export` | 导出 .pptx，可同时出 PDF（质检门禁 + 字体嵌入 + 回读校验） | `path`、`pdf`、`sha256` |
@@ -27,7 +27,7 @@ description: 设计、生成、重做与导出 PPT 演示文稿：从内容出�
 | `ppt_patch` | 对 .pptx 做外科手术式轻改（改字 / 换图 / 调页序） | `path`、`lostParts` |
 | `ppt_open` | 在右侧栏「PPT 工作台」打开工程，用户可在里面直接看、点、改 | `requested` |
 
-**乐观锁**：`ppt_edit`、`ppt_undo`、`ppt_redo`、带 `page` 的 `ppt_svg` 都必须带 `baseRevision`，值取**上一次写操作返回的 `revision`**（`ppt_create` 之后是 0）。别自己 +1 推算：30 秒内的连续编辑会合并成一个修订，修订号不一定变。返回 409 说明工程在你之后被改过（多半是用户在工作台里动了手），409 的 `error.detail.expected` 就是当前修订号；先弄清对方改了什么再改，不要盲目重试。
+**乐观锁**：`ppt_edit`、`ppt_undo`、`ppt_redo`、每次 `ppt_svg action: put` 都必须带 `baseRevision`，值取**上一次写操作返回的 `revision`**（`ppt_create` 之后是 0）。成功变更后 `manifest.revision` 递增；用返回值，不要从历史组推算。`historyCursor` 单独标识当前撤销组，同组编辑可以一起撤销。打开 2.0.4 工程时只读，首次成功变更时记录游标。返回 409 说明工程在你之后被改过（多半是用户在工作台里动了手），409 的 `error.detail.expected` 就是当前修订号；先弄清对方改了什么再改，不要盲目重试。
 
 ## 二、工作流
 
@@ -40,7 +40,7 @@ description: 设计、生成、重做与导出 PPT 演示文稿：从内容出�
 
 ### 2. 建工程
 
-`ppt_create` 建工程（`dir`、`title`，选了设计系统就带 `designSystem` / `theme`）；改已有的 PPT 见第六节。
+为 `ppt_create` 或全量 `ppt_import` 选新目录或空目录。遇到 `409 ProjectAlreadyExists` 就换目录，保留原有文件。用 `ppt_create` 建工程（`dir`、`title`，选了设计系统就带 `designSystem` / `theme`）；改已有的 PPT 见第六节。
 
 ### 3. 定视觉方向，再建页
 
@@ -120,7 +120,7 @@ description: 设计、生成、重做与导出 PPT 演示文稿：从内容出�
 - **图表填充与逐点标签**：柱、面积、饼的系列填充可写图案；饼图的 `dataLabels.points` 能给单个切片换位置、字号与颜色——把一个点的标签用 `offset` 挪到环中心、其余点 `show: false`，就成了环中央的大字；数字长又离切片远时补 `size: {w, h}` 给足标签框，否则会逐字折行。图表的绘图区位置写 `plotLayout`。
 - **散点 / 气泡 / 雷达 / K 线**：散点、气泡每个系列各有 `encode.x`、`encode.y`（气泡再加 `size`），一张长表可用 `dataFilter: {col, value}` 按列值分成多个系列；`marker: {shape, size, fill}` 控制标记。雷达用 `encode.category` 放辐条、每个系列一列数值，`areaColor: false` 只画轮廓，数值范围写 `spokeAxis: {min, max}`。K 线用一个 `type: candlestick` 系列，`encode: {x, open?, high, low, close}`，省略 `open` 画高低收，`upBars` / `downBars` 的 `fill` 定涨跌色。这四类只能与自己同类的系列同图，混排会落成占位。雷达里后一个系列盖在前一个上面，要让只描边的系列不被填充色块挡住，把它排在填充系列之后。瀑布、热力、树图、旭日、桑基与曲面、三维图表没有原生写法，近期也没有支持计划，需要时画成 SVG 页。
 - **表格**：`rows` 是二维数组，`columnWidths`、`rowHeights` 是比例且各自加起来为 1，`rowHeights` 的项数等于行数。只要底部细横线：`border: [null, null, {style: solid, width: 1, color: "#c4bcab"}, null]`（顺序为上、右、下、左）。表格不能旋转。
-- **图片**：放进 `media/` 再用相对路径引用；保持原始宽高比，**严禁拉伸变形**。配图优先级：用户材料 → 官方来源 → 检索到的真实图片 → 生成图；不放与页面结论无关的凑数图。
+- **图片**：先把素材保存到工程内的 `media/`，再用相对路径引用。渲染、导出遇到网址、工程外文件或缺件时，先补齐工程内素材并修正引用；保持原始宽高比，**严禁拉伸变形**。配图优先级：用户材料 → 官方来源 → 检索到的真实图片 → 生成图；不放与页面结论无关的凑数图。
 
 ### 更多可用的表达手段
 
@@ -137,15 +137,15 @@ description: 设计、生成、重做与导出 PPT 演示文稿：从内容出�
 整页的视觉复杂到 PPTD 元素难以表达时（精细渐变、自由曲线、多层叠加的封面或章节页），把这一页画成一份 SVG：
 
 1. 先用 `ppt_edit` 建一页 `pageType: svg`、`svgSource.ref` 指向源文件的空页。
-2. `ppt_svg action: put` 把 SVG 写到 `media/svg/<名称>.svg`，带 `page` 直接挂页。
+2. `ppt_svg action: put` 带最新 `baseRevision`，把 SVG 写到 `media/svg/<名称>.svg`。要挂页就同时传入 SVG 页的 `page`；写源与挂页一起提交，返回的 `revision` 是下一次写入的基准。
 3. `ppt_svg action: compile` 立即编译早检。
 
 SVG 画布用 deck 尺寸（同比例的 `viewBox`），字体用 deck 里声明过的字体。导出时整页编译成 DrawingML 原生形状，成品里的文字和形状依然可选中、可编辑。SVG 页不支持元素级 `update_element`，要改就改源后重新 `put`。编译失败会直接报错，不会悄悄换成占位页。首次使用报 `SvgCompilerMissing` 时，按报错给出的绝对路径运行 `node <插件包根目录>/scripts/prepare-vendor-env.mjs` 建 Python 环境（需 Python 3.10+，约 50MB；默认清华源，可用环境变量 `PIP_INDEX` 换源）。
 
 ## 六、改已有的 PPT
 
-- **只改几个字、换张图、调页序**：用 `ppt_patch`。它直接动原文件，不逆向你没碰的部分，SmartArt、嵌入表格等库不建模的部件原样保留。看返回的 `lostParts`，不为 0 时要告诉用户。
-- **要大改或重新设计**：用 `ppt_import` 全量逆向成 PPTD 工程，改完再 `ppt_export`。常见的原生图表会变成可编辑的 `chart`，SmartArt 会展开成一组可编辑形状，组合关系记在 `group` 里。导入后先读 `import.report.yml`：`dropped` 是没能转换、原位放了占位的对象（OLE、媒体、三维、少见图表类型等），`degraded` 是转换时有损失的属性（如自动缩字、带字形状被拆成形状加文字、SmartArt 展开后不再自动排版）。把这些如实告诉用户。导出以原文件为骨架：没改的页原样沿用；改过的页按 PPTD 重建，页上的占位会从原文件拷回原件。占位只是原件的替身，不要去编辑它的内容，要改就整个换成你自己画的元素。只改几个字、换张图时，`ppt_patch` 仍然更轻更稳。
+- **只改几个字、换张图、调页序**：用 `ppt_patch`。它以原文件为基础另存改稿，未编辑的部分直接沿用，SmartArt、嵌入表格等库不建模的部件原样保留。看返回的 `lostParts`，不为 0 时要告诉用户。
+- **要大改或重新设计**：用 `ppt_import` 全量逆向成 PPTD 工程，改完再 `ppt_export`。常见的原生图表会变成可编辑的 `chart`，有可用绘图缓存的 SmartArt 展开成一组可编辑形状，组合关系记在 `group` 里。导入后先读 `import.report.yml`：`dropped` 是没能转换、原位放了占位的对象（无可用绘图缓存的 SmartArt、OLE、媒体、三维、少见图表类型等），`degraded` 是转换时有损失的属性（如自动缩字、带字形状被拆成形状加文字、SmartArt 展开后不再自动排版）。把这些如实告诉用户。导出以原文件为骨架：没改的页原样沿用；改过的页按 PPTD 重建，页上的占位会从原文件拷回原件。占位只是原件的替身，不要去编辑它的内容，要改就整个换成你自己画的元素。只改几个字、换张图时，`ppt_patch` 仍然更轻更稳。
 - **复刻图片或 PDF**：尽量 1:1。看不清处放大观察；照片、头像等无法用图形近似的内容裁出来存 `media/` 作为图片插入。
 
 ## 七、字体嵌入

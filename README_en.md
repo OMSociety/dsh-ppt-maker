@@ -55,18 +55,22 @@ Stop the running DSH, install with `dsh plugin --profile <profile> add "dsh-ppt-
 
 ## Building a new deck
 
+Choose a new or empty directory when creating a project or importing a full deck. A non-empty target returns `409 ProjectAlreadyExists` and its files stay intact.
+
 Once the model picks a design system, `ppt_create` writes its colors, fonts, and text styles into the project's theme table. Pages reference them as `$primary`, `$title`, and so on, so recoloring the whole deck means editing only the theme table. Shared brand bars, footers, and corner marks go into masters and layouts that each page attaches to.
 
 Page elements include text, shapes (177 preset shapes with adjustment values, or custom paths), lines, images, tables, and native charts (bar, column, line, area, pie, doughnut, and more, with data still editable in PowerPoint after export). Text supports gradients, outlines, shadows, letter spacing, distributed alignment, and exact insets; shapes support gradient and pattern fills, gradient outlines, and drop shadows. Elements can be grouped and move as one group in PowerPoint after export.
 
 When a page is too complex for these elements (fine gradients, freeform curves, layered cover art), the whole page can be drawn as an SVG. On export that page compiles into native PowerPoint text boxes and shapes rather than a single picture, so each piece remains selectable and editable.
 
+Save images and other media inside the project first (for example, `media/logo.png`) and reference them by relative path. Rendering and export read project files only. If a reference is a URL, points outside the project, or is missing, supply the local file and correct its path.
+
 After every round of edits the model can call `ppt_render` to render real images of the final .pptx, not mockups. `ppt_export` can also write a PDF alongside the .pptx.
 
 ## Editing an existing deck
 
-- **Changing a few words, swapping an image, or reordering pages**: `ppt_patch` edits the original file directly and keeps everything it does not touch, including parts the plugin does not model, such as SmartArt and embedded spreadsheets.
-- **Major edits or a redesign**: `ppt_import` turns the .pptx into a PPTD project. Common native charts become editable chart elements, SmartArt expands into a group of editable shapes, and groups, text effects, and gradient and pattern fills are preserved. The import report lists objects that could not be converted (such as OLE objects, media, and less common chart types, each left as a placeholder in place) and properties that lost detail in conversion; the model reports these to you as they are.
+- **Changing a few words, swapping an image, or reordering pages**: `ppt_patch` writes an edited copy of the original file and keeps everything it does not touch, including parts the plugin does not model, such as SmartArt and embedded spreadsheets.
+- **Major edits or a redesign**: `ppt_import` turns the .pptx into a PPTD project. Common native charts become editable chart elements, SmartArt with a usable drawing cache expands into grouped editable shapes (reported as `degraded`), and groups, text effects, and gradient and pattern fills are preserved. The import report lists objects that could not be converted (such as SmartArt without a usable drawing cache, OLE objects, media, and less common charts, each marked `dropped` and represented by a placeholder) and properties that lost detail in conversion; the model reports these to you as they are.
 - **Export uses the original file as the skeleton**: unchanged pages are kept as they are; edited pages are rebuilt from the project on their original layouts, and unconverted objects on those pages are copied back from the original file in place. Theme and masters come from the original file.
 
 ## PPT Workbench
@@ -76,7 +80,7 @@ The "PPT 工作台" tab in the right sidebar is a three-pane editor: page thumbn
 - **Instant view**: the canvas and thumbnails draw pages directly as web elements without waiting for a rendering engine to start. Tables, charts, and SVG pages show as they really look; objects that could not be converted on import show their preview image when one exists, or a placeholder box otherwise.
 - **Direct editing**: double-click to edit text in place, drag pages to reorder them, duplicate, delete, or add pages, replace images, and set exact position and size in the properties panel.
 - **Undo and history**: undo and redo are always at hand; the "历史" (History) drawer previews any version and restores it with one click.
-- **No overwrites**: every write carries a version number. When the model changes the same project elsewhere, the workbench shows a conflict notice instead of overwriting your edits.
+- **No overwrites**: content writes, undo, and redo check `manifest.revision`, which increases after each successful change. `historyCursor` separately identifies the current undo group, so grouped edits can be undone together. Opening a 2.0.4 project is read-only; the first successful change records the cursor. When the model changes the same project elsewhere, the workbench shows a conflict notice instead of overwriting your edits.
 - **Export**: "导出 .pptx" runs a full-deck quality check first, then saves the result under the project's `export/` folder as `<project name>-r<version>.pptx`.
 
 ## Model tools
@@ -87,7 +91,7 @@ The "PPT 工作台" tab in the right sidebar is a three-pane editor: page thumbn
 | `ppt_themes` | List the built-in design systems | `designSystem` (optional) |
 | `ppt_edit` | Atomic batch edits to pages and elements; if any operation fails, nothing is saved | `dir` · `ops` · `baseRevision` |
 | `ppt_undo` / `ppt_redo` | Undo / redo | `dir` · `baseRevision` · `steps` |
-| `ppt_svg` | Write an SVG page source and attach it to a page, or compile it right away to check it | `dir` · `action` · `name` · `svg` · `page` |
+| `ppt_svg` | `put` writes a source and optionally attaches it to an SVG page in the same transaction; `compile` checks a source | `dir` · `action` · `baseRevision` (required for every `put`) · `name` · `svg` · `page` · `ref` |
 | `ppt_render` | Build the final .pptx and render each page to PNG, returning each image's absolute path | `dir` · `pages` · `dpi` |
 | `ppt_check` | Rule-based quality check; `ai: true` adds multimodal visual suggestions | `dir` · `pages` · `ai` |
 | `ppt_export` | Export the .pptx, optionally with a PDF | `dir` · `out` · `pdf` · `skipCheck` |
@@ -108,10 +112,10 @@ npm run build         # rebuild lib/index.js and lib/client.js (required after e
 npm run build:preview # rebuild the self-contained preview page docs/preview/workbench.html from the real workbench components
 npm run check:build   # confirm lib/ matches git
 npm run check:mounts  # verify mount declarations
-npm run check:pack    # verify the published file list
+npm run check:pack    # check actual package members, declared entries, and environment marker exclusion
 ```
 
-> **Tip**: Run the full test suite serially with a large heap: first `$env:NODE_OPTIONS='--max-old-space-size=12288'`, then `npx vitest run --no-file-parallelism`. See [`AGENTS.md`](AGENTS.md) for the full acceptance criteria and development conventions.
+> **Tip**: Run the full test suite serially with a large heap: first `$env:NODE_OPTIONS='--max-old-space-size=12288'`, then `npx vitest run --no-file-parallelism`. Runtime engine versions are pinned in the `dependencies` section of [`package.json`](package.json). See [`AGENTS.md`](AGENTS.md) for the full acceptance criteria and development conventions.
 
 ```text
 src/index.ts       host entry: registers the skill, the twelve tools, and the workbench webServer routes

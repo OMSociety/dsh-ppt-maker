@@ -457,7 +457,14 @@ export function createApiHandler({ resolveCwd, requestRejection, log = () => {},
         }
         let bytes
         try {
-          bytes = await fsp.readFile(absPath)
+          const root = await fsp.realpath(abs)
+          const file = await fsp.realpath(absPath)
+          const relative = path.relative(root, file)
+          if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+            return fail(res, 400, `素材不在工程目录内：${src}`)
+          }
+          if (!(await fsp.stat(file)).isFile()) return fail(res, 404, `素材须为普通文件：${src}`)
+          bytes = await fsp.readFile(file)
         } catch {
           return fail(res, 404, `素材不可读：${src}`)
         }

@@ -62,7 +62,7 @@ function seedStore(): PptStore {
   mockApi.setActive.mockResolvedValue({ ok: true, key: 'k1' })
   mockApi.page.mockResolvedValue({ ok: true, path: 'pages/01.page', page: PAGE_1, revision: 1 })
   mockApi.edit.mockResolvedValue({ ok: true, revision: 2, appliedOps: [], warnings: [] })
-  mockApi.undo.mockResolvedValue({ ok: true, revision: 1, undoneOps: [] })
+  mockApi.undo.mockResolvedValue({ ok: true, revision: 3, undoneOps: [] })
   mockApi.redo.mockResolvedValue({ ok: true, revision: 2, undoneOps: [] })
   mockApi.uploadMedia.mockResolvedValue({ ok: true, src: 'media/x.png', bytes: 1 })
   return createPptStore('s1')
@@ -293,19 +293,19 @@ describe('PptStore 状态纪律', () => {
     await store.actions.applyPoll({ ...STATE_R1, manifest: { ...STATE_R1.manifest, revision: 2, canUndo: true } })
     await store.actions.undo()
     expect(mockApi.undo).toHaveBeenCalledWith('s1', 'k1', 2)
-    expect(store.getSnapshot().lastSeenRevision).toBe(1)
+    expect(store.getSnapshot().lastSeenRevision).toBe(3)
     store.dispose()
   })
 
   it('restoreRevision：成功推游标并清选择；409 挂 conflict 横幅', async () => {
     const store = seedStore()
     await store.actions.init()
-    mockApi.restoreHistory.mockResolvedValueOnce({ revision: 0, undoneOps: ['add_page'], warnings: [] })
+    mockApi.restoreHistory.mockResolvedValueOnce({ revision: 2, undoneOps: ['add_page'], warnings: [] })
     const ok = await store.actions.restoreRevision(0)
     expect(ok).toBe(true)
     expect(mockApi.restoreHistory).toHaveBeenCalledWith('s1', 'k1', 0, 1)
     const snap = store.getSnapshot()
-    expect(snap.lastSeenRevision).toBe(0)
+    expect(snap.lastSeenRevision).toBe(2)
     expect(snap.selection).toBeNull()
     expect(snap.conflict).toBeNull()
 
@@ -378,23 +378,21 @@ describe('PptStore 状态纪律', () => {
     store.dispose()
   })
 
-  it('合并窗口：/edit 回应 revision 不变，也要重拉页内容（否则「保存一次之后就改不动了」）', async () => {
+  it('保存返回编辑版本并重拉页内容', async () => {
     const store = seedStore()
     await store.actions.init()
     await store.actions.ensurePageLoaded()
     expect(store.getSnapshot().currentPageRevision).toBe(1)
-    // history.ts 的 merge window：30s 内同 session 的连写并进同一份快照，revision 停在旧值
-    mockApi.edit.mockResolvedValueOnce({ ok: true, revision: 1, appliedOps: [], warnings: [] })
+    mockApi.edit.mockResolvedValueOnce({ ok: true, revision: 2, appliedOps: [], warnings: [] })
     mockApi.page.mockResolvedValue({
       ok: true,
       path: 'pages/01.page',
       page: { elements: [{ elementId: 'el-1', content: { text: '服务端已存' } }] },
-      revision: 1,
+      revision: 2,
     })
     await store.actions.updateElement('el-1', { content: { text: '改了' } })
     await vi.runAllTimersAsync()
-    // revision 停在旧值时也强制重拉页 AST，并同步 currentPageData
-    expect(store.getSnapshot().lastSeenRevision).toBe(1)
+    expect(store.getSnapshot().lastSeenRevision).toBe(2)
     await Promise.resolve()
     await vi.runAllTimersAsync()
     expect(store.getSnapshot().currentPageData).toEqual({

@@ -773,13 +773,14 @@ function applyRunOpacity(specs: ParagraphSpec[], opacity: number): number {
  * Elements
  * ------------------------------------------------------------------ */
 
-async function preloadImageBytes(src: unknown, ctx: BuildContext, where: string): Promise<Uint8Array | null> {
-  if (typeof src !== 'string' || src === '') return null
+class MediaLoadError extends Error {}
+
+async function preloadImageBytes(src: unknown, ctx: BuildContext, where: string): Promise<Uint8Array> {
+  if (typeof src !== 'string' || !src.trim()) throw new MediaLoadError(`${where}：缺少素材路径`)
   try {
     return await ctx.loadMedia(src)
   } catch (err) {
-    ctx.warnings.push(`${where}：素材加载失败 ${src}：${(err as Error).message}`)
-    return null
+    throw new MediaLoadError(`${where}：${err instanceof Error ? err.message : String(err)}`, { cause: err })
   }
 }
 
@@ -932,24 +933,10 @@ function buildImage(
   element: Record<string, unknown>,
   resolver: ThemeResolver,
   ctx: BuildContext,
-  bytes: Uint8Array | null
+  bytes: Uint8Array
 ): SlideShapeData | null {
   const where = `元素 ${String(element.elementId)}`
   const [x, y, w, h] = (element.bounds as number[]) ?? [0, 0, 100, 100]
-  if (!bytes) {
-    ctx.warnings.push(`${where}：图片素材不可用，落为灰底占位`)
-    return buildPlaceholder(
-      slide,
-      {
-        ...element,
-        originalType: 'unknown',
-        label: `图片缺失：${String(element.src)}`
-      },
-      resolver,
-      ctx,
-      new Set()
-    )
-  }
   const fit = (element.fit as { mode?: string } | undefined)?.mode
   const engineFit = fit === 'contain' ? 'contain' : 'fill'
   if (fit === 'cover' || fit === undefined) {
@@ -2276,7 +2263,7 @@ async function applyBackground(
     else ctx.warnings.push(`${where}：图案背景缺 preset、foreground 或 background`)
   } else if (fill.type === 'image') {
     const bytes = await preloadImageBytes(fill.src, ctx, where)
-    if (bytes) setSlideBackgroundImage(slide, bytes)
+    setSlideBackgroundImage(slide, bytes)
   } else {
     ctx.warnings.push(`${where}：未知背景类型 ${String(fill.type)}`)
   }
@@ -2367,12 +2354,12 @@ function applyDeckTheme(pres: PresentationData, theme: Theme | undefined, warnin
  * 失败口径：母版/版式是显式声明的结构，建不出来要让人知道——单个装饰元素
  * 失败降级为 warning（与页内元素同口径），版式本身建不出来抛错（fail-closed）。
  */
-function buildMasters(
+async function buildMasters(
   pres: PresentationData,
   masters: MasterSpec[],
   resolver: ThemeResolver,
   ctx: BuildContext
-): Map<string, SlideLayoutData> {
+): Promise<Map<string, SlideLayoutData>> {
   const byName = new Map<string, SlideLayoutData>()
   for (const master of masters) {
     const partName = addSlideMaster(pres)
@@ -2385,9 +2372,10 @@ function buildMasters(
       }
       byName.set(spec.name, layout)
       // 装饰图形：母版级 + 版式级共用同一个绘制通道（slide-like 部件）。
-      const draw = (elements: ElementBase[] | undefined, owner: string): void => {
+      const draw = async (elements: ElementBase[] | undefined, owner: string): Promise<void> => {
         for (const el of elements ?? []) {
           const record = el as Record<string, unknown>
+          await preloadFillBytes(record, ctx)
           const where = `${owner} 装饰 ${String(record.elementId)}`
           try {
             switch (record.elementType) {
@@ -2408,8 +2396,8 @@ function buildMasters(
           }
         }
       }
-      if (spec === master.layouts[0]) draw(master.shapes, `母版 ${master.name}`)
-      draw(spec.shapes, `版式 ${spec.name}`)
+      if (spec === master.layouts[0]) await draw(master.shapes, `母版 ${master.name}`)
+      await draw(spec.shapes, `版式 ${spec.name}`)
       for (const ph of spec.placeholders ?? []) {
         const [x, y, w, h] = ph.bounds
         const kind = ph.kind === 'title' ? 'content' : ph.kind === 'body' ? 'text' : ph.kind
@@ -2488,7 +2476,7 @@ export function createOfficeKitEngine(): DeckEngine {
       // 仅生成方言；逆向工程的母版与版式来自源存档骨架。
       const layoutByName =
         profile === 'generate' && Array.isArray(deck.masters) && deck.masters.length > 0
-          ? buildMasters(pres, deck.masters, resolver, ctx)
+          ? await buildMasters(pres, deck.masters, resolver, ctx)
           : new Map<string, SlideLayoutData>()
 
       for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
@@ -2593,7 +2581,7 @@ export function createOfficeKitEngine(): DeckEngine {
                 shape = archive ? copyArchivedOriginal(slide, record, archiveSlides, ctx, pageLabel) : null
                 if (!shape && typeof record.preview === 'string' && record.preview !== '') {
                   const bytes = await preloadImageBytes(record.preview, ctx, `元素 ${String(record.elementId)} 的预览图`)
-                  if (bytes) shape = buildImage(slide, { ...record, src: record.preview, fit: 'fill' }, resolver, ctx, bytes)
+                  shape = buildImage(slide, { ...record, src: record.preview, fit: 'fill' }, resolver, ctx, bytes)
                 }
                 if (!shape) shape = buildPlaceholder(slide, record, resolver, ctx, fonts)
                 break
@@ -2619,6 +2607,7 @@ export function createOfficeKitEngine(): DeckEngine {
                 warnings.push(`${pageLabel}：未知元素类型 ${String(type)}，已跳过`)
             }
           } catch (err) {
+            if (err instanceof MediaLoadError) throw err
             warnings.push(`${pageLabel}：元素 ${String(record.elementId)}（${String(type)}）构建失败：${(err as Error).message}`)
             shape = null
           }
@@ -2690,14 +2679,8 @@ export function createOfficeKitEngine(): DeckEngine {
 
 /** Image fills carry a src, not bytes; resolve them into __bytes before applyFill runs. */
 async function preloadFillBytes(element: Record<string, unknown>, ctx: BuildContext): Promise<void> {
-  const candidates: Array<Record<string, unknown> | undefined> = [element.fill as Record<string, unknown> | undefined]
-  for (const fill of candidates) {
-    if (fill && fill.type === 'image' && typeof fill.src === 'string' && fill.__bytes === undefined) {
-      try {
-        fill.__bytes = await ctx.loadMedia(fill.src)
-      } catch (err) {
-        ctx.warnings.push(`元素 ${String(element.elementId)}：填充素材加载失败 ${fill.src}：${(err as Error).message}`)
-      }
-    }
+  const fill = element.fill as Record<string, unknown> | undefined
+  if (fill?.type === 'image') {
+    fill.__bytes = await preloadImageBytes(fill.src, ctx, `元素 ${String(element.elementId)} 的填充`)
   }
 }

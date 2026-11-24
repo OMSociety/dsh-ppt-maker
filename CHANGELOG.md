@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-25
+
+### 变更
+
+- **工程创建与全量导入**只接受新目录或空目录。非空目标返回 `409 ProjectAlreadyExists`，已有文件保持原样。
+- **协同编辑**用递增的 `manifest.revision` 检查每次内容变更，包括撤销和重做；`historyCursor` 单独标记撤销组。打开 2.0.4 工程时只读，首次成功变更时记录游标。
+- **SVG 源**每次 `ppt_svg action: put` 都须传 `baseRevision`。写源与可选的挂页操作一起提交；版本冲突或页型错误时，两者都保持原样。
+- **渲染与导出**从工程内的相对路径读取素材。使用外部图片时，先将图片保存到工程内，再引用本地文件。
+- **导入说明**区分原生图表、保留组合关系的子元素、带可用绘图缓存的 SmartArt（展开并记为 `degraded`）和原位占位（`dropped`）。只需改字、换图或调页序时，可用 `ppt_patch` 保留未编辑部件。
+- **包检查**以实际 npm 包成员核对导出与文件声明，缺件或打入本机 Python 环境标记均判失败。维护说明以 `package.json` 的 `dependencies` 为引擎版本依据。
+
+### Changed
+
+- **Project creation and full import** accept a new or empty directory. A non-empty target returns `409 ProjectAlreadyExists` with its contents intact.
+- **Collaborative edits** use a monotonically increasing `manifest.revision` for content changes, including undo and redo. `historyCursor` tracks the undo group separately. Opening a 2.0.4 project is read-only; the first successful change records its cursor.
+- **SVG sources** require `baseRevision` on every `ppt_svg action: put`. The source and optional page attachment commit together; a stale revision or an incompatible page leaves both untouched.
+- **Rendering and export** read media using project-relative paths. Save external images in the project before referencing them.
+- **Import guidance** distinguishes native charts, grouped child elements, SmartArt with a usable drawing cache (expanded and reported as `degraded`), and in-place placeholders (`dropped`). Use `ppt_patch` for text, image, or page-order changes when untouched parts must be preserved.
+- **Package checks** compare declared exports and files with actual npm package members and fail on missing entries or an included local Python environment marker. Maintainers use `dependencies` in `package.json` as the source of engine versions.
+
 ## [2.0.4] - 2026-11-24
 
 ### 修复

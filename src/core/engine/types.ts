@@ -55,7 +55,7 @@ export interface ResolvedShadow {
 export interface BuildContext {
   /** Project dir on disk (media/ resolution root). */
   readonly projectDir: string
-  /** Async media loader: project-relative path or http(s) URL → bytes. */
+  /** Async media loader: project-relative file path → bytes. */
   readonly loadMedia: (src: string) => Promise<Uint8Array>
   /** Collects human-readable capability degradations (never silent). */
   readonly warnings: string[]

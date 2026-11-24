@@ -1,7 +1,7 @@
 # AGENTS.md — dsh-ppt-maker Agent 宪法
 
 适用范围：本仓库全部目录。这是接手开发的第一入口；对外说明见 [README.md](README.md)。
-最后更新：2026-11-23
+最后更新：2026-11-25
 
 ## 项目概览
 
@@ -10,11 +10,11 @@ DSH（DeepSeek Harness）插件 + 随包技能，做 PPT 的生成、编辑、�
 
 | 项 | 事实 |
 |---|---|
-| 语言 / 运行时 | TypeScript 5.9、ESM、Node >= 22.19（引擎 @office-kit/pptx 0.24.0 要 22.18、libreoffice-kit 0.1.2 要 22.19） |
+| 语言 / 运行时 | TypeScript、ESM；Node 版本按 [package.json](package.json) 的 `engines.node` 选择 |
 | 构建 | 宿主半侧 tsup：`src/` → `lib/index.js`；客户端半侧 esbuild：`client/` → `lib/client.js` |
-| 测试 | vitest 5.0，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
+| 测试 | Vitest，`tests/**/*.test.ts`，全局超时 20s（[vitest.config.ts](vitest.config.ts)） |
 | 包管理 | npm，锁文件 `package-lock.json`；根目录的 `pnpm-lock.yaml` / `pnpm-workspace.yaml` 未入库，勿提交 |
-| 引擎（pin 死） | `@office-kit/pptx@0.24.0`、`@deepseek-ai/libreoffice-kit@0.1.2`（约 183MB，随包安装） |
+| 引擎 | `@office-kit/pptx`、`@deepseek-ai/libreoffice-kit` 的固定版本以 [package.json](package.json) 的 `dependencies` 为准 |
 | 宿主契约 | 面板与工具依赖的宿主包由 DSH 运行时提供：peer 只列运行期 import 的宿主包名（`@deepseek-ai/dsh-native-command`，区间 `*`，标 `optional`）；`engines.dsh` 写 `"*"`，即接受任意宿主版本，宿主能力差异由运行期探测与降级处理，不设版本闸 |
 
 文档索引（按读序）：
@@ -170,7 +170,7 @@ NODE_OPTIONS=--max-old-space-size=12288 npx vitest run --no-file-parallelism
 
 ## 维护
 
-本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与依赖版本、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。PPTD 格式契约全量自包含于 [docs/pptd-spec.md](docs/pptd-spec.md)，本仓格式以它为准。
+本文件与代码同 PR 更新。改动以下内容时必须同步本文件：`package.json` 的 scripts 与引擎选择、`src/index.ts` 的工具注册表与 inject 列表、`cordis.patch.yml` 的挂载声明、语料与脱敏红线。工具增减还要同步 [README.md](README.md) 与 [skills/ppt-maker/SKILL.md](skills/ppt-maker/SKILL.md) 里的工具清单；工具名录以 `src/index.ts` 的注册表与那两条测试断言为准。PPTD 格式契约全量自包含于 [docs/pptd-spec.md](docs/pptd-spec.md)，本仓格式以它为准。
 本文件写的是约定与边界，发现与代码不符时先判断哪边过时：约定过时改本文件，代码违规改代码。
 
 ## 待办（有触发条件）

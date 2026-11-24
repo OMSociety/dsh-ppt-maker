@@ -4,7 +4,7 @@
  * Model (frozen):
  *  - `.history/r0000`, `r0001`, … is an append-only log of full-state snapshots
  *    (`deck.pptd` + every `pages/*.page` + `meta.json` + `media.json`).
- *  - `manifest.json#revision` is a *cursor* into that log, not a stack pointer.
+ *  - `manifest.json#historyCursor` is a *cursor* into that log, not a stack pointer.
  *    Undo/redo are pure cursor moves, so redo needs no pop-stack.
  *  - Media is never copied into snapshots: `media.json` holds a content-hash
  *    reference list (`media/.objects/<sha1>` dedup is the importer's job). pptx bytes are never snapshotted — they are a derived artifact and
@@ -63,7 +63,7 @@ export interface MediaVerification {
 }
 
 export interface AppendOptions {
-  /** Cursor position the edit started from (`manifest.revision` before the edit). */
+  /** Cursor position the edit started from (`manifest.historyCursor` before the edit). */
   baseRevision: number
   /** Revision this snapshot represents (0 for the creation snapshot, else base + 1). */
   revision: number

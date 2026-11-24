@@ -66,14 +66,14 @@ describe('restoreProject', () => {
     })
 
     const back = await restoreProject(cwd, 'deck', 1)
-    expect(back.revision).toBe(1)
+    expect(back.revision).toBe(3)
     const r1 = await loadProject(cwd, 'deck')
-    expect(r1.manifest.revision).toBe(1)
+    expect(r1.manifest.historyCursor).toBe(1)
     const page1 = r1.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
     expect(page1.elements[0].content).toEqual({ text: '第一版' })
 
     const fwd = await restoreProject(cwd, 'deck', 2)
-    expect(fwd.revision).toBe(2)
+    expect(fwd.revision).toBe(4)
     const r2 = await loadProject(cwd, 'deck')
     const page2 = r2.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
     expect(page2.elements[0].content).toEqual({ text: '第二版' })

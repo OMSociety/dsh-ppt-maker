@@ -1,3 +1,4 @@
+import { canvasMediaUrl } from './media'
 /**
  * PPTD → CSS 解析纯函数（无副作用，可单测）。
  *
@@ -147,9 +148,8 @@ export function fillToCss(
     return patternToCss(typeof f.preset === 'string' ? f.preset : 'pct50', fg, bg)
   }
   if (type === 'image') {
-    const raw = typeof f.src === 'string' ? f.src : undefined
-    if (!raw) return undefined
-    const src = resolveMedia ? resolveMedia(raw) : raw
+    const src = canvasMediaUrl(f.src, resolveMedia)
+    if (!src) return undefined
     // src 不加引号时，含空格/括号/分号的路径会把 url() 截断（甚至多出一条 CSS 声明）：
     // 用双引号包起来，src 走 escapeAttr（与 sanitize 里的属性值同一套转义）。
     return `url("${escapeAttr(src)}") center/cover no-repeat`

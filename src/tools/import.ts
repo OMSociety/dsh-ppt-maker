@@ -30,9 +30,10 @@ export function registerImportTool(ctx: PluginToolCtxWithOpen): (() => void) | u
   const off = ctx.tools.register({
     name: 'ppt_import',
     description:
-      '把一个 .pptx 全量逆向成 PPTD 工程（opt-in 高阶动作；对导入 deck 的轻改请用 ppt_patch）。' +
-      '产出 deck.pptd + pages/*.page + media/（sha1 去重）+ import.report.yml；' +
-      '不支持元素（chart/smartart/ole/media/3d/group）在原位置插灰底占位形状并记 dropped。',
+      '把 .pptx 导入为可编辑的 PPTD 工程。可映射的图表保留为图表；组合拆成带分组路径的元素；' +
+      '有可用绘图缓存的 SmartArt 展开为可编辑形状，记入 import.report.yml 的 degraded。' +
+      '无法映射的图表、未展开的 SmartArt 等以占位元素标记，并记入 dropped。' +
+      '仅改字、换图或调页序且需保留未建模部件时，用 ppt_patch 直接另存 .pptx。',
     parameters: {
       type: 'object',
       additionalProperties: false,

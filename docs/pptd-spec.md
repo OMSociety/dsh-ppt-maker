@@ -115,13 +115,13 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 ```
 <工程目录>/
   deck.pptd            # 主入口（必需；固定此文件名）
-  manifest.json        # 工程账本：revision / designSystem / theme / checksum / exportReport（工具层独占写）
+  manifest.json        # 工程账本：revision / historyCursor / designSystem / theme / checksum / exportReport（工具层独占写）
   pages/               # 页文件目录，每页一个 .page
     01_cover.page
     02_intro.page
   media/               # 图片等素材（逆向导入按 sha1 去重）
     svg/               # svg 页设计源（见 §4.2）
-  .history/            # 修订快照（append-only 日志 + revision 游标）
+  .history/            # 修订快照（historyCursor 是撤销分组游标；revision 是每次内容写入递增的编辑版本）
   import.report.yml    # 逆向导入报告（仅逆向工程；见 §10.3）
 ```
 
@@ -129,7 +129,7 @@ PPTD（PPT-DSL，PPT 领域专用描述语言）是 PowerPoint 演示文稿的 Y
 
 1. **完全自包含**：所有被引用文件必须位于 `deck.pptd` 所在目录内，禁止引用目录外文件；
 2. **只支持相对路径**（相对 `deck.pptd` 所在目录）：`pages/01_cover.page`、`media/image1.jpg`；
-3. **素材支持 URL**：`Image.src`、`ImageFill.src` 可为 `https://...`（jpg/jpeg/png/gif）；
+3. **图片素材**：将图片放入工程后，`Image.src`、`ImageFill.src` 均填写工程内相对路径；缺件须先补齐，再质检、渲染或导出；
 4. **主入口必需且文件名固定为 `deck.pptd`**：一切加载必须经 `deck.pptd`，单个 `.page` 不能直接交给转换/校验命令；文件名固定是因为 `manifest.json` 与 `.history/` 需要稳定的工程根锚点。
 
 ---
@@ -666,7 +666,7 @@ interface GradientFill {
 
 interface ImageFill {
   type: "image";
-  src: string;                  // 相对路径或 https URL（jpg/jpeg/png/gif）
+  src: string;                  // 工程内相对路径（jpg/jpeg/png/gif）
   fit?: "fill" | "contain" | "cover";  // 默认 "cover"
   crop?: ImageCrop;             // 裁剪必先应用（渲染次序：crop → fit）
   opacity?: number;             // [0, 1]，默认 1
@@ -893,7 +893,7 @@ interface ShapeDef {
 
 interface Image extends ElementBase {
   elementType: "image";
-  src: string;                  // 必填；相对路径或 https URL（jpg/jpeg/png/gif）
+  src: string;                  // 必填；工程内相对路径（jpg/jpeg/png/gif）
   cropShape?: ShapeDef;         // 裁剪形状；默认矩形（不裁形）
   fit?: "fill" | "contain" | "cover";   // 默认 "cover"（语义见 §5 ImageFit）
   crop?: ImageCrop;             // 裁剪必先应用（见下渲染次序）

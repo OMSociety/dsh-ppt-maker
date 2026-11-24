@@ -11,6 +11,7 @@
  *
  * `selection` / `pagesAst` / `draft` 是 store 的稳定字段；组件只填值，不改变 store 结构。
  */
+import { canvasMediaUrl } from './render/media'
 import { api, ConflictError, type StatePayload } from './api'
 
 export interface Toast {
@@ -521,8 +522,7 @@ export function createPptStore(sessionId: string) {
     /**
      * Stage/ElementOverlay/TextEditor 都需要页上的元素清单：
      * 走这里拉（已经有就复用，revision 过了就重拉）。
-     * `force`：保存成功后必须走这条——合并窗口里的连写不推进 revision，
-     * 光比 revision 会以为「磁盘没变」，把后续改动全压在旧 AST 上。
+     * `force`：保存成功后按服务器页面重新加载。
      */
     async ensurePageLoaded(force = false): Promise<void> {
       if (!state.activeKey) return
@@ -551,14 +551,10 @@ export function createPptStore(sessionId: string) {
       patch({ selection: ids.length ? { page: state.currentPage, ids } : null })
     },
 
-    /**
-     * PptdView 的媒体 src 解析：media/ 相对路径映射到宿主 /media 路由；
-     * http(s): 远端 URL（规格允许）原样透传，不进 /media。
-     */
+    /** 工作台的媒体地址由活动工程的宿主路由提供。 */
     mediaUrl(src: string): string {
-      if (!state.activeKey) return src
-      if (!src.startsWith('media/')) return src
-      return api.mediaUrl(state.sessionId, state.activeKey, src)
+      const key = state.activeKey
+      return key ? canvasMediaUrl(src, path => api.mediaUrl(state.sessionId, key, path)) : ''
     },
 
     /**
@@ -571,7 +567,7 @@ export function createPptStore(sessionId: string) {
       if (!state.activeKey) return
       if (pageIndex < 0 || pageIndex >= state.deckPages.length) return
       const hit = state.pagesAst[pageIndex]
-      // force=true：刚保存过——合并窗口里 revision 可能没动，缓存不能当「没过期」。
+      // 保存后从服务端重读页面。
       if (!force && hit && hit.revision === state.lastSeenRevision) return
       const key = state.activeKey
       const path = state.deckPages[pageIndex]
@@ -663,11 +659,12 @@ export function createPptStore(sessionId: string) {
           currentPageRevision: -1,
           pagesAst: {},
           // 乐观更新按钮态：undo 成功后游标下降，前方必有快照可重做
-          canUndo: res.revision > 0,
+          canUndo: false,
           canRedo: true,
         })
         void actions.ensurePageLoaded()
         void actions.syncProjectPages()
+        void api.state(state.sessionId).then(applyPoll).catch(() => {})
         toast('已撤销', 'info')
       } catch (error) {
         if (error instanceof ConflictError) {
@@ -727,12 +724,13 @@ export function createPptStore(sessionId: string) {
           currentPageRevision: -1,
           pagesAst: {},
           selection: null,
-          canUndo: res.revision > 0,
+          canUndo: revision > 0,
           canRedo: true,
         })
         void actions.ensurePageLoaded()
         void actions.syncProjectPages()
-        toast(`已恢复到 r${res.revision}`, 'info')
+        void api.state(state.sessionId).then(applyPoll).catch(() => {})
+        toast(`已恢复到 r${revision}`, 'info')
         return true
       } catch (error) {
         if (error instanceof ConflictError) {

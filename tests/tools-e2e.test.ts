@@ -260,10 +260,10 @@ describe('ppt_* 工具全链（e2e stub）', () => {
       baseRevision: 1,
       ops: [{ op: 'add_element', page: 'pages/01.page', element: { elementType: 'text', elementId: 't1', bounds: [0, 0, 100, 50], content: { text: 'hi' } } }]
     })
-    expect(e2).toMatchObject({ ok: true, revision: 1, merged: true })
+    expect(e2).toMatchObject({ ok: true, revision: 2, merged: true })
     const e3 = await call('ppt_edit', {
       dir: 'deck',
-      baseRevision: 1,
+      baseRevision: 2,
       ops: [{ op: 'update_element', page: 'pages/01.page', elementId: 't1', patch: { content: { text: 'hello e2e' } } }]
     })
     expect(e3.ok).toBe(true)
@@ -274,14 +274,14 @@ describe('ppt_* 工具全链（e2e stub）', () => {
     expect(stale).toMatchObject({ ok: false, error: { code: 'RevisionMismatch', status: 409 } })
 
     // undo：合并窗内的三次编辑视为一步 → 回锚点
-    const undone = await call('ppt_undo', { dir: 'deck', baseRevision: 1, steps: 1 })
-    expect(undone).toMatchObject({ ok: true, revision: 0 })
+    const undone = await call('ppt_undo', { dir: 'deck', baseRevision: 3, steps: 1 })
+    expect(undone).toMatchObject({ ok: true, revision: 4 })
     expect((undone.undoneOps as string[]).length).toBe(3)
     expect(await fileExists('deck/pages/01.page')).toBe(false)
 
     // redo
-    const redone = await call('ppt_redo', { dir: 'deck', baseRevision: 0, steps: 1 })
-    expect(redone).toMatchObject({ ok: true, revision: 1 })
+    const redone = await call('ppt_redo', { dir: 'deck', baseRevision: 4, steps: 1 })
+    expect(redone).toMatchObject({ ok: true, revision: 5 })
     expect((redone.redoneOps as string[]).length).toBe(3)
     expect(await fileExists('deck/pages/01.page')).toBe(true)
 

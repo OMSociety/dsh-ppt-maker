@@ -116,13 +116,13 @@ describe('project store（工程层）', () => {
       })
     }
     const undone = await undoProject(cwd, 'proj', 2)
-    expect(undone.revision).toBe(1)
+    expect(undone.revision).toBe(4)
     expect(undone.undoneOps).toHaveLength(2)
     expect(await exists('proj/pages/03.page')).toBe(false)
     expect(await exists('proj/pages/01.page')).toBe(true)
 
     const redone = await redoProject(cwd, 'proj', 2)
-    expect(redone.revision).toBe(3)
+    expect(redone.revision).toBe(5)
     expect(redone.undoneOps).toHaveLength(2)
     expect(await exists('proj/pages/03.page')).toBe(true)
   })
@@ -133,9 +133,9 @@ describe('project store（工程层）', () => {
     await editProject(cwd, { dir: 'proj', sessionId: 's1', baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page' }] })
     await editProject(cwd, { dir: 'proj', sessionId: 's1', baseRevision: 1, ops: [{ op: 'add_page', page: 'pages/02.page' }] })
     await undoProject(cwd, 'proj', 1)
-    await editProject(cwd, { dir: 'proj', sessionId: 's1', baseRevision: 1, ops: [{ op: 'add_page', page: 'pages/09.page' }] })
+    await editProject(cwd, { dir: 'proj', sessionId: 's1', baseRevision: 3, ops: [{ op: 'add_page', page: 'pages/09.page' }] })
     const redone = await redoProject(cwd, 'proj', 5)
-    expect(redone.revision).toBe(2)
+    expect(redone.revision).toBe(4)
     expect(await exists('proj/pages/09.page')).toBe(true)
     expect(await exists('proj/pages/02.page')).toBe(false)
   })
@@ -168,17 +168,17 @@ describe('project store（工程层）', () => {
 })
 
 describe('合并窗口（默认 30s）', () => {
-  it('同会话快速连续编辑合并为同一修订', async () => {
+  it('同会话快速连续编辑合并为同一撤销组', async () => {
     await createProject(cwd, { dir: 'proj', sessionId: 's1' })
     const first = await editProject(cwd, { dir: 'proj', sessionId: 's1', baseRevision: 0, ops: [{ op: 'add_page', page: 'pages/01.page' }] })
     expect(first.revision).toBe(1)
     expect(first.merged).toBe(false)
     const second = await editProject(cwd, { dir: 'proj', sessionId: 's1', baseRevision: 1, ops: [{ op: 'add_page', page: 'pages/02.page' }] })
     expect(second.merged).toBe(true)
-    expect(second.revision).toBe(1)
+    expect(second.revision).toBe(2)
     // 合并后 undo 一步直接回锚点
     const undone = await undoProject(cwd, 'proj', 1)
-    expect(undone.revision).toBe(0)
+    expect(undone.revision).toBe(3)
     expect(undone.undoneOps).toHaveLength(2)
   })
 })

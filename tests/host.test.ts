@@ -428,7 +428,7 @@ describe('host 路由', () => {
     expect(String(r.json!.error)).toContain('未知 op')
   })
 
-  it('undo/redo 游标：undo 回退 revision，redo 回到 r2', async () => {
+  it('undo/redo 游标：撤销与重做各推进编辑版本', async () => {
     await startServer()
     const { key } = await seedProject()
 
@@ -437,21 +437,21 @@ describe('host 路由', () => {
 
     const u = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 2, steps: 1 } })
     expect(u.status).toBe(200)
-    expect(u.json!.revision).toBe(1)
+    expect(u.json!.revision).toBe(3)
 
-    const r = await apiJson(`${API_PREFIX}/redo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 1, steps: 1 } })
+    const r = await apiJson(`${API_PREFIX}/redo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 3, steps: 1 } })
     expect(r.status).toBe(200)
-    expect(r.json!.revision).toBe(2)
+    expect(r.json!.revision).toBe(4)
 
     const missingBase = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, steps: 2 } })
     expect(missingBase.status).toBe(400)
     const stale = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 1, steps: 2 } })
     expect(stale.status).toBe(409)
-    expect(stale.json!.conflict).toEqual({ revision: 2 })
+    expect(stale.json!.conflict).toEqual({ revision: 4 })
 
-    const uu = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 2, steps: 2 } })
+    const uu = await apiJson(`${API_PREFIX}/undo`, { method: 'POST', body: { sessionId: SESSION, key, baseRevision: 4, steps: 2 } })
     expect(uu.status).toBe(200)
-    expect(uu.json!.revision).toBe(0)
+    expect(uu.json!.revision).toBe(5)
   })
 
   it('/export：默认回 pptx 二进制流，save 模式落到工程目录 export/ 并回相对路径', async () => {
@@ -831,20 +831,20 @@ describe('版本历史路由', () => {
       body: { sessionId: SESSION, key, revision: 1, baseRevision: 2 },
     })
     expect(restored.status).toBe(200)
-    expect(restored.json!.revision).toBe(1)
+    expect(restored.json!.revision).toBe(3)
     const loaded = await loadProject(cwd, dir)
-    expect(loaded.manifest.revision).toBe(1)
+    expect(loaded.manifest.historyCursor).toBe(1)
     const page = loaded.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
     expect(page.elements[0].content).toEqual({ text: 'v1' })
 
     // 前向恢复（undo 之后再 redo 到 r2）同样可用
     const forward = await apiJson(`${API_PREFIX}/history/restore`, {
       method: 'POST',
-      body: { sessionId: SESSION, key, revision: 2, baseRevision: 1 },
+      body: { sessionId: SESSION, key, revision: 2, baseRevision: 3 },
     })
     expect(forward.status).toBe(200)
     const loaded2 = await loadProject(cwd, dir)
-    expect(loaded2.manifest.revision).toBe(2)
+    expect(loaded2.manifest.historyCursor).toBe(2)
     const page2 = loaded2.pages.get('pages/01.page') as { elements: Array<{ content?: string }> }
     expect(page2.elements[0].content).toEqual({ text: 'v2' })
 

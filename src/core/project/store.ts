@@ -12,7 +12,7 @@
  *    succeeded, so an `ops[]` batch is atomic: either the whole batch lands or
  *    nothing changes on disk.
  */
-import { mkdir, readFile, readdir, rm } from 'node:fs/promises'
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 import {
   isSafeRelativePath,
@@ -83,6 +83,7 @@ export class OpError extends Error {
 
 export interface Manifest {
   revision: number
+  historyCursor?: number
   createdAt: string
   updatedAt: string
   designSystem: string | null
@@ -97,6 +98,10 @@ const MANIFEST_FILE = 'manifest.json'
 const DECK_FILE = 'deck.pptd'
 const PAGES_DIR = 'pages'
 
+function cursorOf(manifest: Manifest): number {
+  return manifest.historyCursor === undefined ? manifest.revision : manifest.historyCursor
+}
+
 async function readManifest(projectDir: string): Promise<Manifest> {
   let raw: string
   try {
@@ -106,7 +111,7 @@ async function readManifest(projectDir: string): Promise<Manifest> {
   }
   try {
     const manifest = JSON.parse(raw) as Manifest
-    if (typeof manifest.revision !== 'number') throw new Error('revision 缺失')
+    if (![manifest.revision, cursorOf(manifest)].every(n => Number.isSafeInteger(n) && n >= 0)) throw new Error('revision 或 historyCursor 无效')
     return manifest
   } catch (err) {
     throw new ProjectError('ManifestCorrupt', `工程账本损坏：${(err as Error).message}`, { status: 409 })
@@ -183,7 +188,8 @@ export function resolveProjectDir(cwd: string, dir: string): string {
 const locks = new Map<string, Promise<unknown>>()
 
 export async function withProjectLock<T>(projectDir: string, fn: () => Promise<T>): Promise<T> {
-  const key = path.resolve(projectDir)
+  const absolute = path.resolve(projectDir)
+  const key = process.platform === 'win32' ? absolute.toLowerCase() : absolute
   const previous = locks.get(key) ?? Promise.resolve()
   const next = previous.then(fn, fn)
   // Chain a settled wrapper so one failure does not poison the queue, and only
@@ -315,12 +321,9 @@ export const DEFAULT_SIZE: [number, number] = [960, 540]
 export async function createProject(cwd: string, options: CreateProjectOptions): Promise<{ manifest: Manifest; dir: string }> {
   const abs = resolveProjectDir(cwd, options.dir)
   return withProjectLock(abs, async () => {
-    try {
-      await readFile(path.join(abs, DECK_FILE), 'utf8')
-      throw new ProjectError('ProjectAlreadyExists', `目标目录已存在工程：${path.join(abs, DECK_FILE)}`, { status: 409 })
-    } catch (err) {
-      if (err instanceof ProjectError) throw err
-      // ENOENT → good, we can create
+    await mkdir(abs, { recursive: true })
+    if ((await readdir(abs)).length !== 0) {
+      throw new ProjectError('ProjectAlreadyExists', `创建工程需要空目录：${abs}`, { status: 409 })
     }
 
     await mkdir(path.join(abs, PAGES_DIR), { recursive: true })
@@ -342,6 +345,7 @@ export async function createProject(cwd: string, options: CreateProjectOptions):
     const now = new Date().toISOString()
     const manifest: Manifest = {
       revision: 0,
+      historyCursor: 0,
       createdAt: now,
       updatedAt: now,
       designSystem: options.designSystem ?? null,
@@ -582,7 +586,76 @@ export interface EditResult {
   merged: boolean
 }
 
-export async function editProject(cwd: string, options: EditOptions): Promise<EditResult> {
+/** SVG edits install prebuilt files by rename; each displaced entry stays available for rollback. */
+async function commitSvgEdit(abs: string, loaded: LoadedProject, model: ProjectModel, state: SnapshotState,
+  asset: { ref: string; text: string; page?: string }, sessionId: string | null, ops: string[]) {
+  const stage = await mkdtemp(path.join(abs, '.svg-edit-'))
+  const installed: Array<{ target: string; backup?: string; replaced: boolean }> = []
+  let retain = false
+  try {
+    state.media = state.media.filter(entry => entry.path !== asset.ref)
+    state.media.push({ path: asset.ref, sha1: sha1Of(asset.text), bytes: Buffer.byteLength(asset.text) })
+    state.media.sort((a, b) => a.path.localeCompare(b.path))
+    await cp(path.join(abs, '.history'), path.join(stage, '.history'), { recursive: true })
+    const cursor = cursorOf(loaded.manifest)
+    const appended = await appendSnapshot(stage, state, { baseRevision: cursor, revision: cursor + 1, sessionId, ops })
+    const historyCursor = appended.snapshot.revision
+    await pruneAbove(stage, historyCursor)
+    const revision = loaded.manifest.revision + 1
+    await writeManifest(stage, { ...loaded.manifest, revision, historyCursor, updatedAt: new Date().toISOString(), checksum: checksumOf(state.deck, state.pages) })
+    await mkdir(path.join(stage, SVG_MEDIA_DIR), { recursive: true })
+    await writeAtomic(path.join(stage, asset.ref), asset.text)
+    const entries = [asset.ref]
+    if (asset.page) {
+      const page = model.pages.get(asset.page)!
+      await mkdir(path.dirname(path.join(stage, asset.page)), { recursive: true })
+      await writeAtomic(path.join(stage, asset.page), stringifyPage(page))
+      entries.push(asset.page)
+    }
+    entries.push('.history', MANIFEST_FILE)
+    for (const rel of entries) {
+      const target = path.join(abs, rel)
+      await mkdir(path.dirname(target), { recursive: true })
+      const entry = { target, backup: undefined as string | undefined, replaced: false }
+      const existing = await lstat(target).catch(err => { if (err.code === 'ENOENT') return null; throw err })
+      if (existing) {
+        if (rel === '.history' ? !existing.isDirectory() : !existing.isFile()) throw new Error(`目标不是预期的文件类型：${rel}`)
+        entry.backup = path.join(stage, `backup-${installed.length}`)
+        await rename(target, entry.backup)
+      }
+      installed.push(entry)
+      await rename(path.join(stage, rel), target)
+      entry.replaced = true
+    }
+    return { revision, merged: appended.merged }
+  } catch (err) {
+    try {
+      for (const entry of installed.reverse()) {
+        if (entry.replaced) await rm(entry.target, { recursive: true, force: true })
+        if (entry.backup) await rename(entry.backup, entry.target)
+      }
+    } catch (rollbackError) {
+      retain = true
+      throw new AggregateError([err, rollbackError], `恢复未完成；备份位于 ${stage}`)
+    }
+    throw err
+  } finally {
+    if (!retain) await rm(stage, { recursive: true, force: true })
+  }
+}
+
+export function editProject(cwd: string, options: EditOptions): Promise<EditResult> {
+  return applyEdit(cwd, options)
+}
+
+export function putSvgSource(cwd: string, dir: string, name: string, text: string, page: string | undefined, baseRevision: number, sessionId: string | null) {
+  if (!/^[a-z0-9][a-z0-9_-]*\.svg$/i.test(name)) throw new ProjectError('SvgSourceInvalid', 'SVG 文件名无效', { status: 400 })
+  const ref = `${SVG_MEDIA_DIR}/${name}`
+  const ops = page === undefined ? [] : [{ op: 'update_svg_source', page, source: { ref } }]
+  return applyEdit(cwd, { dir, ops, baseRevision, sessionId }, { ref, text, page: page?.replace(/\\/g, '/') })
+}
+
+async function applyEdit(cwd: string, options: EditOptions, asset?: { ref: string; text: string; page?: string }): Promise<EditResult> {
   const abs = resolveProjectDir(cwd, options.dir)
   return withProjectLock(abs, async () => {
     const loaded = await loadProject(cwd, options.dir)
@@ -596,7 +669,10 @@ export async function editProject(cwd: string, options: EditOptions): Promise<Ed
     }
 
     const model = cloneModel({ deck: loaded.deck, pages: loaded.pages })
-    const appliedOps: string[] = []
+    if (asset?.page !== undefined && loaded.pages.get(asset.page)?.pageType !== SVG_PAGE_TYPE) {
+      throw new ProjectError('SvgSourceInvalid', `目标页不是 svg 页型：${asset.page}`, { status: 409 })
+    }
+    const appliedOps: string[] = asset ? [`put_svg ${asset.ref}`] : []
     for (let i = 0; i < options.ops.length; i++) {
       appliedOps.push(applyOp(model, options.ops[i], i))
     }
@@ -623,18 +699,23 @@ export async function editProject(cwd: string, options: EditOptions): Promise<Ed
     }
 
     const state = await snapshotStateOf(abs, model)
+    if (asset) {
+      const saved = await commitSvgEdit(abs, loaded, model, state, asset, options.sessionId ?? null, appliedOps)
+      return { ...saved, appliedOps, warnings: issues.map(issue => issue.message), issues }
+    }
     const appended = await appendSnapshot(abs, state, {
-      baseRevision: base,
-      revision: base + 1,
+      baseRevision: cursorOf(loaded.manifest),
+      revision: cursorOf(loaded.manifest) + 1,
       sessionId: options.sessionId ?? null,
       ops: appliedOps
     })
 
-    const revision = appended.merged ? base : base + 1
+    const revision = base + 1
     await writeModel(abs, model)
     const manifest: Manifest = {
       ...loaded.manifest,
       revision,
+      historyCursor: appended.snapshot.revision,
       updatedAt: new Date().toISOString(),
       checksum: checksumOf(state.deck, state.pages)
     }
@@ -642,7 +723,7 @@ export async function editProject(cwd: string, options: EditOptions): Promise<Ed
     // Only after the new revision is fully on disk: the abandoned forward
     // branch (revisions above the new cursor) is dead, but if any write above
     // failed it must still be there to fall back on.
-    await pruneAbove(abs, revision)
+    await pruneAbove(abs, appended.snapshot.revision)
 
     const warnings = issues.map((issue) => `[${issue.level}/${issue.code}] ${issue.path ?? ''} ${issue.message}`.trim())
     return { revision, appliedOps, warnings, issues, merged: appended.merged }
@@ -687,15 +768,16 @@ async function moveCursor(cwd: string, dir: string, plan: CursorPlan, options: C
   const abs = resolveProjectDir(cwd, dir)
   return withProjectLock(abs, async () => {
     const loaded = await loadProject(cwd, dir)
-    const current = loaded.manifest.revision
-    assertBaseRevision(options.baseRevision, current)
+    const current = cursorOf(loaded.manifest)
+    const version = loaded.manifest.revision
+    assertBaseRevision(options.baseRevision, version)
 
     const snapshots = await listSnapshots(abs)
     const maxRevision = snapshots.length > 0 ? snapshots[snapshots.length - 1].revision : 0
     const decided = plan(current, maxRevision)
-    if ('noop' in decided) return { revision: current, undoneOps: [], warnings: [decided.noop] }
+    if ('noop' in decided) return { revision: version, undoneOps: [], warnings: [decided.noop] }
     const { target, label } = decided
-    if (target === current) return { revision: current, undoneOps: [], warnings: [`没有可${label === 'undo' ? '撤销' : '重做'}的步骤`] }
+    if (target === current) return { revision: version, undoneOps: [], warnings: [`没有可${label === 'undo' ? '撤销' : '重做'}的步骤`] }
 
     const between =
       label === 'undo'
@@ -724,12 +806,13 @@ async function moveCursor(cwd: string, dir: string, plan: CursorPlan, options: C
     await materializeSnapshot(abs, state)
     const manifest: Manifest = {
       ...loaded.manifest,
-      revision: target,
+      revision: version + 1,
+      historyCursor: target,
       updatedAt: new Date().toISOString(),
       checksum: checksumOf(state.deck, state.pages)
     }
     await writeManifest(abs, manifest)
-    return { revision: target, undoneOps: movedOps, warnings }
+    return { revision: manifest.revision, undoneOps: movedOps, warnings }
   })
 }
 
@@ -761,7 +844,7 @@ export async function projectUndoState(
   const abs = resolveProjectDir(cwd, dir)
   const snapshots = await listSnapshots(abs)
   const max = snapshots.length > 0 ? snapshots[snapshots.length - 1].revision : 0
-  return { canUndo: loaded.manifest.revision > 0, canRedo: loaded.manifest.revision < max }
+  return { canUndo: cursorOf(loaded.manifest) > 0, canRedo: cursorOf(loaded.manifest) < max }
 }
 
 /* ------------------------------------------------------------------ *
@@ -770,7 +853,7 @@ export async function projectUndoState(
 
 /** 版本历史列表：游标当前位置 + 全部快照元数据（升序）。 */
 export interface HistoryListResult {
-  /** manifest.revision——游标当前位置。 */
+  /** 历史抽屉使用的快照游标。 */
   revision: number
   entries: SnapshotMeta[]
 }
@@ -779,7 +862,7 @@ export async function listProjectHistory(cwd: string, dir: string): Promise<Hist
   const abs = resolveProjectDir(cwd, dir)
   const loaded = await loadProject(cwd, dir)
   const entries = await listSnapshots(abs)
-  return { revision: loaded.manifest.revision, entries }
+  return { revision: cursorOf(loaded.manifest), entries }
 }
 
 export interface HistorySnapshotResult {

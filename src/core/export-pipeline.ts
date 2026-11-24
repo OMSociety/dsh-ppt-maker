@@ -4,7 +4,7 @@
  * review). One path, three entry points — render and check never approximate
  * the final artifact, they always go through the same engine build.
  */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, stat, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createConverter, type Converter, type RenderImagesResult } from '@deepseek-ai/libreoffice-kit'
@@ -95,53 +95,23 @@ export async function saveProjectPptx(pipeline: PipelineResult): Promise<{ bytes
   return { bytes, fontEmbed: summary }
 }
 
-/** Media loader: project-relative path or http(s) URL → bytes. */
-const MEDIA_FETCH_TIMEOUT_MS = 30_000
-const MEDIA_FETCH_MAX_BYTES = 50 * 1024 * 1024
-
-/**
- * Remote media is attacker-influenced (a tool argument or a hand-edited deck),
- * so the body is capped while streaming — buffering first would let a hostile
- * or misconfigured URL exhaust memory before the size check runs.
- */
-async function fetchMediaBytes(src: string): Promise<Uint8Array> {
-  const tooLarge = () => new Error(`远端素材超过 ${MEDIA_FETCH_MAX_BYTES} 字节上限：${src}`)
-  const res = await fetch(src, { signal: AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS) })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const declared = Number(res.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > MEDIA_FETCH_MAX_BYTES) throw tooLarge()
-  if (!res.body) throw new Error(`远端素材没有响应体：${src}`)
-
-  const reader = res.body.getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    total += value.byteLength
-    if (total > MEDIA_FETCH_MAX_BYTES) {
-      await reader.cancel()
-      throw tooLarge()
-    }
-    chunks.push(value)
-  }
-  const bytes = new Uint8Array(total)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return bytes
-}
-
+/** Image references resolve to regular files within the canonical project directory. */
 async function loadMediaBytes(projectDir: string, src: string): Promise<Uint8Array> {
-  if (/^https?:\/\//i.test(src)) return fetchMediaBytes(src)
-  const abs = path.resolve(projectDir, src)
-  const rel = path.relative(projectDir, abs)
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error(`素材路径越出工程目录：${src}`)
+  const ref = src.replaceAll('\\', '/')
+  if (!ref.trim() || ref.includes(':') || ref.startsWith('/') || ref.split('/').includes('..')) {
+    throw new Error('素材须使用工程内相对路径，请将文件放入工程后引用')
   }
-  return new Uint8Array(await readFile(abs))
+  const root = await realpath(projectDir)
+  const file = await realpath(path.resolve(root, ref)).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT' || err.code === 'ENOTDIR') throw new Error(`工程素材不存在：${ref}`, { cause: err })
+    throw err
+  })
+  const relative = path.relative(root, file)
+  if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`素材不在工程目录内：${ref}`)
+  }
+  if (!(await stat(file)).isFile()) throw new Error(`素材须为普通文件：${ref}`)
+  return readFile(file)
 }
 
 /* ------------------------------------------------------------------ *

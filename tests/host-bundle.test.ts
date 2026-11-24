@@ -118,6 +118,6 @@ describe('lib/index.js 随包宿主 bundle 的接线行为', () => {
 
     const undone = await request(routeHandler!, 'POST', '/ppt-maker/api/undo', { sessionId: 's-bundle', key, baseRevision: 1 })
     expect(undone.status, JSON.stringify(undone.json)).toBe(200)
-    expect(undone.json).toMatchObject({ ok: true, revision: 0 })
+    expect(undone.json).toMatchObject({ ok: true, revision: 2 })
   }, 60_000)
 })
